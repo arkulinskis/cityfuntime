@@ -8,7 +8,7 @@ won back from the crews. 153 missions, played at real places near you. Built on 
 City Coin Run (`Documents/CLAUDE/citycoinrun`).
 
 - **App repo:** github.com/arkulinskis/cityfuntime (branch `master`). Anvil pulls `master`.
-- **Live:** not published yet.
+- **Live:** https://city-fun-time.anvil.app
 
 ## What it does
 
