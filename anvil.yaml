@@ -261,9 +261,12 @@ native_deps:
     \ its own <link rel=\"icon\">, so drop any other icon link. */\n(function () {\n  function keep() {\n    var ours = document.getElementById('ui-favicon');\n\
     \    if (!ours) return;\n    document.querySelectorAll('link[rel~=\"icon\"]').forEach(function (l) { if (l !== ours) l.remove();\
     \ });\n  }\n  keep();\n  document.addEventListener('DOMContentLoaded', keep);\n  window.addEventListener('load', keep);\n\
-    })();\n</script>\n<script>window.CFT_ASSET_V = {\"cft-content.js\": \"c2ec2947fd\", \"cft-game.js\": \"f7faaab36f\", \"\
-    cft-tiles.js\": \"85f2c2c736\", \"cft-ui.js\": \"99009da86e\", \"cft-world.js\": \"b4ebe64a47\", \"three.min.js\": \"\
-    a13f10ad8e\"};</script>\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=08c7b44459\">\n<script src=\"_/theme/app.js?v=b6d29c95b3\"\
+    })();\n</script>\n\n<!-- Prepsto feedback panel: the footer's \"Suggest an idea\" link (data-prepsto-open) slides it in.\
+    \ No floating button, no cookies, nothing loads until it is opened. Codes: APP_MAKER/prepsto-links.json -->\n<script src=\"\
+    https://prepsto.com/_/theme/widget.js\" data-prepsto=\"xz9nut9\" data-button=\"false\" data-label=\"Suggest an idea\"\
+    \ async></script>\n<script>window.CFT_ASSET_V = {\"cft-content.js\": \"c2ec2947fd\", \"cft-game.js\": \"f7faaab36f\",\
+    \ \"cft-tiles.js\": \"85f2c2c736\", \"cft-ui.js\": \"99009da86e\", \"cft-world.js\": \"b4ebe64a47\", \"three.min.js\"\
+    : \"a13f10ad8e\"};</script>\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=08c7b44459\">\n<script src=\"_/theme/app.js?v=b26d2e6fe0\"\
     ></script>\n"
 package_name: City_Fun_Time
 runtime_options:
