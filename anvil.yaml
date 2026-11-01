@@ -299,7 +299,7 @@ native_deps:
     <script src=\"https://prepsto.com/_/theme/widget.js\" data-prepsto=\"xz9nut9\" data-button=\"false\" data-label=\"Submit\
     \ feedback\" async></script>\n<script>window.CFT_ASSET_V = {\"cft-content.js\": \"c2ec2947fd\", \"cft-game.js\": \"f7faaab36f\"\
     , \"cft-tiles.js\": \"85f2c2c736\", \"cft-ui.js\": \"99009da86e\", \"cft-world.js\": \"b4ebe64a47\", \"three.min.js\"\
-    : \"a13f10ad8e\"};</script>\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=08c7b44459\">\n<script src=\"_/theme/app.js?v=d60b11ed16\"\
+    : \"a13f10ad8e\"};</script>\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=52589dd360\">\n<script src=\"_/theme/app.js?v=5acab2bb17\"\
     ></script>\n"
 package_name: City_Fun_Time
 runtime_options:

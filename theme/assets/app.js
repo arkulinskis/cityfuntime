@@ -781,34 +781,38 @@
           ['What do I need?', 'An internet connection (the map streams in as you explore) and a browser with WebGL, which every recent browser has.']],
   };
 
+  // A whole street of sticker-style buildings, wide enough to run edge to edge (the SVG crops to fit the screen)
   function heroArt() {
-    // A sticker-style city block: buildings, a street, a runner, a coin, a mission marker, a heart, a scooter.
     var b = function (x, y, w, h, fill, rows, cols) {
       var s = '<rect class="ink" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + fill + '"/>';
       for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) s += '<rect class="' + ((r + c) % 3 ? 'win' : 'wind') + '" x="' + (x + 12 + c * ((w - 24) / cols)) + '" y="' + (y + 14 + r * 30) + '" width="' + ((w - 24) / cols - 10) + '" height="18" rx="3"/>';
       return s;
     };
-    return '<div class="lp-art" aria-hidden="true"><svg class="lp-svg" viewBox="0 0 520 470" xmlns="http://www.w3.org/2000/svg">' +
-      '<rect class="sky ink" x="4" y="4" width="512" height="462" rx="40"/>' +
-      '<circle cx="430" cy="80" r="40" fill="#ffc21f" class="ink"/>' +
-      '<path d="M40 70 q20-22 44 0 q18-16 34 2 q-4 14-24 12 h-46 q-16-2-8-14z" fill="#fff" class="ink"/>' +
-      b(36, 150, 110, 206, '#ff8a3d', 6, 2) + b(150, 96, 120, 260, '#ffffff', 8, 3) + b(274, 176, 96, 180, '#20c997', 5, 2) + b(374, 130, 110, 226, '#ff5c8a', 7, 2) +
-      '<path d="M150 96 l60 -34 l60 34z" fill="#6b4eff" class="ink"/>' +
-      '<rect class="walk ink" x="6" y="356" width="508" height="28"/><rect class="road" x="8" y="386" width="504" height="70" rx="0"/>' +
-      '<g fill="#fff">' + [30, 110, 190, 270, 350, 430].map(function (x) { return '<rect x="' + x + '" y="417" width="44" height="7" rx="3"/>'; }).join('') + '</g>' +
-      '<g transform="translate(212 300)"><rect class="ink" x="-14" y="0" width="28" height="34" rx="6" fill="#6b4eff"/><circle class="ink" cx="0" cy="-12" r="13" fill="#e9b98f"/><path d="M-13 -18 q13 -14 26 0" fill="#3a2618" class="ink"/>' +
-      '<path class="ink" d="M-8 34 l-10 22 M8 34 l12 20" fill="none" stroke-linecap="round"/><path class="ink" d="M-14 8 l-14 14 M14 8 l14 -12" fill="none" stroke-linecap="round"/></g>' +
-      '<g class="lp-bob"><path transform="translate(212 252)" d="M-26 0 h30 v-12 l22 18 -22 18 v-12 h-30z" fill="#ffc21f" class="ink"/></g>' +
-      '<g transform="translate(330 306)"><rect class="ink" x="-13" y="0" width="26" height="32" rx="6" fill="#9b2c4f"/><circle class="ink" cx="0" cy="-11" r="12" fill="#f1c9a5"/><path d="M-12 -16 q12 -12 24 0" fill="#d9d4cc" class="ink"/>' +
-      '<path class="ink" d="M-7 32 l-4 18 M7 32 l4 18" fill="none" stroke-linecap="round"/></g>' +
-      '<g class="lp-bob2"><g transform="translate(330 250)"><rect class="ink" x="-17" y="-22" width="34" height="38" rx="10" fill="#ffc21f"/><text x="0" y="8" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="30" fill="#1f1a3d">!</text></g></g>' +
-      '<g class="lp-bob"><circle cx="110" cy="320" r="17" fill="#ffd54a" class="ink"/><text x="110" y="327" text-anchor="middle" font-size="18" font-weight="800" fill="#a35f00" font-family="Fredoka, sans-serif">$</text></g>' +
-      '<g class="lp-bob2"><circle cx="440" cy="318" r="17" fill="#ffd1dc" class="ink"/><path d="M440 326 c-7-6 -14-9 -14-15 a6 6 0 0 1 14 -2 a6 6 0 0 1 14 2 c0 6 -7 9 -14 15z" fill="#ff5c8a"/></g>' +
-      '<g class="lp-bob2"><path class="ink" d="M90 232 c-12-14 -34-2 -22 16 l22 20 l22 -20 c12-18 -10-30 -22-16z" fill="#ff5c8a"/></g>' +
-      '<g transform="translate(410 412)"><rect class="ink" x="-34" y="-20" width="60" height="22" rx="10" fill="#7fd1c7"/><path class="ink" d="M22 -20 l10 -26 h12" fill="none" stroke-linecap="round"/>' +
-      '<circle cx="-24" cy="6" r="11" fill="#222" class="ink"/><circle cx="24" cy="6" r="11" fill="#222" class="ink"/></g>' +
-      '<rect x="4" y="4" width="512" height="462" rx="40" fill="none" class="ink"/>' +
+    var town = [[0, 120, 96, '#20c997', 4, 2], [100, 60, 120, '#ff8a3d', 6, 3], [224, 140, 90, '#ffffff', 3, 2], [318, 90, 110, '#ff5c8a', 5, 2], [432, 30, 130, '#ffffff', 7, 3],
+                [566, 110, 100, '#6b4eff', 4, 2], [670, 70, 116, '#ffc21f', 6, 3], [790, 130, 96, '#20c997', 4, 2], [890, 50, 124, '#ff8a3d', 7, 3], [1018, 110, 90, '#ffffff', 4, 2],
+                [1112, 80, 120, '#ff5c8a', 5, 3]];
+    var bld = town.map(function (t) { return b(t[0], t[1], t[2], 240 - t[1], t[3], t[4], t[5]); }).join('');
+    return '<div class="lp-street" aria-hidden="true"><svg class="lp-svg" viewBox="0 0 1200 330" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M432 30 l65 -26 l65 26z" fill="#6b4eff" class="ink"/>' + bld +
+      '<rect x="604" y="190" width="24" height="50" fill="#1f1a3d"/><text x="616" y="186" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="14" fill="#1f1a3d">CAFÉ</text>' +
+      '<rect class="walk ink" x="-10" y="240" width="1220" height="24"/><rect class="road" x="-10" y="264" width="1220" height="70"/>' +
+      '<g fill="#fff">' + [20, 120, 220, 320, 420, 520, 620, 720, 820, 920, 1020, 1120].map(function (x) { return '<rect x="' + x + '" y="294" width="48" height="7" rx="3"/>'; }).join('') + '</g>' +
+      '<g class="lp-bob"><circle cx="170" cy="214" r="15" fill="#ffd54a" class="ink"/><text x="170" y="220" text-anchor="middle" font-size="16" font-weight="800" fill="#a35f00" font-family="Fredoka, sans-serif">$</text></g>' +
+      '<g class="lp-bob2"><circle cx="980" cy="212" r="15" fill="#ffd54a" class="ink"/><text x="980" y="218" text-anchor="middle" font-size="16" font-weight="800" fill="#a35f00" font-family="Fredoka, sans-serif">$</text></g>' +
+      '<g class="lp-bob2"><g transform="translate(616 136)"><rect class="ink" x="-17" y="-22" width="34" height="38" rx="10" fill="#ffc21f"/><text x="0" y="8" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="30" fill="#1f1a3d">!</text></g></g>' +
+      '<g class="lp-bob"><path class="ink" d="M380 204 c-10-12 -28-2 -18 13 l18 17 l18 -17 c10-15 -8-25 -18-13z" fill="#ff5c8a"/></g>' +
+      '<g transform="translate(1050 296)"><rect class="ink" x="-34" y="-20" width="60" height="22" rx="10" fill="#7fd1c7"/><path class="ink" d="M22 -20 l10 -26 h12" fill="none" stroke-linecap="round"/>' +
+        '<circle cx="-24" cy="6" r="11" fill="#222" class="ink"/><circle cx="24" cy="6" r="11" fill="#222" class="ink"/></g>' +
+      '<g class="lp-run"><g transform="translate(0 196)"><rect class="ink" x="-13" y="0" width="26" height="30" rx="6" fill="#6b4eff"/><circle class="ink" cx="0" cy="-11" r="12" fill="#e9b98f"/>' +
+        '<path d="M-12 -16 q12 -13 24 0" fill="#3a2618" class="ink"/><path class="ink legs" d="M-6 30 l-10 16 M6 30 l10 14" fill="none" stroke-linecap="round"/></g></g>' +
       '</svg></div>';
+  }
+
+  // Mission pop-ups, the way the game shows them
+  function toasts() {
+    return '<div class="lp-toasts" aria-hidden="true">' + [['👵', 'New mission', 'Nonna Rosa needs basil from the corner store'], ['🍋', 'Business', 'Your lemonade stand made $120 today'],
+      ['🌷', 'Date night', 'Sam wants to see the sunset from the park']].map(function (t) {
+      return '<div class="lp-toast"><span class="cf-emoji">' + t[0] + '</span><span><small>' + t[1] + '</small>' + t[2] + '</span></div>'; }).join('') + '</div>';
   }
 
   UI.page('landing', { title: 'Welcome' }, function (view, ctx) {
@@ -816,11 +820,11 @@
     var primary = '<a class="ui-btn primary lg" href="#play" data-go="play">🎮 ' + (me ? 'Keep playing' : 'Play now, it\'s free') + '</a>' +
       (me ? '<a class="ui-btn lg" href="#life" data-go="life">My life</a>' : '<a class="ui-btn lg" href="#auth/signup" data-go="auth/signup">Create an account</a>');
     view.innerHTML =
-      '<section class="lp-hero"><div class="ui-wrap"><div>' +
+      '<section class="lp-hero"><div class="ui-wrap">' +
         '<div class="eyebrow">' + esc(C.eyebrow) + '</div><h1>' + C.title + '</h1><p class="lp-lead">' + esc(C.lead) + '</p>' +
         '<div class="lp-cta">' + primary + '</div>' +
         '<div class="lp-proof">' + C.proof.map(function (p) { return '<span class="cf-pill cf-emoji">' + esc(p) + '</span>'; }).join('') + '</div>' +
-      '</div>' + heroArt() + '</div></section>' +
+      '</div>' + toasts() + heroArt() + '</section>' +
       '<section class="lp-section" id="how"><div class="ui-wrap"><div class="lp-head"><h2>' + esc(C.stepsTitle) + '</h2><p>' + esc(C.stepsLead) + '</p></div>' +
         '<div class="lp-steps">' + C.steps.map(function (s) { return '<div class="ui-card lp-step"><span class="cf-emoji">' + s[0] + '</span><h3>' + esc(s[1]) + '</h3><p class="muted">' + esc(s[2]) + '</p></div>'; }).join('') + '</div></div></section>' +
       '<section class="lp-section"><div class="ui-wrap"><div class="lp-head"><h2>' + esc(C.featuresTitle) + '</h2><p>Grown from a coin-collecting game into a full city life.</p></div>' +

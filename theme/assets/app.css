@@ -348,20 +348,34 @@ html.ui-modal-open { overflow: hidden; }
 
 /* ===== landing.html ===== */
 .page-landing .ui-main { overflow-x: clip; }
-.lp-hero { position: relative; padding: 56px 0 36px; }
-.lp-hero .ui-wrap { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; padding-top: 0; padding-bottom: 0; }
-.lp-hero h1 { font-size: clamp(2.4rem, 5.6vw, 4rem); line-height: 1.02; margin-bottom: 18px; }
-.lp-hero h1 em { font-style: normal; color: var(--c-brand); background: linear-gradient(transparent 62%, var(--c-accent) 62%); padding: 0 4px; }
-.lp-lead { font-size: 1.2rem; color: var(--c-muted); max-width: 33em; margin-bottom: 26px; font-weight: 600; }
-.lp-cta { display: flex; gap: 12px; flex-wrap: wrap; }
-.lp-proof { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
-.lp-art { position: relative; }
-.lp-art svg { width: 100%; height: auto; display: block; filter: drop-shadow(6px 6px 0 var(--c-edge)); }
-.lp-svg .sky { fill: var(--c-brand-soft); } .lp-svg .ink { stroke: #1f1a3d; stroke-width: 5; stroke-linejoin: round; }
+/* Title-screen hero: the headline centred in the sky, a whole street of the city across the full width (a runner crosses it,
+   coins and mission markers bob), and mission pop-ups cycle above it like in-game toasts. */
+.lp-hero { position: relative; padding: 46px 0 0; text-align: center; overflow: hidden; background: linear-gradient(var(--c-brand-soft), var(--c-bg) 92%); }
+.lp-hero .ui-wrap { position: relative; z-index: 2; max-width: 860px; padding-top: 0; padding-bottom: 0; }
+.lp-hero h1 { font-size: clamp(2.4rem, 5.8vw, 4.2rem); line-height: 1.02; margin: 14px 0 16px; }
+.lp-hero h1 em { font-style: normal; color: var(--c-brand); background: linear-gradient(transparent 62%, var(--c-accent) 62%); padding: 0 4px; display: inline-block; }
+.lp-lead { font-size: 1.15rem; color: var(--c-muted); max-width: 36em; margin: 0 auto 24px; font-weight: 600; }
+.lp-cta { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.lp-proof { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.lp-street { position: relative; z-index: 1; margin-top: -6px; }
+.lp-street svg { display: block; width: 100%; height: clamp(220px, 26vw, 340px); }
+.lp-svg .sky { fill: var(--c-brand-soft); } .lp-svg .ink { stroke: #1f1a3d; stroke-width: 4; stroke-linejoin: round; }
 .lp-svg .road { fill: #4b4760; } .lp-svg .walk { fill: #d9cfbd; }
 .lp-svg .win { fill: #fff3c4; } .lp-svg .wind { fill: #6b4eff; }
+html.ui-dark .lp-svg .win { fill: #ffe27a; }
 .lp-bob { animation: lp-bob 2.4s ease-in-out infinite; } .lp-bob2 { animation: lp-bob 3s ease-in-out infinite .6s; }
 @keyframes lp-bob { 50% { transform: translateY(-10px); } }
+.lp-run { animation: lp-run 16s linear infinite; }
+.lp-run .legs { animation: lp-step .4s steps(2) infinite; transform-box: fill-box; transform-origin: 50% 0; }
+@keyframes lp-run { from { transform: translateX(-80px); } to { transform: translateX(1280px); } }
+@keyframes lp-step { to { transform: scaleX(-1); } }
+.lp-toasts { position: relative; z-index: 3; margin: 26px auto 0; width: min(420px, 86vw); height: 64px; }
+.lp-toast { position: absolute; inset: 0; display: flex; gap: 12px; align-items: center; padding: 10px 16px; text-align: left; background: var(--c-surface); border: 2px solid var(--c-edge);
+  border-radius: 18px; box-shadow: 4px 4px 0 var(--c-edge); opacity: 0; animation: lp-toast 12s infinite; font-weight: 700; font-size: .95rem; }
+.lp-toast .cf-emoji { font-size: 1.7rem; }
+.lp-toast small { display: block; color: var(--c-brand); font: 700 .72rem/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; }
+.lp-toast:nth-child(2) { animation-delay: 4s; } .lp-toast:nth-child(3) { animation-delay: 8s; }
+@keyframes lp-toast { 0% { opacity: 0; transform: translateY(14px); } 4%, 28% { opacity: 1; transform: none; } 33%, 100% { opacity: 0; transform: translateY(-10px); } }
 .lp-section { padding: 52px 0; }
 .lp-section .ui-wrap { padding-top: 0; padding-bottom: 0; }
 .lp-head { text-align: center; max-width: 680px; margin: 0 auto 32px; }
@@ -386,12 +400,12 @@ html.ui-modal-open { overflow: hidden; }
 .lp-band h2 { color: inherit; margin: 0 0 6px; } .lp-band p { margin: 0; opacity: .9; font-weight: 600; }
 @media (max-width: 860px) {
   .lp-hero { padding-top: 30px; }
-  .lp-hero .ui-wrap { grid-template-columns: 1fr; gap: 26px; }
-  .lp-art { max-width: 480px; width: 100%; margin: 0 auto; }
+  .lp-street svg { height: 260px; }
   .lp-steps { grid-template-columns: 1fr; }
   .lp-band { padding: 28px 22px; }
   .lp-section { padding: 38px 0; }
 }
+@media (prefers-reduced-motion: reduce) { .lp-bob, .lp-bob2, .lp-run, .lp-run .legs { animation: none; } .lp-toast { animation: none; } .lp-toast:first-child { opacity: 1; } }
 
 /* ===== life.html ===== */
 .lf-hero { display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: center; padding: 24px; background: var(--c-brand); color: var(--c-brand-ink);
