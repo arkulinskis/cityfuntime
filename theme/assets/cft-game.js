@@ -95,6 +95,29 @@ function mount(root, opts) {
   let W = null, raf = 0, alive = true, state = 'start', save = null;
   G.state = () => state;
 
+  // ------------------------------------------------------------------ music
+  // Real tracks streamed by ArkMusic (web/pages/_arkmusic.html): a playlist picked from the game clock and
+  // whether you're driving, checked every few seconds. Settings > Music turns it off (save.settings.music).
+  const MUSIC = {
+    day: ['dont-stress-out', 'cosmic', 'my-love-for-you', 'bright-road'],
+    night: ['high-notes', 'never-morning', 'cosmic'],
+    drive: ['midwest-western', 'how-do-you-love'],
+  };
+  let musicT = 0, musicMood = '';
+  function music(dt) {
+    const M = window.ArkMusic;
+    if (!M || !save) return;
+    musicT -= dt;
+    if (musicT > 0) return;
+    musicT = 3;
+    M.enabled(save.settings.music !== false);
+    const drive = !!(save.equip.ride && W && W.ride().mode === 'drive');
+    const h = save.clock;
+    musicMood = drive ? 'drive' : (h >= 20 || h < 6) ? 'night' : 'day';
+    M.play(MUSIC[musicMood], { volume: 0.4, shuffle: true, fade: 2.5 });
+  }
+  G.musicMood = () => musicMood;
+
   // ------------------------------------------------------------------ sound
   let actx = null;
   function tone(notes, type, vol) {
@@ -1841,6 +1864,7 @@ function mount(root, opts) {
       rt.chatCooldown -= dt;
     }
     W.setClock(save.clock);
+    music(dt);
     managePickups(dt);
     updateActors(dt);
     updateMissions(dt);
@@ -1945,6 +1969,7 @@ function mount(root, opts) {
     destroy() {
       if (save && state === 'play') doSave('exit');
       alive = false;
+      if (window.ArkMusic) window.ArkMusic.stop();
       cancelAnimationFrame(raf);
       if (W) W.destroy();
       U.destroy();

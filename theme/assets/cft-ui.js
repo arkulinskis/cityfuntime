@@ -764,6 +764,7 @@ function create(G, root) {
     return '<div class="cft-sec"><h4>You</h4><div class="cft-row"><span>Name: <b>' + esc(s.name) + '</b></span><button type="button" class="cft-btn sm" data-act="rename">Change</button></div>' +
       (s.pref ? '<div class="cft-row"><span>Looking for: <b>' + (s.pref === 'bf' ? 'a boyfriend' : 'a girlfriend') + '</b></span><button type="button" class="cft-btn sm" data-act="pref">Switch</button></div>' : '') + '</div>' +
       '<div class="cft-sec"><h4>Game</h4><label class="cft-check"><input type="checkbox" data-set="sound" ' + (st.sound ? 'checked' : '') + '> Sound effects</label>' +
+      '<label class="cft-check"><input type="checkbox" data-set="music" ' + (st.music !== false ? 'checked' : '') + '> Music</label>' +
       '<div class="cft-row"><span>Graphics</span><div class="cft-chips">' + ['auto', 'high', 'low'].map(q => '<button type="button" class="cft-chipb ' + (st.quality === q ? 'on' : '') + '" data-act="quality" data-id="' + q + '">' + q + '</button>').join('') + '</div></div>' +
       '<p class="muted small">Graphics changes apply next time you open the game. "low" turns off shadows and draws fewer people, for phones and older laptops.</p></div>' +
       '<div class="cft-sec"><h4>Home address</h4><p class="muted small">Your world is built around ' + esc(s.home.short || s.home.label) + '. To live somewhere else, start a new life.</p><button type="button" class="cft-btn danger" data-act="reset">Start a new life…</button></div>' +
@@ -776,7 +777,11 @@ function create(G, root) {
     const fol = e.target.closest('[data-follow]');
     if (fol) { save().settings.follow[fol.dataset.follow] = fol.checked; G.refreshFollowers(); G.dirty(); return; }
     const set = e.target.closest('[data-set]');
-    if (set) { save().settings[set.dataset.set] = set.checked; G.dirty(); return; }
+    if (set) {
+      save().settings[set.dataset.set] = set.checked; G.dirty();
+      if (set.dataset.set === 'music' && window.ArkMusic) window.ArkMusic.enabled(set.checked);
+      return;
+    }
     const b = e.target.closest('[data-act]');
     if (!b) return;
     const s = save(), id = b.dataset.id, act = b.dataset.act;
