@@ -1257,8 +1257,19 @@ function mount(root, opts) {
   }
   function addressOf(x, z) {
     const hn = W.housenumbersNear(x, z, 40).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0];
-    const st = W.streetAt(x, z) || (hn ? W.streetAt(hn.x, hn.z) : '');
-    return (hn ? hn.t + ' ' : '') + (st || 'a quiet street');
+    const st = W.streetAt(x, z) || (hn ? W.streetAt(hn.x, hn.z) : '') || nearbyStreetName(x, z);
+    if (st) return (hn ? hn.t + ' ' : '') + st;
+    return hn ? 'number ' + hn.t + ' on a quiet street' : 'a quiet street';
+  }
+  // The closest named street within ~80 m (streetAt only looks 14 m around a point).
+  function nearbyStreetName(x, z) {
+    for (const r of [20, 40, 60, 80]) {
+      for (let a = 0; a < 12; a++) {
+        const n = W.streetAt(x + Math.cos(a * Math.PI / 6) * r, z + Math.sin(a * Math.PI / 6) * r);
+        if (n) return n;
+      }
+    }
+    return '';
   }
   G.addressOf = addressOf;
   G.moveHome = async function (tier) {
@@ -1429,21 +1440,74 @@ function mount(root, opts) {
   G.turfCrew = turfCrew;
   G.turfIncome = () => Object.keys(save.turf).filter(t => save.turf[t].own).reduce((a, t) => a + (15 + 10 * turfRing(t)) * (1 + stat('cred') * 0.02), 0);
   G.turfNeed = id => 1 + turfRing(id) * 3;
-  // Makes sure a turf has its 4 crew posters (on real walls) once the area is loaded.
-  function ensureTurf(id) {
-    let t = save.turf[id];
-    if (t && t.spots) return t;
-    rt.turfFail = rt.turfFail || {};
-    if (rt.turfFail[id] && rt.t - rt.turfFail[id] < 20) return null;
-    rt.turfFail[id] = rt.t;
+  // A poster can be tagged only if the player can stand within reach (3.5 m) of it: free ground just outside the wall,
+  // a clear straight walk from the street, and still close enough after the walls push the player out.
+  // (A spot on Notre-Dame Ouest in Old Montreal sat where an attached building covered the ground, Nov 2026.)
+  function spotReachable(w) {
+    for (const out of [1.2, 2]) {
+      const ox = w.x + w.nx * out, oz = w.z + w.nz * out;
+      if (W.heightAt(ox, oz)) continue;
+      const sx = w.street.x, sz = w.street.z, n = Math.max(2, Math.ceil(Math.hypot(sx - ox, sz - oz) / 1.5));
+      let clear = true;
+      for (let i = 1; i < n && clear; i++) if (W.heightAt(ox + (sx - ox) * i / n, oz + (sz - oz) * i / n)) clear = false;
+      if (!clear) continue;
+      const pos = { x: ox, z: oz };
+      W.collide(pos);
+      if (Math.hypot(pos.x - w.x, pos.z - w.z) < 3) return true;
+    }
+    return false;
+  }
+  G.spotReachable = spotReachable;
+  // Wall spots in a turf that can hold a poster, in a fixed order for that turf.
+  function turfWalls(id) {
     const bnd = turfBounds(id), c = turfCenter(id);
     const bs = W.buildingsNear(c.x, c.z, TURF * 0.75).filter(b => b.cx > bnd.x0 + 10 && b.cx < bnd.x1 - 10 && b.cz > bnd.z0 + 10 && b.cz < bnd.z1 - 10 && b.area > 80)
       .sort((a, b) => hash(Math.round(a.cx * 3 + a.cz * 7)) - hash(Math.round(b.cx * 3 + b.cz * 7)));
-    const spots = [];
+    const out = [];
     for (const b of bs) {
-      if (spots.length >= 4) break;
       const w = W.wallSpot(b);
-      if (!w || Math.hypot(w.street.x - w.x, w.street.z - w.z) > 25) continue;
+      if (!w || Math.hypot(w.street.x - w.x, w.street.z - w.z) > 25 || !spotReachable(w)) continue;
+      out.push(w);
+    }
+    return out;
+  }
+  const spotRow = s => { const a = ll(s.x, s.z); return [Math.round(a.lat * 1e6) / 1e6, Math.round(a.lon * 1e6) / 1e6, Math.round(s.nx * 100) / 100, Math.round(s.nz * 100) / 100]; };
+  // Saves made before the reach check can hold a spot nobody can get to: once the area is loaded, move those posters.
+  function fixTurfSpots(id, t) {
+    rt.spotsOk = rt.spotsOk || {};
+    if (rt.spotsOk[id]) return;
+    const bad = [];
+    let looked = 0;
+    t.spots.forEach((s, k) => {
+      if (t.tags[k]) return;
+      const q = xz({ lat: s[0], lon: s[1] }), st = W.nearestWalk(q.x, q.z, 40);
+      if (!st || !W.buildingsNear(q.x, q.z, 30).length) return;  // not loaded yet: look again later
+      looked++;
+      if (!spotReachable({ x: q.x, z: q.z, nx: s[2], nz: s[3], street: st })) bad.push(k);
+    });
+    if (!looked) return;
+    rt.spotsOk[id] = true;
+    if (!bad.length) return;
+    const taken = t.spots.filter((s, k) => bad.indexOf(k) < 0).map(s => xz({ lat: s[0], lon: s[1] }));
+    for (const w of turfWalls(id)) {
+      if (!bad.length) break;
+      if (taken.some(s => Math.hypot(s.x - w.x, s.z - w.z) < 55)) continue;
+      t.spots[bad.shift()] = spotRow(w);
+      taken.push(w);
+    }
+    for (const [k, m] of rt.posters) if (k.indexOf(id + ':') === 0) { W.scene.remove(m); rt.posters.delete(k); }
+    dirty();
+  }
+  // Makes sure a turf has its 4 crew posters (on real walls) once the area is loaded.
+  function ensureTurf(id) {
+    let t = save.turf[id];
+    if (t && t.spots) { fixTurfSpots(id, t); return t; }
+    rt.turfFail = rt.turfFail || {};
+    if (rt.turfFail[id] && rt.t - rt.turfFail[id] < 20) return null;
+    rt.turfFail[id] = rt.t;
+    const spots = [];
+    for (const w of turfWalls(id)) {
+      if (spots.length >= 4) break;
       if (spots.some(s => Math.hypot(s.x - w.x, s.z - w.z) < 55)) continue;
       spots.push(w);
     }
@@ -1454,7 +1518,7 @@ function mount(root, opts) {
     t = save.turf[id] = Object.assign(save.turf[id] || {}, {
       name: (top ? top.replace(/^(Rue|Avenue|Boulevard|Street|St\.?|Avenue de la|Rue de la|Rue du|Rue des)\s+/i, '') : 'Block ' + id) + ' block',
       crew: (t && t.crew) || turfCrew(id), own: !!(t && t.own), tags: (t && t.tags) || (t && t.own ? [1, 1, 1, 1] : [0, 0, 0, 0]),
-      spots: spots.map(s => { const a = ll(s.x, s.z); return [Math.round(a.lat * 1e6) / 1e6, Math.round(a.lon * 1e6) / 1e6, Math.round(s.nx * 100) / 100, Math.round(s.nz * 100) / 100]; }),
+      spots: spots.map(spotRow),
     });
     dirty();
     return t;
