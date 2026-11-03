@@ -252,7 +252,7 @@ metadata:
   title: 'City Fun Time: a life-sim game on your real streets in 3D'
 name: City Fun Time
 native_deps:
-  head_html: "<script src=\"_/theme/legal-kit.js?v=bd607f502a\"></script>\n<!-- seo:start (APP_MAKER/seo: edit seo/apps/cityfuntime.json\
+  head_html: "<script src=\"_/theme/legal-kit.js?v=8bb3ebc592\"></script>\n<!-- seo:start (APP_MAKER/seo: edit seo/apps/cityfuntime.json\
     \ and run seo.py, not here) -->\n<link rel=\"canonical\" href=\"https://city-fun-time.anvil.app/\">\n<meta name=\"robots\"\
     \ content=\"index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1\">\n<meta name=\"keywords\" content=\"\
     life simulation game, 3D game on real streets, play in your neighbourhood, OpenStreetMap game, city life sim browser,\
@@ -299,7 +299,7 @@ native_deps:
     <script src=\"https://prepsto.com/_/theme/widget.js\" data-prepsto=\"xz9nut9\" data-button=\"false\" data-label=\"Submit\
     \ feedback\" async></script>\n<script>window.CFT_ASSET_V = {\"cft-content.js\": \"c2ec2947fd\", \"cft-game.js\": \"c7f1ae425d\"\
     , \"cft-tiles.js\": \"85f2c2c736\", \"cft-ui.js\": \"d2595cc99f\", \"cft-world.js\": \"b4ebe64a47\", \"three.min.js\"\
-    : \"a13f10ad8e\"};</script>\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=d3dd829e21\">\n<script src=\"_/theme/app.js?v=861bad12bb\"\
+    : \"a13f10ad8e\"};</script>\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=d5aa44cee7\">\n<script src=\"_/theme/app.js?v=e0beb14414\"\
     ></script>\n"
 package_name: City_Fun_Time
 runtime_options:
