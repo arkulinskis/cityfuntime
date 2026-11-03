@@ -247,7 +247,16 @@ function mount(root, opts) {
     if (isNew && setDone(set.id)) { U.banner('🎴 Set complete!', set.n + ' · ' + set.bonusText, 'level'); log('Completed sticker set ' + set.n, '🎴'); G.sfx.done(); }
     return s;
   }
-  G.addSticker = addSticker; G.addMoney = addMoney; G.addXp = addXp; G.addStat = addStat; G.addHappy = addHappy; G.addEnergy = addEnergy;
+  function giveSticker(id) { // a specific sticker (mission rewards)
+    const s = STICKERS.find(x => x.id === id);
+    if (!s) return null;
+    const isNew = !(save.stickers[s.id] > 0);
+    save.stickers[s.id] = (save.stickers[s.id] || 0) + 1;
+    const set = D.STICKER_SETS.find(x => x.id === s.set);
+    if (isNew && setDone(set.id)) { U.banner('🎴 Set complete!', set.n + ' · ' + set.bonusText, 'level'); log('Completed sticker set ' + set.n, '🎴'); G.sfx.done(); }
+    return s;
+  }
+  G.addSticker = addSticker; G.giveSticker = giveSticker; G.addMoney = addMoney; G.addXp = addXp; G.addStat = addStat; G.addHappy = addHappy; G.addEnergy = addEnergy;
   G.addRel = addRel; G.giveItem = giveItem; G.makeFriend = makeFriend; G.has = has; G.owned = owned; G.isFriend = isFriend; G.setDone = setDone;
   function applyReward(r, title) {
     const parts = [];
@@ -257,6 +266,7 @@ function mount(root, opts) {
     for (const k of Object.keys(r.items || {})) { giveItem(k, r.items[k]); if (r.items[k] > 0) parts.push(D.ITEMS[k].e + ' ' + D.ITEMS[k].n); }
     for (const k of Object.keys(r.rel || {})) { addRel(k, r.rel[k]); parts.push('❤️ ' + D.CAST[k].n); }
     if (r.happy) { addHappy(r.happy); parts.push('😊 +' + r.happy); }
+    if (r.sticker) { const s = giveSticker(r.sticker); if (s) parts.push(s.e + ' ' + s.n + ' sticker'); }
     if (r.energy) addEnergy(r.energy);
     if (r.friend) makeFriend(r.friend);
     if (r.partner) { save.partner = r.partner; save.rel[r.partner] = Math.max(save.rel[r.partner] || 0, 80); log('Started dating ' + D.CAST[r.partner].n, '💘'); refreshFollowers(); }
@@ -357,10 +367,38 @@ function mount(root, opts) {
     for (const b of bs.slice(0, 8)) { const w = W.wallSpot(b); if (w) return { x: w.street.x, z: w.street.z, b, h: b.h }; }
     return null;
   }
+  // The highest street within 900 m of home (real heights from the hills map). Kept in the save, per home.
+  function hilltop() {
+    const key = 'hill@' + save.apt.lat.toFixed(4) + ',' + save.apt.lon.toFixed(4);
+    if (save.spots[key]) return save.spots[key];
+    const h = homeSpot();
+    W.registerAround(h.x, h.z, 900);
+    let best = null, seen = 0, known = 0;
+    for (const s of W.subs()) {
+      if (!s.reg) continue;
+      for (const sg of s.walk) {
+        const x = (sg.x1 + sg.x2) / 2, z = (sg.z1 + sg.z2) / 2;
+        if (Math.hypot(x - h.x, z - h.z) > 900 || W.heightAt(x, z)) continue;
+        const e = W.elevAt(x, z);
+        seen++;
+        if (e === e) { known++; if (!best || e > best.e) best = { x, z, e }; }
+      }
+    }
+    if (!best) return null;
+    const sure = known >= seen * 0.8; // hills not loaded everywhere yet (you're far from home): don't remember this one
+    const home = W.elevAt(h.x, h.z), up = home === home ? Math.round(best.e - home) : null;
+    const st = W.streetAt(best.x, best.z), near = st ? null : W.nearestWalk(best.x, best.z, 250, true), nst = near && W.streetAt(near.x, near.z);
+    const name = (st ? 'the top of ' + st : nst ? 'the hilltop above ' + nst : 'the highest spot around') + ' (' + Math.round(best.e) + ' m above the sea' + (up > 0 ? ', ' + up + ' m above home' : '') + ')';
+    const spot = Object.assign(ll(best.x, best.z), { name, kind: 'hilltop' });
+    if (sure) { save.spots[key] = spot; dirty(); }
+    return spot;
+  }
+  G.hilltop = hilltop;
   // Target spec -> {lat, lon, name, kind}
   function resolveTarget(spec, m, step) {
     const p = P();
     const mk = (x, z, name, kind) => Object.assign(ll(x, z), { name, kind });
+    if (spec === 'hilltop') { const t = hilltop(); if (t) return Object.assign({}, t); spec = 'park'; }
     if (spec === 'giver') { const s = spotOf(m.giver, m.at); return s ? Object.assign({}, s) : mk(p.x, p.z, 'here', 'here'); }
     if (spec === 'who') { const key = save.castAt[step.who]; const s = key && save.spots[key]; return s ? Object.assign({}, s) : resolveTarget('giver', m, step); }
     if (spec === 'home') { const a = homeSpot(); return mk(a.x, a.z, save.apt.label || 'home', 'home'); }
@@ -598,7 +636,7 @@ function mount(root, opts) {
       } else if (step.do === 'sleep') {
         await sleep();
       } else if (step.do === 'race') {
-        if (!rt.race) startRace({ mission: id, n: step.n, time: step.time, ride: step.ride, x: P().x, z: P().z });
+        if (!rt.race) startRace({ mission: id, n: step.n, time: step.time, ride: step.ride, hill: step.hill, x: P().x, z: P().z });
       } else if (step.do === 'chase') {
         if (!rt.chase) startChase({ mission: id, who: step.who, time: step.time, speed: step.speed });
       }
@@ -809,7 +847,11 @@ function mount(root, opts) {
     let px = o.x, pz = o.z;
     const step = o.ride === 'drive' ? [90, 170] : [50, 110];
     for (let i = 0; i < o.n; i++) {
-      const s = W.randomWalkSpot(px, pz, step[0], step[1], (x, z, sg) => (o.ride !== 'drive' || sg.car) && cps.every(c => Math.hypot(c.x - x, c.z - z) > 45) && Math.hypot(o.x - x, o.z - z) > 30 * Math.min(i, 2));
+      const ok = (x, z, sg) => (o.ride !== 'drive' || sg.car) && cps.every(c => Math.hypot(c.x - x, c.z - z) > 45) && Math.hypot(o.x - x, o.z - z) > 30 * Math.min(i, 2);
+      let s = null;
+      if (o.hill) { // uphill race: of a dozen candidates, the highest one
+        for (let k = 0; k < 12; k++) { const c = W.randomWalkSpot(px, pz, step[0], step[1], ok); if (c && (!s || W.groundAt(c.x, c.z) > W.groundAt(s.x, s.z))) s = c; }
+      } else s = W.randomWalkSpot(px, pz, step[0], step[1], ok);
       if (!s) break;
       cps.push({ x: s.x, z: s.z });
       px = s.x; pz = s.z;
@@ -823,11 +865,12 @@ function mount(root, opts) {
       const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 60, 8, 1, true).translate(0, 30, 0), new THREE.MeshBasicMaterial({ color: 0x6b4eff, transparent: true, opacity: 0.25, depthWrite: false }));
       g.add(beam);
       const num = W.label(String(i + 1), { bg: '#6b4eff', size: 48, height: 1.1 }); num.position.y = 5.8; g.add(num);
-      g.position.set(c.x, 0, c.z);
+      g.position.set(c.x, W.groundAt(c.x, c.z), c.z);
       W.scene.add(g);
       return g;
     });
-    rt.race = { mission: o.mission, cps, meshes, i: 0, time: o.time, t0: rt.t + 3, onWin: o.onWin, onFail: o.onFail, ride: o.ride, count: 3 };
+    rt.race = { mission: o.mission, cps, meshes, i: 0, time: o.time, t0: rt.t + 3, onWin: o.onWin, onFail: o.onFail, ride: o.ride, count: 3,
+      hill: !!o.hill, e0: W.elevAt(o.x, o.z) };
     U.countdown(() => { if (rt.race) rt.race.t0 = rt.t; });
     updateBeam();
   }
@@ -845,7 +888,9 @@ function mount(root, opts) {
     if (rt.t < r.t0) return;
     const c = r.cps[r.i];
     if (c && Math.hypot(c.x - p.x, c.z - p.z) < (W.ride().mode === 'drive' ? 7 : 5)) {
-      r.i++; G.sfx.tick(); U.feed('🏁', 'Checkpoint ' + r.i + '/' + r.cps.length);
+      r.i++; G.sfx.tick();
+      const up = r.hill ? W.elevAt(c.x, c.z) - r.e0 : NaN;
+      U.feed('🏁', 'Checkpoint ' + r.i + '/' + r.cps.length + (up === up ? ' · ⛰️ ' + (up >= 0 ? '+' : '') + Math.round(up) + ' m' : ''));
       updateBeam();
       if (r.i >= r.cps.length) { const cb = r.onWin, id = r.mission; stopRace(); bump('races'); if (cb) cb(); else if (id) completeStep(id); return; }
     }
@@ -858,7 +903,7 @@ function mount(root, opts) {
     const a = W.agentOn(s.x, s.z, false);
     if (!a) { U.toast('Nowhere to run here!'); return; }
     const obj = o.obj || makeCastObj(o.who);
-    obj.position.set(s.x, 0, s.z);
+    obj.position.set(s.x, W.groundAt(s.x, s.z), s.z);
     W.scene.add(obj);
     const name = o.name || (D.CAST[o.who] ? D.CAST[o.who].n : 'them');
     W.say(obj, o.taunt || 'Catch me if you can!', 2.5);
@@ -881,7 +926,7 @@ function mount(root, opts) {
       return best;
     });
     const q = W.agentPoint(c.a);
-    o.set(q.x, 0, q.z);
+    o.set(q.x, q.y, q.z);
     c.obj.rotation.y = Math.atan2(-q.ux, -q.uz);
     W.animate(c.obj, sp, dt);
     const left = c.time - (rt.t - c.t0);
@@ -908,17 +953,17 @@ function mount(root, opts) {
   }
   function spawnPickup(type, x, z, mission, idx) {
     const THREE = W.THREE;
-    const mesh = new THREE.Mesh(tokenGeo(), tokenMats(type));
-    mesh.position.set(x, 1.15, z);
+    const mesh = new THREE.Mesh(tokenGeo(), tokenMats(type)), gy = W.surfaceAt(x, z);
+    mesh.position.set(x, gy + 1.15, z);
     W.scene.add(mesh);
     let beam = null;
     if (mission || type === 'gem' || type === 'pack' || type === 'cash') {
       beam = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, mission ? 70 : 30, 8, 1, true).translate(0, mission ? 35 : 15, 0),
         new THREE.MeshBasicMaterial({ color: mission ? 0xff5c8a : 0xffd84a, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending }));
-      beam.position.set(x, 0, z);
+      beam.position.set(x, gy, z);
       W.scene.add(beam);
     }
-    const k = { type, x, z, mesh, beam, mission, idx, phase: Math.random() * 6.28, dead: 0 };
+    const k = { type, x, z, gy, mesh, beam, mission, idx, phase: Math.random() * 6.28, dead: 0 };
     rt.pickups.push(k);
     return k;
   }
@@ -963,13 +1008,13 @@ function mount(root, opts) {
       const k = rt.pickups[i];
       if (k.dead) {
         k.dead += dt; const t = k.dead / 0.35;
-        k.mesh.position.y = 1.15 + t * 2.2; k.mesh.scale.setScalar(Math.max(0.01, 1 - t)); k.mesh.rotation.y += dt * 30;
+        k.mesh.position.y = k.gy + 1.15 + t * 2.2; k.mesh.scale.setScalar(Math.max(0.01, 1 - t)); k.mesh.rotation.y += dt * 30;
         if (t >= 1) { removePickup(k); rt.pickups.splice(i, 1); }
         continue;
       }
       k.mesh.rotation.y = tt * 2.6 + k.phase;
-      k.mesh.position.y = 1.15 + Math.sin(tt * 3 + k.phase) * 0.14;
-      if (Math.hypot(k.x - p.x, k.z - p.z) < reach && p.y < 2.6) collect(k);
+      k.mesh.position.y = k.gy + 1.15 + Math.sin(tt * 3 + k.phase) * 0.14;
+      if (Math.hypot(k.x - p.x, k.z - p.z) < reach && p.y - k.gy < 2.6 && p.y - k.gy > -1.5) collect(k);
     }
   }
   function collect(k) {
@@ -1050,7 +1095,7 @@ function mount(root, opts) {
         else { obj = makeCastObj(s.who); name = D.CAST[s.who].n; e = D.CAST[s.who].e; }
         const off = (hash(s.key.length * 31 + s.key.charCodeAt(0) * 7 + (s.key.charCodeAt(2) || 0)) - 0.5) * 4;
         s.x += off; s.z += off * 0.3;
-        obj.position.set(s.x, 0, s.z);
+        obj.position.set(s.x, W.surfaceAt(s.x, s.z), s.z);
         const nm = W.label(e + ' ' + name, { size: 34, height: 0.5, bg: 'rgba(255,255,255,.92)', fg: '#1f1a3d', border: '#1f1a3d' });
         nm.position.y = 2.35 / (obj.scale.y || 1); obj.add(nm);
         const mark = W.label('!', { bg: '#ffc21f', fg: '#1f1a3d', size: 60, height: 0.9, border: '#1f1a3d', depthTest: false });
@@ -1313,7 +1358,7 @@ function mount(root, opts) {
     const h = homeSpot(), dx = h.bx - h.x, dz = h.bz - h.z, d = Math.hypot(dx, dz);
     let fx = h.x + (d > 0.5 ? dx / d * Math.min(2.5, d) : 2.5), fz = h.z + (d > 0.5 ? dz / d * Math.min(2.5, d) : 0);
     if (W.heightAt(fx, fz)) { fx = h.x + (fx - h.x) * 0.4; fz = h.z + (fz - h.z) * 0.4; }
-    rt.flag.position.set(fx, 0, fz);
+    rt.flag.position.set(fx, W.groundAt(fx, fz), fz);
   }
 
   // ------------------------------------------------------------------ businesses
@@ -1414,7 +1459,7 @@ function mount(root, opts) {
     sign.position.y = 3.3; grp.add(sign);
     const coin = W.emojiSprite('💰', 1.1); coin.position.y = 4.6; grp.add(coin); grp.userData.coin = coin;
     const w = xz({ lat: b.wlat, lon: b.wlon });
-    grp.position.set(w.x + b.nx * 0.25, 0, w.z + b.nz * 0.25);
+    grp.position.set(w.x + b.nx * 0.25, W.groundAt(w.x + b.nx * 1.5, w.z + b.nz * 1.5), w.z + b.nz * 0.25);
     grp.rotation.y = Math.atan2(b.nx, b.nz);
     W.scene.add(grp);
     rt.signs.set(id, grp);
@@ -1580,7 +1625,7 @@ function mount(root, opts) {
     const rival = t.rival === k;
     const tagged = t.tags[k] && !rival;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.25), new THREE.MeshBasicMaterial({ map: posterTexture(tagged ? 'mine' : rival ? t.rivalCrew || t.crew : t.crew), side: THREE.DoubleSide }));
-    m.position.set(q.x + nx * 0.06, 1.9, q.z + nz * 0.06);
+    m.position.set(q.x + nx * 0.06, W.groundAt(q.x + nx, q.z + nz) + 1.9, q.z + nz * 0.06);
     m.rotation.y = Math.atan2(nx, nz);
     W.scene.add(m);
     return m;
@@ -1850,7 +1895,7 @@ function mount(root, opts) {
       const g = new THREE.Group();
       g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 120, 12, 1, true).translate(0, 60, 0), new THREE.MeshBasicMaterial({ color: 0x6b4eff, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending })));
       const ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.8, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x6b4eff, transparent: true, opacity: 0.65, depthWrite: false }));
-      ring.position.y = 0.12; g.add(ring);
+      ring.position.y = 0.3; g.add(ring);
       W.scene.add(g); rt.beam = g;
     }
     rt.goalDirty = true;
@@ -1941,7 +1986,7 @@ function mount(root, opts) {
     // goal beam + arrow
     rt.goalT = (rt.goalT || 0) - dt;
     if (rt.goalT <= 0 || rt.goalDirty) { rt.goalT = 0.25; rt.goalDirty = false; rt.goal = currentGoal(); }
-    if (rt.beam) { rt.beam.visible = !!rt.goal && !rt.race; if (rt.goal) rt.beam.position.set(rt.goal.x, 0, rt.goal.z); }
+    if (rt.beam) { rt.beam.visible = !!rt.goal && !rt.race; if (rt.goal) rt.beam.position.set(rt.goal.x, W.groundAt(rt.goal.x, rt.goal.z), rt.goal.z); }
     updateArrow();
     if (rt.flag) rt.flag.userData.cloth.rotation.y = Math.sin(rt.t * 2) * 0.25;
     if (rt.dirtyT > 0) { rt.dirtyT -= dt; if (rt.dirtyT <= 0) doSave('auto'); }

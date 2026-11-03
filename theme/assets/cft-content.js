@@ -271,6 +271,7 @@ D.STICKER_SETS = [
   { id: 'arts', n: 'Artsy', bonus: { stats: { smarts: 2 } }, bonusText: '+2 Smarts', items: [['palette', '🎨', 'Palette'], ['masks', '🎭', 'Theatre'], ['frame', '🖼️', 'Masterpiece'], ['camera', '📷', 'Camera'], ['clapper', '🎬', 'Film'], ['statue', '🗿', 'Statue']] },
   { id: 'lucky', n: 'Lucky Charms', bonus: { luck: 0.15 }, bonusText: 'More rare pickups', items: [['clover', '🍀', 'Four-leaf clover'], ['dice', '🎲', 'Lucky dice'], ['ball', '🔮', 'Crystal ball'], ['eye', '🧿', 'Evil eye'], ['shooting', '🌠', 'Shooting star'], ['unicorn', '🦄', 'Unicorn']] },
   { id: 'gadgets', n: 'Gadget Geek', bonus: { income: 0.1 }, bonusText: 'Businesses earn 10% more', items: [['phone', '📱', 'Phone'], ['laptop', '💻', 'Laptop'], ['gamepad', '🎮', 'Gamepad'], ['joystick', '🕹️', 'Joystick'], ['radio', '📻', 'Radio'], ['battery', '🔋', 'Battery']] },
+  { id: 'heights', n: 'High Points', bonus: { stats: { fit: 1, cred: 1 } }, bonusText: '+1 Fitness, +1 Street cred', items: [['hilltop', '⛰️', 'Hilltop'], ['telescope', '🔭', 'Telescope'], ['sunrise', '🌄', 'Sunrise view'], ['cablecar', '🚡', 'Cable car'], ['paraglider', '🪂', 'Paraglider'], ['eagle', '🦅', 'Eagle']] },
   { id: 'legends', n: 'City Legends', rare: true, bonus: { stats: { cred: 3, charm: 1 } }, bonusText: '+3 Street cred, +1 Charm', items: [['crown', '👑', 'Crown'], ['trophy', '🏆', 'Trophy'], ['diamond', '💎', 'Diamond'], ['rocket', '🚀', 'Rocket'], ['hero', '🦸', 'Hero'], ['liberty', '🗽', 'Landmark']] },
 ];
 
@@ -888,6 +889,13 @@ S('s-early-bird', 'Early Bird', 'kim', 'park', { m: ['s-kim-5k'] }, ['Kim: Champ
   [{ do: 'go', to: 'park', when: [5, 8], text: 'Be at {place} at dawn (5:00–8:00) 🌅' }, { do: 'race', n: 4, time: 55, ride: 'foot', text: 'Dawn sprint: 4 checkpoints' }], ['Kim: The early bird gets the gains!'], { xp: 260, stats: { fit: 2 } });
 S('s-metro', 'Underground', 'tourist', 'metro', { m: ['s-tourist'] }, ['Tourist: Which way is the metro? Can you show me two different stations? I want to ride them all!'],
   [{ do: 'visit', kinds: ['metro'], text: 'Visit a metro station' }, { do: 'photo', of: 'metro', text: 'Photograph a metro entrance 🚇' }], ['Tourist: Thank you! Metro stations are fast travel, did you know? Tap one to ride.'], { money: 40, xp: 150 });
+// Hills (real heights from the Mapterhorn elevation map): the highest street near home, and an uphill race
+S('s-hilltop', 'Top of the Hill', 'noor', 'museum', { m: ['c4-noor'] }, ['Noor: Every neighbourhood has a highest street. The light up there is different. Find it and bring me the view.'],
+  [{ do: 'go', to: 'hilltop', text: 'Climb to {place} ⛰️' }, { do: 'photo', of: 'hilltop', text: 'Photograph the view from the top 📸' }],
+  ['Noor: Look how far you can see! I\'m framing this one.'], { money: 60, xp: 220, happy: 8, stats: { fit: 1 }, rel: { noor: 10 }, sticker: 'hilltop' });
+S('s-hill-race', 'King of the Hill', 'kai', 'park', { m: ['s-hilltop', 'c3-ollie'] }, ['Kai: Uphill race, dude. Every checkpoint is higher than the last. Board, kick scooter or bike. Your legs will hate you.'],
+  [{ do: 'race', n: 4, time: 80, ride: 'ride', hill: true, text: 'Uphill race on wheels: 4 checkpoints, each one higher 🛹' }],
+  ['Kai: You climbed that?! The ride down is the reward.'], { money: 120, xp: 300, stats: { fit: 1 }, rel: { kai: 10 }, sticker: 'cablecar' });
 
 D.QUIZ = QUIZ;
 
@@ -902,6 +910,7 @@ D.JOBS = [
   { t: 'Lost & found', e: '🔍', steps: [{ do: 'collect', what: 'clue', n: 3, near: 'here', text: 'Find 3 lost items 🔍' }], pay: [40, 75] },
   { t: 'Survey', e: '📋', steps: [{ do: 'chat', n: 4, text: 'Interview 4 people on the street' }], pay: [30, 60] },
   { t: 'Photo gig', e: '📸', steps: [{ do: 'photo', of: 'landmark', text: 'Photograph {place}' }], pay: [35, 70] },
+  { t: 'Hill climb', e: '⛰️', steps: [{ do: 'race', n: 4, time: 75, ride: 'foot', hill: true, text: 'Run uphill: 4 checkpoints, each one higher' }], pay: [40, 80] },
 ];
 
 // People on the street say these. {place} = a real place nearby.

@@ -155,6 +155,42 @@ db_schema:
     indexes: []
     server: full
     title: Saves
+  tiles:
+    client: none
+    columns:
+    - admin_ui:
+        order: 0
+        width: 200
+      name: key
+      type: string
+    - admin_ui:
+        order: 1
+        width: 200
+      name: kind
+      type: string
+    - admin_ui:
+        order: 2
+        width: 200
+      name: data
+      type: media
+    - admin_ui:
+        order: 3
+        width: 200
+      name: size
+      type: number
+    - admin_ui:
+        order: 4
+        width: 200
+      name: missing
+      type: bool
+    - admin_ui:
+        order: 5
+        width: 200
+      name: created
+      type: datetime
+    indexes: []
+    server: full
+    title: Map tiles
   users:
     client: none
     columns:
@@ -252,7 +288,7 @@ metadata:
   title: 'City Fun Time: a life-sim game on your real streets in 3D'
 name: City Fun Time
 native_deps:
-  head_html: "<script src=\"_/theme/legal-kit.js?v=8bb3ebc592\"></script>\n<!-- seo:start (APP_MAKER/seo: edit seo/apps/cityfuntime.json\
+  head_html: "<script src=\"_/theme/legal-kit.js?v=a34dcc3133\"></script>\n<!-- seo:start (APP_MAKER/seo: edit seo/apps/cityfuntime.json\
     \ and run seo.py, not here) -->\n<link rel=\"canonical\" href=\"https://city-fun-time.anvil.app/\">\n<meta name=\"robots\"\
     \ content=\"index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1\">\n<meta name=\"keywords\" content=\"\
     life simulation game, 3D game on real streets, play in your neighbourhood, OpenStreetMap game, city life sim browser,\
@@ -277,18 +313,18 @@ native_deps:
     \ 3D game on real streets, play in your neighbourhood, OpenStreetMap game, city life sim browser, open world browser game,\
     \ real map game, business sim game, free browser game 3D\", \"applicationCategory\": \"GameApplication\", \"operatingSystem\"\
     : \"Any (web browser)\", \"browserRequirements\": \"Requires JavaScript and a modern web browser\", \"featureList\": [\"\
-    Any address rebuilt in 3D from OpenStreetMap\", \"153 missions: 85 story missions in 9 chapters, plus side jobs\", \"\
-    Friends, love, a family and fifteen businesses\", \"An album of 72 stickers and photo missions\", \"Leaderboards for net\
-    \ worth, level, blocks and missions\", \"Play as a guest; saves stay in the browser\"], \"audience\": {\"@type\": \"Audience\"\
-    , \"audienceType\": \"Players who want a life-sim adventure set in their own neighbourhood\"}}, {\"@type\": \"WebSite\"\
-    , \"@id\": \"https://city-fun-time.anvil.app/#site\", \"url\": \"https://city-fun-time.anvil.app/\", \"name\": \"City\
-    \ Fun Time\", \"publisher\": {\"@id\": \"https://arkvital.com/#org\"}}, {\"@type\": \"Organization\", \"@id\": \"https://arkvital.com/#org\"\
-    , \"name\": \"Arkvital\", \"url\": \"https://arkvital.com\", \"email\": \"arkvital@outlook.com\", \"address\": {\"@type\"\
-    : \"PostalAddress\", \"addressLocality\": \"Montreal\", \"addressRegion\": \"QC\", \"addressCountry\": \"CA\"}}]}</script>\n\
-    <!-- seo:end -->\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n<meta\
-    \ name=\"theme-color\" content=\"#6b4eff\">\n<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n<link rel=\"\
-    preconnect\" href=\"https://fonts.googleapis.com\">\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n\
-    <link href=\"https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap\"\
+    Any address rebuilt in 3D from OpenStreetMap, with real hills from Mapterhorn elevation data\", \"155 missions: 85 story\
+    \ missions in 9 chapters, plus side jobs\", \"Friends, love, a family and fifteen businesses\", \"An album of 78 stickers\
+    \ and photo missions\", \"Leaderboards for net worth, level, blocks and missions\", \"Play as a guest; saves stay in the\
+    \ browser\"], \"audience\": {\"@type\": \"Audience\", \"audienceType\": \"Players who want a life-sim adventure set in\
+    \ their own neighbourhood\"}}, {\"@type\": \"WebSite\", \"@id\": \"https://city-fun-time.anvil.app/#site\", \"url\": \"\
+    https://city-fun-time.anvil.app/\", \"name\": \"City Fun Time\", \"publisher\": {\"@id\": \"https://arkvital.com/#org\"\
+    }}, {\"@type\": \"Organization\", \"@id\": \"https://arkvital.com/#org\", \"name\": \"Arkvital\", \"url\": \"https://arkvital.com\"\
+    , \"email\": \"arkvital@outlook.com\", \"address\": {\"@type\": \"PostalAddress\", \"addressLocality\": \"Montreal\",\
+    \ \"addressRegion\": \"QC\", \"addressCountry\": \"CA\"}}]}</script>\n<!-- seo:end -->\n<meta name=\"viewport\" content=\"\
+    width=device-width, initial-scale=1, viewport-fit=cover\">\n<meta name=\"theme-color\" content=\"#6b4eff\">\n<meta name=\"\
+    apple-mobile-web-app-capable\" content=\"yes\">\n<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n<link\
+    \ rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n<link href=\"https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap\"\
     \ rel=\"stylesheet\">\n<link id=\"ui-favicon\" rel=\"icon\" type=\"image/svg+xml\" href=\"_/theme/icon.svg?v=2f5e62071c\"\
     >\n<link rel=\"apple-touch-icon\" href=\"_/theme/icon-180.png?v=2f5e62071c\">\n<script>\n/* Keep our tab icon: Anvil adds\
     \ its own <link rel=\"icon\">, so drop any other icon link. */\n(function () {\n  function keep() {\n    var ours = document.getElementById('ui-favicon');\n\
@@ -297,9 +333,9 @@ native_deps:
     })();\n</script>\n\n<!-- Prepsto feedback panel: every \"Submit feedback\" link and button opens it (it is the only feedback\
     \ channel). No floating button, no cookies, nothing loads until it is opened. Codes: APP_MAKER/prepsto-links.json -->\n\
     <script src=\"https://prepsto.com/_/theme/widget.js\" data-prepsto=\"xz9nut9\" data-button=\"false\" data-label=\"Submit\
-    \ feedback\" async></script>\n<script>window.CFT_ASSET_V = {\"cft-content.js\": \"c2ec2947fd\", \"cft-game.js\": \"e15438b251\"\
-    , \"cft-tiles.js\": \"85f2c2c736\", \"cft-ui.js\": \"d2595cc99f\", \"cft-world.js\": \"b4ebe64a47\", \"three.min.js\"\
-    : \"a13f10ad8e\"};</script>\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=d5aa44cee7\">\n<script src=\"_/theme/app.js?v=b947bdf185\"\
+    \ feedback\" async></script>\n<script>window.CFT_ASSET_V = {\"cft-content.js\": \"39cceaa904\", \"cft-game.js\": \"c2324cdc6f\"\
+    , \"cft-tiles.js\": \"a65067908e\", \"cft-ui.js\": \"1f7612707a\", \"cft-world.js\": \"2c21d9ee65\", \"three.min.js\"\
+    : \"a13f10ad8e\"};</script>\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=d5aa44cee7\">\n<script src=\"_/theme/app.js?v=5889977a5f\"\
     ></script>\n"
 package_name: City_Fun_Time
 runtime_options:

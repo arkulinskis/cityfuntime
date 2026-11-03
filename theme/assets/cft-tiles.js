@@ -260,7 +260,8 @@ function process(buf, tx, ty) {
     for (const line of parts) splitLine(line, S, subOf, (sub, pts) => {
       const rd = { t: type, w, p: pts };
       if (coins) rd.k = 1;
-      if (pr.brunnel === 'bridge') rd.br = 1;
+      // be = the whole bridge's two ends (the game keeps the deck level between them on hilly ground)
+      if (pr.brunnel === 'bridge') { rd.br = 1; rd.be = [line[0], line[1], line[line.length - 2], line[line.length - 1]]; }
       sub.r.push(rd);
     });
   });

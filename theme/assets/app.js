@@ -379,7 +379,7 @@
   UI.configure({
     name: 'City Fun Time',
     key: 'cityfuntime',          // prefix for this app's browser storage
-    tagline: 'Your real neighbourhood, a whole new life. Map data © OpenStreetMap contributors.',   // footer line
+    tagline: 'Your real neighbourhood, a whole new life. Map data © OpenStreetMap contributors, hills © Mapterhorn.',   // footer line
     home: 'life',                // first page after signing in
     landing: 'landing'           // first page for visitors who aren't signed in
   });
@@ -633,6 +633,11 @@
   var ALL = ['three.min.js', 'cft-content.js', 'cft-tiles.js', 'cft-world.js', 'cft-ui.js', 'cft-game.js'];
 
   window.CFT = {
+    // The server's backup copy of the map tiles (server_code/Tiles.py), used by the 3D world (cft-world.js).
+    tiles: {
+      archive: function (keys) { return UI.apiQuiet('tile_archive', keys); },
+      backup: function (key) { return UI.apiQuiet('tile_backup', key); }
+    },
     // Game data only (content + rules), enough for the Life / Quests / Album pages.
     data: function () { return DATA.reduce(function (p, n) { return p.then(function () { return script(n); }); }, Promise.resolve()); },
     // Everything the 3D game needs.
@@ -686,7 +691,7 @@
 /* ===== admin.html ===== */
 (function () {
   var esc = UI.esc;
-  var TABS = [['overview', 'Overview', 'grid'], ['players', 'Players', 'star'], ['feedback', 'Feedback', 'inbox'], ['users', 'Users', 'users'], ['demo', 'Demo data', 'database']];
+  var TABS = [['overview', 'Overview', 'grid'], ['players', 'Players', 'star'], ['maps', 'Map backup', 'map'], ['feedback', 'Feedback', 'inbox'], ['users', 'Users', 'users'], ['demo', 'Demo data', 'database']];
 
   UI.page('admin', { title: 'Admin', auth: 'admin' }, function (view, ctx) {
     var tab = TABS.some(function (t) { return t[0] === ctx.args[0]; }) ? ctx.args[0] : 'overview';
@@ -767,7 +772,43 @@
       });
     }
 
-    var DRAW = { overview: overview, players: players, feedback: feedback, users: users, demo: demo };
+    // Map backup: the server's copy of the street and hills tiles (server_code/Tiles.py)
+    var seeding = false;
+    function maps() {
+      return UI.api('admin_tiles_status').then(function (d) {
+        body.innerHTML = '<div class="ui-card ui-narrow" style="margin:0"><h3>Map backup</h3>' +
+          '<p class="muted">The 3D city is built from two free map services: street maps from OpenFreeMap and hills from Mapterhorn. ' +
+          'Every place someone plays is copied here automatically, so the game keeps working there if a service closes. ' +
+          'Places nobody has played yet would load without that data.</p>' +
+          '<p><b>' + d.tiles + '</b> tiles kept · <b>' + d.mb + ' MB</b> of ' + d.cap_mb + ' MB allowed</p>' +
+          '<form class="ui-row" data-cap style="margin-bottom:18px"><label class="small muted">Size limit (MB)</label><input name="mb" type="number" min="100" max="100000" value="' + d.cap_mb + '" style="max-width:120px">' +
+          '<button class="ui-btn sm" type="submit">Save</button></form>' +
+          '<h4>Starter cities</h4><p class="muted small">Copy 1.2 km around each of these now, before anyone plays there (' + d.cities.length + ' cities, about 3 MB each). You can leave this page open while it runs.</p>' +
+          '<ul class="small" style="columns:2;padding-left:18px">' + d.cities.map(function (c) { return '<li>' + esc(c.name) + '</li>'; }).join('') + '</ul>' +
+          '<div class="ui-row"><button class="ui-btn primary" data-seed>' + UI.icon('download') + 'Copy the starter cities</button><span class="muted small" data-seedmsg></span></div></div>';
+      });
+    }
+    function seedAll(btn) {
+      if (seeding) return;
+      seeding = true; btn.disabled = true;
+      var msg = view.querySelector('[data-seedmsg]'), added = 0;
+      UI.api('admin_tiles_status').then(function (d) {
+        var i = 0, next = 0;
+        function step() {
+          if (i >= d.cities.length) { seeding = false; UI.toast('Starter cities copied (' + added + ' new tiles)', 'ok'); maps(); return; }
+          return UI.apiQuiet('admin_tiles_seed', i, next).then(function (r) {
+            added += r.added;
+            if (msg) msg.textContent = r.city + ': ' + Math.min(r.next, r.total) + ' / ' + r.total + ' · ' + added + ' new tiles';
+            if (r.full) { seeding = false; UI.toast('The size limit is reached', 'error'); maps(); return; }
+            if (r.done) { i++; next = 0; } else next = r.next;
+            return step();
+          });
+        }
+        return step();
+      }).catch(function (e) { seeding = false; btn.disabled = false; UI.toast(e.message || 'Something went wrong', 'error'); });
+    }
+
+    var DRAW = { overview: overview, players: players, maps: maps, feedback: feedback, users: users, demo: demo };
 
     view.addEventListener('click', function (e) {
       var f = e.target.closest('[data-filter]');
@@ -792,6 +833,8 @@
         });
         return;
       }
+      var sb = e.target.closest('[data-seed]');
+      if (sb) { seedAll(sb); return; }
       var dm = e.target.closest('[data-demo]');
       if (dm) {
         var load = dm.getAttribute('data-demo') === 'load';
@@ -815,6 +858,7 @@
     view.addEventListener('submit', function (e) {
       if (e.target.matches('[data-search]')) { e.preventDefault(); users(UI.formData(e.target).q); }
       if (e.target.matches('[data-psearch]')) { e.preventDefault(); players(UI.formData(e.target).q); }
+      if (e.target.matches('[data-cap]')) { e.preventDefault(); UI.api('admin_tiles_cap', UI.formData(e.target).mb).then(function () { UI.toast('Saved', 'ok'); maps(); }); }
     });
     return DRAW[tab]();
   });
@@ -947,7 +991,7 @@
             ['🌇', 'Live it up', 'Friends, a partner, a wedding, kids, a dog, a fleet of businesses and the best view in the city.']],
     featuresTitle: 'Everything in the game',
     features: [
-      ['📜', '153 missions', 'A ten-chapter story plus side quests. Every one happens at a real café, park, school or shop near you.'],
+      ['📜', '155 missions', 'A ten-chapter story plus side quests. Every one happens at a real café, park, school or shop near you.'],
       ['🧑‍🤝‍🧑', 'A living city', 'People walk their dogs, cars honk, pigeons scatter. Say hi to anyone: sometimes they tip you.'],
       ['💘', 'Love & family', 'Meet Sam at the flower shop. Dates at sunset, a ring, a wedding, a baby who loses Mr. Snuggles.'],
       ['🤝', 'Friends with perks', 'A gamer, a DJ, a photographer, a foodie, a mechanic... 14 friends, each with a bonus.'],
@@ -955,12 +999,13 @@
       ['🏠', 'Better homes', 'Couch, basement, one-bedroom, loft, townhouse, then the top floor of the tallest tower around.'],
       ['🎨', 'Take over the blocks', 'Twelve crews run the blocks. Tag their posters, then beat the boss at a race, dance-off, quiz or chase.'],
       ['🛵', 'Wheels', 'Skateboard, kick scooter, bike, Vespa, compact car, family SUV, sports car.'],
-      ['🎴', '72 stickers', 'Twelve sticker sets to complete, each with a permanent bonus. Plus a photo album of your city.'],
+      ['🎴', '78 stickers', 'Thirteen sticker sets to complete, each with a permanent bonus. Plus a photo album of your city.'],
       ['💪', 'Stats that matter', 'Fitness, Charm, Smarts, Style and Street cred change your speed, your dates, your income and your discounts.'],
       ['🌙', 'Day & night', 'A full day every 24 minutes. Lit windows at night, rent at midnight, golden-hour photo shoots.'],
-      ['🚇', 'Metro', 'Unlock real metro entrances and ride between them.']],
+      ['🚇', 'Metro', 'Unlock real metro entrances and ride between them.'],
+      ['⛰️', 'Real hills', 'Your streets climb and dip like the real ones. Boards fly downhill, hills slow you down, and Kai races you to the top.']],
     cast: ['🧔 Cousin Max', '👵 Nonna Rosa', '🏃‍♀️ Coach Kim', '👩‍💼 Priya', '🧑‍🔧 Dmitri', '🧑‍🎨 Luna', '🛹 Kai', '🎮 Jay', '📸 Noor', '🍜 Benny', '🎧 Zoe', '🐶 Ollie', '🌷 Sam', '🧑‍🍳 Chef Tomás', '🤑 Chad Moneybags'],
-    faq: [['Is it really my street?', 'Yes. The buildings, streets, parks, rivers, house numbers and shop names come from OpenStreetMap, the free world map made by volunteers. Heights are guessed where the map has none, so your building might be a floor or two off.'],
+    faq: [['Is it really my street?', 'Yes. The buildings, streets, parks, rivers, house numbers and shop names come from OpenStreetMap, the free world map made by volunteers. The hills are real too, from the open elevation data of Mapterhorn (drawn a little taller so you notice them). Building heights are guessed where the map has none, so your building might be a floor or two off.'],
           ['Do I need an account?', 'No. Press Play and go: your game is saved in this browser. Create a free account to save it to the cloud, keep it across devices and appear on the leaderboard.'],
           ['Who sees my address?', 'Nobody else. The address you type is looked up on OpenStreetMap\'s search to find it on the map. If you have an account, it\'s stored with your save so your world loads in the same place. Other players only see the name you choose.'],
           ['Does it work on my phone?', 'Yes, in any modern browser. Drag on the left to walk, drag on the right to look. Phones get lighter graphics automatically.'],

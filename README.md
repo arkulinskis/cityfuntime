@@ -1,10 +1,10 @@
 # City Fun Time
 
 A life-simulation game on your real streets. Type your address and the neighbourhood around it is rebuilt in 3D from
-OpenStreetMap: real buildings, streets, parks, house numbers and shop names, filled with people walking dogs, traffic and
+OpenStreetMap, on its real hills: buildings, streets, parks, house numbers and shop names, filled with people walking dogs, traffic and
 pigeons. You arrive with $20 and a backpack, crash on Cousin Max's couch, and work your way up: errands for Nonna Rosa,
 odd jobs, a lemonade stand, a skateboard, friends, love, a wedding, kids, fifteen businesses, a penthouse, and every block
-won back from the crews. 153 missions, played at real places near you. Built on [Anvil](https://anvil.works); grown out of
+won back from the crews. 155 missions, played at real places near you. Built on [Anvil](https://anvil.works); grown out of
 City Coin Run (`Documents/CLAUDE/citycoinrun`).
 
 - **App repo:** github.com/arkulinskis/cityfuntime (branch `master`). Anvil pulls `master`.
@@ -16,16 +16,16 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
 - **Landing page** (`#landing`): the promise, how it works, everything in the game, the cast, FAQ.
 - **The game** (`#play`, full screen): a move-in screen (name, skin/hair/shirt, then an address search, "use where I am", or six
   featured neighbourhoods in Montréal and New York), then the 3D city. Guests save in the browser.
-- **Quests** (`#quests`): all 153 missions by chapter with status, story, steps and rewards. **Album** (`#album`): 72 stickers in 12
+- **Quests** (`#quests`): all 155 missions by chapter with status, story, steps and rewards. **Album** (`#album`): 78 stickers in 13
   sets plus the photos from photo missions. **Leaderboard** (`#ranks`): net worth, level, blocks, missions.
 
 **In the game:**
 - **Missions:** 85 story missions in 9 chapters (New in Town, The Hustle, Wheels, The Crew, Love, Turf, Boss Mode, Family, The Big Leagues)
-  + 68 side stories. People with a yellow **!** stand at real places (cafés, bakeries, banks, libraries, parks...). Step types: go,
+  + 70 side stories. People with a yellow **!** stand at real places (cafés, bakeries, banks, libraries, parks...). Step types: go,
   talk (with charm-checked choices), collect, deliver (to real house numbers, some timed), buy, have money, reach a stat or level,
   own (home, business, blocks, friends...), pay, escort (slow grandpas, dogs, your partner), chase, race (checkpoints), photo (some
   only at golden hour or night), visit several places, dance-off, quiz, sleep, walk a distance, chat with strangers, tag, defend.
-- **Repeatables:** 3 odd jobs a day (phone), a rush hour per business per day (deliveries for tips), rival tags to clean.
+- **Repeatables:** 3 odd jobs a day (phone; one of them can be an uphill run), a rush hour per business per day (deliveries for tips), rival tags to clean.
 - **Stats:** Fitness (speed, energy), Charm (dialogue choices, relationships), Smarts (business income, XP), Style (shop discounts),
   Street cred (crew bosses, turf income). Plus energy (sprinting drains it; food and sleep refill it), happiness (follows your
   home, furniture, family, friends and pets; multiplies income) and XP levels.
@@ -39,6 +39,10 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
   upgrades, managers (offline earnings), rush hours.
 - **Turf:** 300 m blocks around home, each run by one of 12 crews. Tag its 4 posters (spray cans), beat the boss (race, dance-off,
   quiz, chase or cred check). Owned blocks pay hourly; rivals sometimes tag them back.
+- **Hills:** real elevation from Mapterhorn, drawn 1.5x taller. Streets, parks, buildings, people and cars follow the slope;
+  bridges keep a level deck. Boards, scooters and bikes are much slower uphill and faster downhill (cars and walking a little).
+  Side missions "Top of the Hill" (Noor: climb to the highest street within 900 m of home and photograph the view) and
+  "King of the Hill" (Kai: uphill race on wheels); a 13th sticker set, **High Points**.
 - **World:** day and night (24 minutes a day), lit windows, pedestrians, cars that stop and honk, pigeons, metro entrances as fast
   travel, a phone (P) with Quests, Map, Me, Bag, People, Homes, Business, Turf, Album, Diary, Settings.
 
@@ -48,6 +52,7 @@ A game played as a guest is kept when you sign up.
 
 **For admins** (`#admin`; arkulinskis@gmail.com becomes an admin on first sign-in):
 - **Players:** every save with progress; hide a player from the leaderboard or reset a game name.
+- **Map backup:** how many map tiles the server keeps, a size limit, and a button that copies 20 starter cities in advance.
 - **Feedback inbox**, **Users**, **Demo data** (six demo players for the leaderboard).
 
 ## Map data
@@ -55,10 +60,19 @@ A game played as a guest is kept when you sign up.
 | Source | Used for |
 |---|---|
 | [OpenFreeMap](https://openfreemap.org) | zoom-14 vector tiles (OpenMapTiles schema): buildings, roads, parks, water, house numbers, named places. Free, no key, CORS open |
-| IndexedDB `cityfuntime` | tiles already explored |
+| [Mapterhorn](https://mapterhorn.com) | elevation tiles (Terrarium WebP, 512 px, zoom 15 where a country has detailed data, else lower): the hills. Free, no key, CORS open |
+| IndexedDB `cityfuntime` | tiles already explored (streets and hills) |
+| The app's own table `tiles` | the server's backup copy of every tile players loaded (server_code/Tiles.py), used when a service doesn't answer |
 | [Nominatim](https://nominatim.org), fallback [Photon](https://photon.komoot.io) | the address typed on the move-in screen |
 
-Data © OpenStreetMap contributors (ODbL), © OpenMapTiles. The credit is in the footer, the game's settings and the legal kit.
+Data © OpenStreetMap contributors (ODbL), © OpenMapTiles; hills © Mapterhorn (open data, sources at mapterhorn.com/attribution, all
+allow commercial use with credit). The credit is in the footer, the game's settings and the legal kit.
+
+**If a map service closes:** each browser keeps what it explored (IndexedDB), and the server keeps a copy of every tile any player
+loaded (they're copied automatically in small batches; the server fetches them itself). The game asks the server when a service
+doesn't answer, so every neighbourhood someone has played keeps working; places nobody played yet would load without that data
+(no hills: the world stays flat; no streets: empty). Admin > Map backup copies 20 starter cities ahead of time. Size limit:
+3,000 MB by default (Admin > Map backup).
 
 ## Setting it up in Anvil (once)
 
@@ -79,13 +93,14 @@ What this project uses besides its own code. Generated by `APP_MAKER/tools/libra
 | [Nominatim](https://nominatim.org) | Outside web service | OpenStreetMap's address search: turns an address into a map position, and back. |
 | [OpenFreeMap](https://openfreemap.org) | Outside web service | street, building and park shapes for the 3D neighbourhood |
 | [Photon](https://photon.komoot.io) | Outside web service | finds the address you type |
+| [Mapterhorn](https://mapterhorn.com) | Outside web service | the real hills under the 3D neighbourhood |
 | [Arkvital music library (ArkMusic)](https://arkvital-media.web.app) | Outside web service | day, night and driving playlists |
 | [YouTube embeds](https://developers.google.com/youtube/player_parameters) | Outside web service | Plays a YouTube video inside the page (the privacy-friendlier youtube-nocookie address). |
 | [Google Fonts](https://fonts.google.com) | Loaded from a CDN | Fredoka, Nunito |
 
-**Built into the browser:** Canvas 2D, WebGL, Pointer Lock, Geolocation, Web Audio API, localStorage, IndexedDB.
+**Built into the browser:** Canvas 2D, WebGL, Pointer Lock, Geolocation, Web Audio API, localStorage, File downloads (Blob), IndexedDB.
 
-**Anvil platform:** Anvil, Anvil Data Tables, Anvil Google service, Anvil JS bridge (anvil.js), Anvil Users.
+**Anvil platform:** Anvil, Anvil Data Tables, Anvil Google service, Anvil JS bridge (anvil.js), Anvil Users, Anvil HTTP.
 
 **Build and test tools (not shipped):** Node.js, PyYAML, Headless Chrome (DevTools Protocol).
 

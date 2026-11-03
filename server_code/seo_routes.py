@@ -33,21 +33,21 @@ SEO = {
  "category": "GameApplication",
  "audience": "Players who want a life-sim adventure set in their own neighbourhood",
  "about": [
-  "City Fun Time is a life-simulation game on your real streets. Type your address and the neighbourhood around it is rebuilt in 3D from OpenStreetMap: real buildings, streets, parks, house numbers and shop names, filled with people walking dogs, traffic and pigeons.",
-  "You arrive with $20 and a backpack, crash on Cousin Max's couch and work your way up: errands, odd jobs, a lemonade stand, friends, love, a wedding, kids, fifteen businesses, a penthouse and every block won back from the crews. 153 missions, played at real places near you."
+  "City Fun Time is a life-simulation game on your real streets. Type your address and the neighbourhood around it is rebuilt in 3D from OpenStreetMap: real buildings, streets, parks, hills, house numbers and shop names, filled with people walking dogs, traffic and pigeons.",
+  "You arrive with $20 and a backpack, crash on Cousin Max's couch and work your way up: errands, odd jobs, a lemonade stand, friends, love, a wedding, kids, fifteen businesses, a penthouse and every block won back from the crews. 155 missions, played at real places near you."
  ],
  "features": [
-  "Any address rebuilt in 3D from OpenStreetMap",
-  "153 missions: 85 story missions in 9 chapters, plus side jobs",
+  "Any address rebuilt in 3D from OpenStreetMap, with real hills from Mapterhorn elevation data",
+  "155 missions: 85 story missions in 9 chapters, plus side jobs",
   "Friends, love, a family and fifteen businesses",
-  "An album of 72 stickers and photo missions",
+  "An album of 78 stickers and photo missions",
   "Leaderboards for net worth, level, blocks and missions",
   "Play as a guest; saves stay in the browser"
  ],
  "faq": [
   [
    "Is the city really my neighbourhood?",
-   "Yes. Type an address (or use where you are) and the streets, buildings, parks and shop names around it come from OpenStreetMap."
+   "Yes. Type an address (or use where you are) and the streets, buildings, parks and shop names around it come from OpenStreetMap. The hills are real too, from Mapterhorn's open elevation data."
   ],
   [
    "Do I need an account?",
@@ -55,7 +55,7 @@ SEO = {
   ],
   [
    "How long is the game?",
-   "There are 153 missions: 85 story missions in nine chapters plus side missions."
+   "There are 155 missions: 85 story missions in nine chapters plus side missions."
   ]
  ],
  "site": "https://city-fun-time.anvil.app",
