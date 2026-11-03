@@ -397,8 +397,9 @@ function create(G, root) {
       '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>📱</kbd> your phone</div>'
         : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
       '</div><p class="muted">The <b>gold arrow</b> over your head always points to your current goal. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
-      '<button type="button" class="cft-btn primary big" data-go>Let\'s go!</button></div>', 'cft-center');
-    ov.el.querySelector('[data-go]').onclick = () => { ov.close(); if (G.W && !t) G.W.lock(); };
+      // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
+      '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
+    ov.el.querySelector('[data-letsgo]').onclick = e => { e.stopPropagation(); ov.close(); if (G.W && !t) G.W.lock(); };
   };
   U.startScreen = function (me) {
     return new Promise(resolve => {
