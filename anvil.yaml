@@ -336,10 +336,10 @@ native_deps:
     <!-- Prepsto feedback panel: every "Submit feedback" link and button opens it (it is the only feedback channel). No floating button, no cookies, nothing loads until it is opened. Codes: APP_MAKER/prepsto-links.json -->
     <script src="https://prepsto.com/_/theme/widget.js" data-prepsto="xz9nut9" data-button="false" data-label="Submit feedback" async></script>
     <link rel="stylesheet" href="_/theme/icons.css?v=8f508d76cd">
-    <link rel="stylesheet" href="_/theme/app.css?v=ee79cd53d5">
+    <link rel="stylesheet" href="_/theme/app.css?v=a5accb078e">
     <script src="_/theme/app-kit.js?v=9ddf8e5515"></script>
     <script src="_/theme/ark-music.js?v=884c4f647c"></script>
-    <script src="_/theme/cft-kit.js?v=a33c4edb71"></script>
+    <script src="_/theme/cft-kit.js?v=28477669ab"></script>
     <!-- the game engine, loaded only when a page needs it (cft-kit.js reads these; tools/assets.py keeps ?v= current) -->
     <meta name="cft-asset" content="_/theme/three.min.js?v=a13f10ad8e">
     <meta name="cft-asset" content="_/theme/cft-content.js?v=39cceaa904">

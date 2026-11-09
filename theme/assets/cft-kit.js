@@ -262,6 +262,7 @@
       if (req.lvl) reqs.push('⭐ Level ' + req.lvl);
       if (req.partner) reqs.push('💘 Be in a relationship');
       if (req.stat) Object.keys(req.stat).forEach(function (k) { reqs.push('📊 ' + k + ' ' + req.stat[k]); });
+      if (!save) reqs.unshift('🎮 Start a game: press Play and move in');
       var r = M.reward || {}, out = [];
       if (r.money) out.push({ text: '💵 ' + money(r.money), tone: 'gold' });
       if (r.xp) out.push({ text: '⭐ ' + r.xp + ' XP', tone: 'grape' });

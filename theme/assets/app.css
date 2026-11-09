@@ -570,7 +570,7 @@ html.ui-dark .lp-svg .win { fill: #ffe27a; }
 @keyframes cft-in { from { opacity: 0; transform: translateX(20px); } }
 .cft-mmwrap { position: absolute; left: 12px; bottom: 12px; width: 200px; height: 200px; border-radius: 50%; overflow: hidden; border: 3px solid #1f1a3d; box-shadow: 4px 4px 0 #1f1a3d; background: #e6e2d9; cursor: pointer; }
 .cft-mm { width: 100%; height: 100%; display: block; }
-.cft-mmwrap span { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); background: #1f1a3d; color: #fff; border-radius: 99px; padding: 2px 8px; font: 700 .7rem/1.4 var(--font-body); }
+.cft-mmwrap span { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); background: #1f1a3d; color: #fff; border-radius: 99px; padding: 2px 8px; font: 700 .75rem/1.4 var(--font-body); }
 .cft-mmwrap span:empty { display: none; }
 .cft-br { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .cft-act { display: flex; align-items: center; background: #ffc21f; border: 2.5px solid #1f1a3d; border-radius: 16px; box-shadow: 4px 4px 0 #1f1a3d; padding: 10px 16px 10px 10px; font: 700 1rem/1.2 var(--font-display); cursor: pointer; max-width: min(420px, 60vw); text-align: left; animation: cft-pop .2s ease-out; }
@@ -952,6 +952,7 @@ anvil-dropzone { display: contents; }
 .anvil-role-note { background: var(--c-brand-soft); color: var(--c-ink); border-radius: var(--radius-sm); padding: 10px 14px; font-size: .92rem; border: 2px solid var(--c-edge); }
 :where(.anvil-label) > .anvil-label-text { font: inherit; color: inherit; }
 .ui .anvil-label { margin: 0; }
+.ui .anvil-label > .anvil-label-text { padding: 0; }  /* the App Server's theme pads Label text 7px */
 .anvil-component-icon:empty { display: none; }
 .cf-pill.pink, .al-st i { color: var(--c-pink-ink); }
 .ui-empty h2 { font-size: 1.2rem; }
@@ -1010,7 +1011,8 @@ anvil-dropzone { display: contents; }
 .anvil-role-lf-chips > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .anvil-role-lf-list > div { display: grid; gap: 8px; }
 .lf-li > div { min-width: 0; }
-.lf-diary { display: grid; gap: 6px; max-height: 320px; overflow: auto; position: relative; }
+.anvil-role-lf-diary-list > div { display: grid; gap: 6px; }
+.lf-diary { max-height: 320px; overflow: auto; position: relative; }
 .lf-diary-row { display: flex; gap: 10px; font-size: .92rem; align-items: baseline; }
 .lf-diary-e { width: 22px; text-align: center; flex: none; }
 .anvil-role-lf-diary-text { flex: 1; min-width: 0; }
