@@ -1,0 +1,17 @@
+<anvil-form layout="City_Fun_Time.Layouts.Shell">
+  <anvil-block slot="content">
+
+<div class="ui-wrap">
+  <div class="ui-page-head">
+    <div><h1>Quests</h1><anvil-component type="Label" name="lead" prop:role='["lead"]'></anvil-component></div>
+    <a class="ui-btn primary" href="#play">🎮 Play</a>
+  </div>
+  <anvil-component type="Label" name="not_started" prop:role='["note", "qs-note"]' prop:text="You haven't started yet. Everything below is waiting for you."></anvil-component>
+  <div class="qs-filters" role="group" aria-label="Show missions">
+    <anvil-component type="Button" name="f_all" prop:text="All" prop:role='["qs-filter"]'></anvil-component> <anvil-component type="Button" name="f_active" prop:text="Active" prop:role='["qs-filter"]'></anvil-component> <anvil-component type="Button" name="f_open" prop:text="Available" prop:role='["qs-filter"]'></anvil-component> <anvil-component type="Button" name="f_done" prop:text="Done" prop:role='["qs-filter"]'></anvil-component> <anvil-component type="Button" name="f_locked" prop:text="Locked" prop:role='["qs-filter"]'></anvil-component>
+  </div>
+  <anvil-component type="RepeatingPanel" name="chapters_panel" prop:item_template="City_Fun_Time.Items.Chapter"></anvil-component>
+  <div class="ui-empty" anvil:name="none_box"><h2>Nothing here yet</h2><p>No missions match this filter. Try another one, or go play.</p></div>
+</div>
+  </anvil-block>
+</anvil-form>

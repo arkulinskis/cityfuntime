@@ -1,0 +1,10 @@
+<div class="ad-table ad-player-row">
+  <div><anvil-component type="Label" name="name" prop:role='["strong"]' bind:text="self.item['name']"></anvil-component><anvil-component type="Label" name="demo" prop:role='["badge"]' prop:text="demo"></anvil-component></div>
+  <anvil-component type="Label" name="email" prop:role='["ad-email"]' bind:text="self.item['email']"></anvil-component>
+  <anvil-component type="Label" name="progress" prop:role='["fine-print"]'></anvil-component>
+  <anvil-component type="Label" name="when" prop:role='["fine-print"]'></anvil-component>
+  <div class="ad-player-actions">
+    <anvil-component type="CheckBox" name="shown_box" prop:text="Shown"></anvil-component>
+    <anvil-component type="Button" name="rename_button" prop:text="Reset name" prop:role='["btn", "btn-sm", "btn-ghost"]'></anvil-component>
+  </div>
+</div>

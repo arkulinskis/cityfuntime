@@ -66,7 +66,7 @@ def _vector_url():
     """OpenFreeMap's current tile URL (it changes with every map update), from its TileJSON, kept 6 hours."""
     if _ofm["url"] and _ofm["at"] and (C.now() - _ofm["at"]).total_seconds() < 6 * 3600:
         return _ofm["url"]
-    j = anvil.http.request(OFM_TILEJSON, json=True, timeout=20)
+    j: dict = anvil.http.request(OFM_TILEJSON, json=True, timeout=20)  # type: ignore
     _ofm["url"], _ofm["at"] = j["tiles"][0], C.now()
     return _ofm["url"]
 

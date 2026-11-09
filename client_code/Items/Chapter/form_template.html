@@ -1,0 +1,8 @@
+<section class="qs-ch">
+  <div class="qs-ch-h">
+    <span class="cf-emoji" aria-hidden="true" anvil:dom-node="e"></span>
+    <div class="grow"><anvil-component type="Label" name="title" prop:role='["qs-ch-title"]' bind:text="self.item['title']"></anvil-component><anvil-component type="Label" name="blurb" prop:role='["fine-print"]' bind:text="self.item['blurb']"></anvil-component></div>
+    <div class="qs-ch-n"><anvil-component type="Label" name="count" prop:role='["fine-print"]' bind:text="self.item['count']"></anvil-component><anvil-component type="City_Fun_Time.Components.Bar" name="bar" prop:tone="mint" bind:value="self.item['pct']"></anvil-component></div>
+  </div>
+  <anvil-component type="RepeatingPanel" name="missions_panel" prop:item_template="City_Fun_Time.Items.MissionCard" prop:role='["qs-list"]'></anvil-component>
+</section>
