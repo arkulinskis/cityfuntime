@@ -1,0 +1,15 @@
+<anvil-form layout="City_Fun_Time.Layouts.Shell">
+  <anvil-block slot="content">
+
+<div class="ui-wrap">
+  <div class="ui-page-head">
+    <div><h1>Album</h1><anvil-component type="Label" name="lead" prop:role='["lead"]'></anvil-component></div>
+    <div class="al-total"><anvil-component type="City_Fun_Time.Components.Bar" name="total_bar" prop:tone="gold"></anvil-component></div>
+  </div>
+  <anvil-component type="RepeatingPanel" name="sets_panel" prop:item_template="City_Fun_Time.Items.StickerSet" prop:role='["al-sets"]'></anvil-component>
+  <h2 class="al-photos-h"><span class="cf-emoji" aria-hidden="true">📸</span> Photos</h2>
+  <anvil-component type="RepeatingPanel" name="photos_panel" prop:item_template="City_Fun_Time.Items.Photo" prop:role='["al-photos"]'></anvil-component>
+  <div class="ui-empty" anvil:name="photos_empty"><h3>No photos yet</h3><p>Photo missions (Noor the photographer has lots) save a snapshot of your city here. Photos stay on this device.</p></div>
+</div>
+  </anvil-block>
+</anvil-form>

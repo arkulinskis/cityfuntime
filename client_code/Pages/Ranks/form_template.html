@@ -1,0 +1,19 @@
+<anvil-form layout="City_Fun_Time.Layouts.Shell">
+  <anvil-block slot="content">
+
+<div class="ui-wrap ui-narrow">
+  <div class="ui-page-head"><div><h1>Leaderboard</h1><p class="muted">The neighbourhood's biggest lives. Everyone plays in their own city, but the money is the same.</p></div></div>
+  <div class="rk-totals">
+    <div class="ui-card ui-stat tight"><anvil-component type="Label" name="players" prop:role='["stat-num"]'></anvil-component><span>players</span></div>
+    <div class="ui-card ui-stat tight"><anvil-component type="Label" name="missions" prop:role='["stat-num"]'></anvil-component><span>missions done</span></div>
+    <div class="ui-card ui-stat tight"><anvil-component type="Label" name="turfs" prop:role='["stat-num"]'></anvil-component><span>blocks won</span></div>
+  </div>
+  <div class="rk-tabs" role="group" aria-label="Rank by">
+    <anvil-component type="Button" name="b_worth" prop:text="💰 Net worth" prop:role='["rk-tab"]'></anvil-component> <anvil-component type="Button" name="b_level" prop:text="⭐ Level" prop:role='["rk-tab"]'></anvil-component> <anvil-component type="Button" name="b_turfs" prop:text="🎨 Blocks" prop:role='["rk-tab"]'></anvil-component> <anvil-component type="Button" name="b_missions" prop:text="📜 Missions" prop:role='["rk-tab"]'></anvil-component>
+  </div>
+  <anvil-component type="RepeatingPanel" name="rows_panel" prop:item_template="City_Fun_Time.Items.RankRow" prop:role='["rk-list"]'></anvil-component>
+  <div class="ui-empty" anvil:name="none_box"><h2>Nobody here yet</h2><p>Be the first.</p></div>
+  <p class="muted small rk-guest" anvil:name="guest_note">Guests play too, but only <a href="#auth/signup">players with an account</a> show up here.</p>
+</div>
+  </anvil-block>
+</anvil-form>

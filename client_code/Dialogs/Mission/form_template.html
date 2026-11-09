@@ -1,0 +1,21 @@
+<div class="qs-dlg">
+  <div class="qs-dlg-head">
+    <span class="cf-emoji qs-dlg-e" aria-hidden="true" anvil:dom-node="e"></span>
+    <div><anvil-component type="Label" name="title" prop:role='["dlg-title"]'></anvil-component><anvil-component type="Label" name="who" prop:role='["fine-print"]'></anvil-component></div>
+  </div>
+  <div anvil:name="locked_box">
+    <p class="muted">Unlocks after:</p>
+    <anvil-component type="RepeatingPanel" name="reqs_panel" prop:item_template="City_Fun_Time.Items.StepRow" prop:role='["qs-reqs"]'></anvil-component>
+  </div>
+  <div anvil:name="story_box">
+    <anvil-component type="Label" name="quote" prop:role='["qs-quote"]'></anvil-component>
+    <anvil-component type="RepeatingPanel" name="steps_panel" prop:item_template="City_Fun_Time.Items.StepRow" prop:role='["qs-steps"]'></anvil-component>
+  </div>
+  <h3 class="qs-reward-h">Reward</h3>
+  <anvil-component type="RepeatingPanel" name="rewards_panel" prop:item_template="City_Fun_Time.Items.Pill" prop:role='["qs-reward"]'></anvil-component>
+  <div class="ui-row end qs-dlg-actions">
+    <anvil-component type="Button" name="track_button" prop:text="🎯 Track it" prop:role='["btn"]'></anvil-component>
+    <anvil-component type="Button" name="close_button" prop:text="Close" prop:role='["btn", "btn-ghost"]'></anvil-component>
+    <anvil-component type="Button" name="play_button" prop:text="🎮 Play" prop:role='["btn", "btn-primary"]'></anvil-component>
+  </div>
+</div>

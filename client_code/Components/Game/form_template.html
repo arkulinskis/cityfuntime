@@ -1,0 +1,15 @@
+---
+custom_component: true
+properties: []
+toolbox_item:
+  title: 3D game
+  group: City Fun Time
+help_text: |
+  The whole 3D game (theme/assets/cft-*.js): mounted through cft.mount_game when the component appears, destroyed (with
+  a last save) when it leaves. Exit goes to Life (members) or the landing page; "start over" reloads #play.
+---
+<div class="cft-host">
+  <div class="cft-root" anvil:dom-node="root">
+    <div class="cft-loading"><div class="cft-spin" aria-hidden="true">🏙️</div><p>Getting the city ready...</p></div>
+  </div>
+</div>

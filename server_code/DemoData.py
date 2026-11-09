@@ -37,7 +37,7 @@ STICKERS = ["pigeon", "squirrel", "raccoon", "hotdog", "bagel", "slice", "taco",
 
 def demo_save(name, xp, money, done, turfs, biz, kids, partner, day, active=None, home=None):
     """A believable save. Used for the demo players and for Ana on the local dev server."""
-    home = home or HOME
+    home: dict = home or HOME
     m = {mid: {"s": "done", "done": max(1, day - 1)} for mid in STORY[:done]}
     for i in range(max(0, done - len(STORY))):
         m["s-extra-%d" % i] = {"s": "done", "done": day}

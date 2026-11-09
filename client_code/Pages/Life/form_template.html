@@ -1,0 +1,74 @@
+<anvil-form layout="City_Fun_Time.Layouts.Shell">
+  <anvil-block slot="content">
+
+<div class="ui-wrap">
+  <div class="cf-sticker-card lf-welcome" anvil:name="welcome_box">
+    <div class="big" aria-hidden="true">🧳</div>
+    <h1>Your new life starts at your front door</h1>
+    <p class="muted lf-welcome-lead">Type your address and your real neighbourhood turns into a 3D city full of people. Cousin Max has a couch for you. The rest is up to you.</p>
+    <div class="lf-steps">
+      <div><b>1. Move in</b><p class="muted small">Pick your street, your name and your look.</p></div>
+      <div><b>2. Hustle</b><p class="muted small">Coins, errands, odd jobs, a lemonade stand.</p></div>
+      <div><b>3. Live it up</b><p class="muted small">Friends, love, a family, a penthouse, the whole neighbourhood.</p></div>
+    </div>
+    <anvil-component type="Label" name="adopt_note" prop:role='["note", "lf-adopt"]'></anvil-component>
+    <div anvil:name="start_new"><a class="ui-btn primary lg cf-hero-btn" href="#play">🎮 Start my new life</a></div>
+    <div anvil:name="start_keep"><a class="ui-btn primary lg cf-hero-btn" href="#play">🎮 Keep playing</a></div>
+  </div>
+
+  <div anvil:name="life_box">
+    <section class="lf-hero">
+      <div class="lf-av"><anvil-component type="Label" name="initials" prop:role='["lf-initials"]'></anvil-component></div>
+      <div class="lf-who"><anvil-component type="Label" name="name_title" prop:role='["lf-name"]'></anvil-component><anvil-component type="Label" name="sub" prop:role='["lf-sub"]'></anvil-component><anvil-component type="City_Fun_Time.Components.Bar" name="xp_bar" prop:tone="gold"></anvil-component></div>
+      <div class="lf-play"><anvil-component type="Label" name="money" prop:role='["lf-money"]'></anvil-component><anvil-component type="Label" name="worth" prop:role='["lf-worth"]'></anvil-component><a class="ui-btn accent lg cf-hero-btn" href="#play">🎮 Play</a></div>
+    </section>
+    <div class="lf-grid">
+      <div class="lf-card" anvil:dom-node="now_card">
+        <h2 class="lf-h"><span class="cf-emoji" aria-hidden="true">🎯</span> Right now</h2>
+        <anvil-component type="Label" name="now_title" prop:role='["lf-big"]'></anvil-component><anvil-component type="Label" name="now_text" prop:role='["lf-muted"]'></anvil-component>
+        <a class="ui-btn sm" href="#quests">All quests</a>
+      </div>
+      <div class="lf-card">
+        <h2 class="lf-h"><span class="cf-emoji" aria-hidden="true" anvil:dom-node="home_e">🏠</span> Home</h2>
+        <anvil-component type="Label" name="home_title" prop:role='["lf-big"]'></anvil-component><anvil-component type="Label" name="home_label" prop:role='["lf-muted"]'></anvil-component><anvil-component type="Label" name="home_note" prop:role='["lf-small"]'></anvil-component>
+      </div>
+      <div class="lf-card">
+        <h2 class="lf-h"><span class="cf-emoji" aria-hidden="true">💘</span> Love &amp; family</h2>
+        <anvil-component type="Label" name="love_title" prop:role='["lf-big"]'></anvil-component><anvil-component type="Label" name="love_sub" prop:role='["lf-muted"]'></anvil-component>
+        <anvil-component type="RepeatingPanel" name="kids_panel" prop:item_template="City_Fun_Time.Items.Pill" prop:role='["lf-chips"]'></anvil-component>
+        <anvil-component type="RepeatingPanel" name="pets_panel" prop:item_template="City_Fun_Time.Items.Pill" prop:role='["lf-chips"]'></anvil-component>
+      </div>
+      <div class="lf-card">
+        <h2 class="lf-h"><span class="cf-emoji" aria-hidden="true">📊</span> Stats</h2>
+        <anvil-component type="RepeatingPanel" name="stats_panel" prop:item_template="City_Fun_Time.Items.StatRow"></anvil-component>
+      </div>
+      <div class="lf-card">
+        <h2 class="lf-h"><span class="cf-emoji" aria-hidden="true">🤝</span> <span anvil:dom-node="friends_h">Friends</span></h2>
+        <anvil-component type="RepeatingPanel" name="friends_panel" prop:item_template="City_Fun_Time.Items.ListRow" prop:role='["lf-list"]'></anvil-component>
+        <anvil-component type="Label" name="friends_empty" prop:role='["lf-muted"]' prop:text="Help people with missions and they'll become friends. Every friend has a perk."></anvil-component>
+      </div>
+      <div class="lf-card">
+        <h2 class="lf-h"><span class="cf-emoji" aria-hidden="true">💼</span> <span anvil:dom-node="biz_h">Businesses</span></h2>
+        <anvil-component type="RepeatingPanel" name="biz_panel" prop:item_template="City_Fun_Time.Items.ListRow" prop:role='["lf-list"]'></anvil-component>
+        <anvil-component type="Label" name="biz_empty" prop:role='["lf-muted"]' prop:text="A lemonade stand is $60. A boutique hotel is $1.5 million. Everything in between is up to you."></anvil-component>
+      </div>
+      <div class="lf-card">
+        <h2 class="lf-h"><span class="cf-emoji" aria-hidden="true">🎨</span> Blocks</h2>
+        <anvil-component type="Label" name="turfs" prop:role='["lf-big"]'></anvil-component><anvil-component type="Label" name="turfs_note" prop:role='["lf-muted"]'></anvil-component>
+      </div>
+      <div class="lf-card">
+        <h2 class="lf-h"><span class="cf-emoji" aria-hidden="true">🎴</span> Collection</h2>
+        <anvil-component type="Label" name="stickers" prop:role='["lf-big"]'></anvil-component><anvil-component type="City_Fun_Time.Components.Bar" name="stickers_bar" prop:tone="gold"></anvil-component><anvil-component type="Label" name="missions" prop:role='["lf-small", "lf-gap"]'></anvil-component>
+        <a class="ui-btn sm" href="#album">Open the album</a>
+      </div>
+      <div class="lf-card wide">
+        <h2 class="lf-h"><span class="cf-emoji" aria-hidden="true">📔</span> Diary</h2>
+        <div class="lf-diary" tabindex="0" aria-label="Diary"><anvil-component type="RepeatingPanel" name="diary_panel" prop:item_template="City_Fun_Time.Items.DiaryRow"></anvil-component></div>
+        <anvil-component type="Label" name="diary_empty" prop:role='["lf-muted"]' prop:text="Nothing yet. Go make some memories."></anvil-component>
+      </div>
+    </div>
+    <div class="lf-foot"><anvil-component type="Label" name="saved" prop:role='["fine-print"]'></anvil-component><span class="muted small">·</span><a class="small" href="#ranks">See the leaderboard</a></div>
+  </div>
+</div>
+  </anvil-block>
+</anvil-form>

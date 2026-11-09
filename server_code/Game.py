@@ -77,7 +77,7 @@ def store(user, data, is_demo=False):
     """Write a (clean) save for a user and refresh the summary columns."""
     s = summarize(data)
     row = app_tables.saves.get(user=user)
-    vals = dict(data=data, name=data.get("name") or "Player", updated=C.now(), level=s["level"], xp=s["xp"], worth=s["worth"],
+    vals: dict = dict(data=data, name=data.get("name") or "Player", updated=C.now(), level=s["level"], xp=s["xp"], worth=s["worth"],
                 missions=s["missions"], turfs=s["turfs"], biz=s["biz"], kids=s["kids"], partner=s["partner"], day=s["day"])
     if row is None:
         row = app_tables.saves.add_row(user=user, created=C.now(), hidden=False, is_demo=is_demo, **vals)
@@ -128,7 +128,7 @@ def leaderboard():
     DemoData.ensure_loaded()
     me = C.me()
     rows = [r for r in app_tables.saves.search() if not r["hidden"]]
-    out = {}
+    out: dict = {}
     for key, col in (("worth", "worth"), ("level", "xp"), ("turfs", "turfs"), ("missions", "missions")):
         top = sorted(rows, key=lambda r: (r[col] or 0, r["xp"] or 0), reverse=True)
         out[key] = [dict(_entry(r, me), rank=i + 1) for i, r in enumerate(top[:15])]

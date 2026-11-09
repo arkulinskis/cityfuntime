@@ -1,0 +1,19 @@
+---
+custom_component: true
+properties:
+  - name: value
+    type: number
+    default_value: 0
+    description: How full the bar is, 0 to 100
+    default_binding_prop: true
+  - name: tone
+    type: string
+    default_value: ""
+    description: The fill colour - empty for grape, or gold, pink, mint
+toolbox_item:
+  title: Progress bar
+  group: City Fun Time
+help_text: |
+  The chunky sticker-style progress bar (XP, stats, stickers, chapters). value 0-100, tone = gold, pink or mint.
+---
+<div class="cf-bar-host"><div class="cf-bar" anvil:dom-node="bar"><i anvil:dom-node="fill"></i></div></div>
