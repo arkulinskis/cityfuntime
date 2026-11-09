@@ -312,13 +312,12 @@ native_deps:
     , \"inLanguage\": \"en\", \"publisher\": {\"@id\": \"https://arkvital.com/#org\"}, \"keywords\": \"life simulation game,\
     \ 3D game on real streets, play in your neighbourhood, OpenStreetMap game, city life sim browser, open world browser game,\
     \ real map game, business sim game, free browser game 3D\", \"applicationCategory\": \"GameApplication\", \"operatingSystem\"\
-    : \"Any (web browser)\", \"browserRequirements\": \"Requires JavaScript and a modern web browser\", \"featureList\": [\"\
-    Any address rebuilt in 3D from OpenStreetMap, with real hills from Mapterhorn elevation data\", \"155 missions: 85 story\
-    \ missions in 9 chapters, plus side jobs\", \"Friends, love, a family and fifteen businesses\", \"An album of 78 stickers\
-    \ and photo missions\", \"Leaderboards for net worth, level, blocks and missions\", \"Play as a guest; saves stay in the\
-    \ browser\"], \"audience\": {\"@type\": \"Audience\", \"audienceType\": \"Players who want a life-sim adventure set in\
-    \ their own neighbourhood\"}}, {\"@type\": \"WebSite\", \"@id\": \"https://city-fun-time.anvil.app/#site\", \"url\": \"\
-    https://city-fun-time.anvil.app/\", \"name\": \"City Fun Time\", \"publisher\": {\"@id\": \"https://arkvital.com/#org\"\
+    : \"Any (web browser)\", \"featureList\": [\"Any address rebuilt in 3D from OpenStreetMap, with real hills from Mapterhorn\
+    \ elevation data\", \"155 missions: 85 story missions in 9 chapters, plus side jobs\", \"Friends, love, a family and fifteen\
+    \ businesses\", \"An album of 78 stickers and photo missions\", \"Leaderboards for net worth, level, blocks and missions\"\
+    , \"Play as a guest; saves stay in the browser\"], \"audience\": {\"@type\": \"Audience\", \"audienceType\": \"Players\
+    \ who want a life-sim adventure set in their own neighbourhood\"}}, {\"@type\": \"WebSite\", \"@id\": \"https://city-fun-time.anvil.app/#site\"\
+    , \"url\": \"https://city-fun-time.anvil.app/\", \"name\": \"City Fun Time\", \"publisher\": {\"@id\": \"https://arkvital.com/#org\"\
     }}, {\"@type\": \"Organization\", \"@id\": \"https://arkvital.com/#org\", \"name\": \"Arkvital\", \"url\": \"https://arkvital.com\"\
     , \"email\": \"arkvital@outlook.com\", \"address\": {\"@type\": \"PostalAddress\", \"addressLocality\": \"Montreal\",\
     \ \"addressRegion\": \"QC\", \"addressCountry\": \"CA\"}}]}</script>\n<!-- seo:end -->\n<meta name=\"viewport\" content=\"\
