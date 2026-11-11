@@ -1674,8 +1674,8 @@ function create(opts) {
     g.userData = { kind: 'animal', legs, head, tail, phase: Math.random() * 6 };
     return g;
   };
-  // Monsters (cartoon ones: you bonk them, they pop into coins). Each has googly eyes and its own wobble.
-  // kind: slime | bin | cone | sock | pigeon | goose | blob (the big purple boss). W.animateMonster(g, dt, speed) moves it.
+  // Monsters (cartoon figments: you bonk them, they pop into coins). Each has googly eyes and its own wobble.
+  // kind: slime | bin | cone | sock | pigeon | goose | blob (the big purple boss) | rat | raccoon | wisp | cart | spider | worm | gargoyle | brute. W.animateMonster(g, dt, speed) moves it.
   const eye = (m, x, y, z, r) => { m.add(SPHERE, 0xffffff, x, y, z, 0, 0, 0, r, r, r); m.add(SPHERE, 0x111111, x, y, z - r * 0.36, 0, 0, 0, r * 0.5, r * 0.5, r * 0.4); };
   const slimeMat = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.86 });
   W.monster = function (kind) {
@@ -1710,6 +1710,95 @@ function create(opts) {
       eye(m, -0.13, 1.1, -0.2, 0.18); eye(m, 0.13, 1.1, -0.2, 0.18);
       m.box(0.2, 0.2, 0.04, 0x111111, 0, 0.82, -0.18);
       h = 1.8;
+    } else if (kind === 'rat') {
+      const c = 0x8a8f99, pink = 0xf2a7b8;
+      m.add(SPHERE, c, 0, 0.45, 0.08, 0, 0, 0, 0.9, 0.62, 1.35);
+      m.add(SPHERE, c, 0, 0.6, -0.62, 0, 0, 0, 0.56, 0.5, 0.62);
+      m.add(SPHERE, pink, 0, 0.56, -0.94, 0, 0, 0, 0.13, 0.11, 0.12);
+      m.add(SPHERE, pink, -0.22, 0.9, -0.58, 0, 0, 0, 0.26, 0.26, 0.08); m.add(SPHERE, pink, 0.22, 0.9, -0.58, 0, 0, 0, 0.26, 0.26, 0.08);
+      eye(m, -0.13, 0.7, -0.86, 0.12); eye(m, 0.13, 0.7, -0.86, 0.12);
+      for (const sx of [-1, 1]) for (const k of [0, 1]) m.box(0.34, 0.012, 0.012, 0x333333, sx * 0.2, 0.56 + k * 0.04, -0.9, 0, 0, sx * (0.12 - k * 0.24));
+      m.add(CYL, pink, 0, 0.34, 0.95, 1.25, 0, 0, 0.06, 1.1, 0.06);
+      for (const [x, z] of [[-0.25, -0.35], [0.25, -0.35], [-0.25, 0.4], [0.25, 0.4]]) m.box(0.14, 0.18, 0.2, pink, x, 0.09, z);
+      m.box(0.14, 0.05, 0.03, 0xffffff, 0, 0.46, -0.9);
+      h = 1.05;
+    } else if (kind === 'raccoon') {
+      const c = 0x7d7d84, mask = 0x2b2b2b, light = 0xd9d4cc;
+      m.add(SPHERE, c, 0, 0.55, 0.05, 0, 0, 0, 0.9, 0.85, 1.05);
+      m.add(SPHERE, light, 0, 0.5, -0.36, 0, 0, 0, 0.55, 0.55, 0.3);
+      m.add(SPHERE, c, 0, 1.05, -0.3, 0, 0, 0, 0.66, 0.58, 0.6);
+      m.box(0.56, 0.15, 0.08, mask, 0, 1.08, -0.58);
+      m.add(SPHERE, light, 0, 0.97, -0.62, 0, 0, 0, 0.26, 0.2, 0.24); m.add(SPHERE, mask, 0, 1.0, -0.75, 0, 0, 0, 0.09, 0.07, 0.07);
+      m.add(CONE, c, -0.22, 1.38, -0.28, 0, 0, 0.2, 0.18, 0.24, 0.12); m.add(CONE, c, 0.22, 1.38, -0.28, 0, 0, -0.2, 0.18, 0.24, 0.12);
+      eye(m, -0.13, 1.1, -0.64, 0.1); eye(m, 0.13, 1.1, -0.64, 0.1);
+      for (let k = 0; k < 5; k++) m.add(CYL, k % 2 ? mask : c, 0, 0.4 + k * 0.1, 0.55 + k * 0.17, -0.9, 0, 0, 0.24 - k * 0.02, 0.18, 0.24 - k * 0.02);
+      m.add(SPHERE, mask, -0.36, 0.7, -0.35, 0, 0, 0, 0.16, 0.16, 0.16); m.add(SPHERE, mask, 0.36, 0.7, -0.35, 0, 0, 0, 0.16, 0.16, 0.16);
+      m.box(0.2, 0.14, 0.24, mask, -0.22, 0.07, -0.1); m.box(0.2, 0.14, 0.24, mask, 0.22, 0.07, -0.1);
+      h = 1.45;
+    } else if (kind === 'wisp') {
+      const c = 0xbfe3ff, deep = 0x8fc8f5;
+      m.add(SPHERE, c, 0, 0.95, 0, 0, 0, 0, 0.95, 0.85, 0.95);
+      m.add(SPHERE, c, 0, 1.5, 0.02, 0, 0, 0, 0.72, 0.62, 0.72);
+      m.add(SPHERE, c, 0.05, 1.88, 0.06, 0, 0, 0.3, 0.42, 0.4, 0.42);
+      m.add(SPHERE, deep, 0, 0.45, 0.05, 0, 0, 0, 0.5, 0.4, 0.5); m.add(SPHERE, deep, 0, 0.16, 0.1, 0, 0, 0, 0.24, 0.2, 0.24);
+      eye(m, -0.16, 1.05, -0.4, 0.18); eye(m, 0.16, 1.05, -0.4, 0.18);
+      m.add(SPHERE, 0x1c2a4a, 0, 0.78, -0.44, 0, 0, 0, 0.2, 0.14, 0.05);
+      mat = slimeMat; h = 2.0;
+    } else if (kind === 'cart') {
+      const wire = 0xb9c0c8, dark = 0x3a3f4a;
+      m.box(0.92, 0.6, 1.2, wire, 0, 0.9, 0); m.box(0.8, 0.5, 1.08, 0x8a929c, 0, 0.94, 0);
+      for (let k = -2; k <= 2; k++) m.box(0.94, 0.03, 0.03, dark, 0, 0.9 + k * 0.12, -0.61);
+      m.box(0.3, 0.3, 0.3, 0xe8453c, -0.18, 1.32, 0.15, 0, 0.4, 0); m.box(0.26, 0.4, 0.2, 0xf2b134, 0.2, 1.36, -0.05, 0, -0.3, 0); m.add(SPHERE, 0x2f9e6e, 0.05, 1.3, 0.4, 0, 0, 0, 0.3, 0.26, 0.3);
+      m.add(CYL, 0xe8453c, 0, 1.3, 0.66, 0, 0, Math.PI / 2, 0.08, 1.0, 0.08);
+      for (const [x, z] of [[-0.38, -0.5], [0.38, -0.5], [-0.38, 0.5], [0.38, 0.5]]) { m.box(0.05, 0.5, 0.05, dark, x, 0.36, z); m.add(CYL, 0x222428, x, 0.1, z, 0, 0, Math.PI / 2, 0.2, 0.08, 0.2); }
+      eye(m, -0.22, 1.02, -0.66, 0.17); eye(m, 0.22, 1.02, -0.66, 0.17);
+      for (let k = -2; k <= 2; k++) m.box(0.07, 0.1, 0.03, 0xffffff, k * 0.11, 0.72, -0.63);
+      h = 1.45;
+    } else if (kind === 'spider') {
+      const c = 0x1f2229, red = 0xff3b30;
+      m.add(SPHERE, c, 0, 0.55, -0.1, 0, 0, 0, 0.8, 0.55, 0.85);
+      m.add(SPHERE, c, 0, 0.65, 0.55, 0, 0, 0, 0.95, 0.8, 1.0);
+      m.add(SPHERE, red, 0, 0.82, 0.62, 0, 0, 0, 0.3, 0.2, 0.36);
+      for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) {
+        const z = -0.32 + i * 0.22;
+        m.box(0.62, 0.06, 0.06, c, sx * 0.55, 0.62, z, 0, sx * (i - 1.5) * 0.3, sx * 0.5);
+        m.box(0.06, 0.6, 0.06, c, sx * 0.86, 0.32, z + sx * 0 - (i - 1.5) * 0.06, 0, 0, sx * -0.2);
+      }
+      eye(m, -0.14, 0.72, -0.48, 0.14); eye(m, 0.14, 0.72, -0.48, 0.14);
+      for (const [x, y] of [[-0.26, 0.6], [0.26, 0.6], [-0.08, 0.86], [0.08, 0.86]]) m.add(SPHERE, red, x, y, -0.46, 0, 0, 0, 0.06, 0.06, 0.04);
+      h = 1.0;
+    } else if (kind === 'worm') {
+      const c = 0xd98c9a, belly = 0xf2c4cc;
+      m.add(CYL, 0x3a3f4a, 0, 0.04, 0, 0, 0, 0, 1.7, 0.08, 1.7); m.add(CYL, 0x1c1e22, 0, 0.06, 0, 0, 0, 0, 1.3, 0.06, 1.3);
+      for (let k = 0; k < 5; k++) m.add(SPHERE, k % 2 ? c : belly, 0, 0.32 + k * 0.32, -k * 0.04, 0, 0, 0, 0.78 - k * 0.05, 0.42, 0.78 - k * 0.05);
+      m.add(SPHERE, c, 0, 1.85, -0.18, 0, 0, 0, 0.72, 0.66, 0.72);
+      m.add(CYL, 0x3a1020, 0, 1.74, -0.5, Math.PI / 2, 0, 0, 0.42, 0.06, 0.42);
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; m.add(CONE, 0xffffff, Math.cos(a) * 0.16, 1.74 + Math.sin(a) * 0.16, -0.53, Math.PI / 2, 0, a + Math.PI / 2, 0.06, 0.1, 0.06); }
+      eye(m, -0.18, 2.06, -0.4, 0.15); eye(m, 0.18, 2.06, -0.4, 0.15);
+      h = 2.3;
+    } else if (kind === 'gargoyle') {
+      const c = 0x8c8b88, dark = 0x6b6a67;
+      m.add(SPHERE, c, 0, 0.78, 0.05, 0, 0, 0, 0.92, 0.95, 0.82);
+      m.add(SPHERE, c, 0, 1.38, -0.22, 0, 0, 0, 0.6, 0.55, 0.58);
+      m.add(CONE, dark, -0.17, 1.72, -0.2, -0.3, 0, 0.35, 0.12, 0.3, 0.12); m.add(CONE, dark, 0.17, 1.72, -0.2, -0.3, 0, -0.35, 0.12, 0.3, 0.12);
+      m.box(0.95, 0.65, 0.06, dark, -0.6, 1.2, 0.3, 0, 0.55, 0.35); m.box(0.95, 0.65, 0.06, dark, 0.6, 1.2, 0.3, 0, -0.55, -0.35);
+      for (const sx of [-1, 1]) { m.add(SPHERE, 0xffd23f, sx * 0.13, 1.44, -0.48, 0, 0, 0, 0.14, 0.12, 0.06); m.add(SPHERE, 0x111111, sx * 0.13, 1.44, -0.51, 0, 0, 0, 0.05, 0.08, 0.03); }
+      for (let k = -1; k <= 1; k++) m.add(CONE, 0xf4f1ea, k * 0.08, 1.24, -0.5, Math.PI, 0, 0, 0.05, 0.08, 0.05);
+      m.box(0.24, 0.2, 0.34, dark, -0.26, 0.1, -0.12); m.box(0.24, 0.2, 0.34, dark, 0.26, 0.1, -0.12);
+      m.box(0.16, 0.4, 0.16, dark, -0.4, 0.55, -0.36); m.box(0.16, 0.4, 0.16, dark, 0.4, 0.55, -0.36);
+      h = 1.85;
+    } else if (kind === 'brute') {
+      const c = 0xb5533c, mortar = 0xd9c7b8, dark = 0x8a3a2a;
+      m.box(1.1, 1.0, 0.72, c, 0, 1.28, 0);
+      for (let k = 0; k < 4; k++) m.box(1.12, 0.04, 0.74, mortar, 0, 0.88 + k * 0.25, 0);
+      for (let k = 0; k < 4; k++) m.box(0.04, 0.22, 0.74, mortar, (k % 2 ? -0.2 : 0.2), 1.0 + k * 0.25, 0);
+      m.box(0.52, 0.44, 0.48, c, 0, 2.0, -0.04); m.box(0.54, 0.04, 0.5, mortar, 0, 1.92, -0.04);
+      eye(m, -0.12, 2.04, -0.28, 0.1); eye(m, 0.12, 2.04, -0.28, 0.1);
+      m.box(0.24, 0.05, 0.03, 0x2a1410, 0, 1.88, -0.29, 0, 0, 0.1);
+      m.box(0.38, 0.92, 0.38, c, -0.8, 1.15, 0); m.box(0.38, 0.92, 0.38, c, 0.8, 1.15, 0);
+      m.box(0.46, 0.36, 0.46, dark, -0.8, 0.56, -0.02); m.box(0.46, 0.36, 0.46, dark, 0.8, 0.56, -0.02);
+      m.box(0.42, 0.78, 0.42, dark, -0.28, 0.39, 0); m.box(0.42, 0.78, 0.42, dark, 0.28, 0.39, 0);
+      h = 2.3;
     } else { // pigeon (a very large one) and goose (a very angry one)
       const goose = kind === 'goose', c = goose ? 0xf4f1ea : 0x8b8f9c;
       m.add(SPHERE, c, 0, 0.75, 0.05, 0, 0, 0, 0.9, 0.8, 1.3);
@@ -1730,6 +1819,10 @@ function create(opts) {
     const s = Math.sin(u.phase), k = u.mkind;
     if (k === 'slime' || k === 'blob') { const q = 1 + s * 0.14; b.scale.set(1 / Math.sqrt(q), q, 1 / Math.sqrt(q)); b.position.y = Math.max(0, s) * (speed > 0.3 ? 0.5 : 0.08); }
     else if (k === 'sock') { b.position.y = 0.25 + s * 0.14; b.rotation.z = s * 0.14; }
+    else if (k === 'wisp') { b.position.y = 0.3 + s * 0.25; b.rotation.y += dt * 0.6; b.rotation.z = Math.sin(u.phase * 0.5) * 0.08; }
+    else if (k === 'worm') { b.rotation.z = s * 0.16; b.rotation.x = Math.cos(u.phase * 0.7) * 0.1; b.scale.y = 1 + s * 0.05; }
+    else if (k === 'spider') { b.position.y = Math.abs(s) * 0.12 * Math.min(1, speed + 0.3); b.rotation.y = Math.sin(u.phase * 2) * 0.08; }
+    else if (k === 'brute' || k === 'gargoyle') { b.rotation.z = s * 0.06 * Math.min(1, speed + 0.2); b.position.y = Math.abs(s) * 0.05; b.rotation.y = s * 0.05; }
     else if (k === 'bin') { b.rotation.z = s * 0.1 * Math.min(1, speed); b.position.y = Math.abs(s) * 0.08 * Math.min(1, speed); if (u.lid) u.lid.rotation.x = -Math.max(0, Math.sin(u.phase * 0.7)) * 0.7; }
     else { b.rotation.z = s * 0.12 * Math.min(1, speed + 0.2); b.position.y = Math.abs(s) * 0.1 * Math.min(1, speed + 0.2); }
     if (u.hurt > 0) { u.hurt -= dt; const f = 1 + Math.sin(u.hurt * 40) * 0.12; g.scale.setScalar((u.size || 1) * f); } else g.scale.setScalar(u.size || 1);

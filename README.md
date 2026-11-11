@@ -56,6 +56,22 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
   jeans with the backpack you arrived with; outfits, shoes, headphones and the helmet from the shops show on you. Change skin,
   hair colour, hair style, glasses, beard and backpack any time: phone → Settings (or Me) → **Change your look**, with your
   character turning to face you.
+- **Combat, Diablo-style** (2026-11-11): you're an ordinary person whose mind sometimes turns the city's noise into **figments**
+  only you can see ("the Static"); you face them. **15 monster types** (slime, cone gremlin, trash goblin, lost-sock ghost,
+  pigeonzilla, King Blob, goose, rat, raccoon, static wisp, cart golem, cable spider, subway worm, rooftop gargoyle, brick brute),
+  each named for your city (Montréal's "Ruelle Rat" is Tokyo's "Alley Rat"; hand-written for Montréal, New York, Paris,
+  London, Riga and Tokyo, picked from local variants elsewhere). More at night, a couple by day (never near home), fewer
+  when you're happy. Monster **levels** rise with yours and with distance from home; **champion packs** (blue tags, 2.5x
+  health); a **foe bar** with name and level; damage numbers. A red **health bar**, armour from loot, regeneration out of a
+  fight, food and calm tea 🍵 heal (Q or the 🍵 button). At zero you **black out** and come to at the nearest metro station
+  you've freed, or home; 10% of your pocket money stays in your dropped wallet 👛 where you fell, for you to pick up.
+  **Every metro station has a guardian** (Turnstile Titan, Tunnel Wyrm, Platform Gargoyle, Rush-Hour Juggernaut, Escalator
+  Weaver): big, levelled, it stays by its stairs. Beat it and the station joins your metro network (fast travel, a place to
+  come to). Max's side story "The Static" (face three figments, a check-up, a night's sleep).
+- **Gear you can see:** loot hats (cap, beanie, helmet, bucket hat, hard hat), jackets (hoodie, denim, leather, puffer, trench,
+  track), shoes and weapons (loot versions of the shop weapons) in rarity colours, with armour, health, speed or damage and
+  Diablo-style affixes ("Sturdy Puffer Coat of the Sprinter"). They show on your character; phone → Character lists weapon,
+  head, body, feet and three charms with your health and armour. Shop outfits still work; loot wins where both apply.
 - **The long game** (after what kept people in World of Warcraft; the phone's Character, Reputation and Achievements apps):
   - **Loot in rarity colours:** charms in Junk grey, Common, Uncommon green, Rare blue, Epic purple and Legendary orange, with
     random stats (and a perk on Epic and Legendary), from monsters (about one in five), treasure chests, mystery crates and
@@ -171,6 +187,7 @@ python -I tools/live/game_test.py                # plays the 3D game for real (n
 python -I tools/live/game_test.py --shots DIR    # pictures of the city by day, at dusk and at night
 python -I tools/live/game_test.py --people DIR   # close-ups of the characters: you, passers-by in poses, the look editor
 python -I tools/live/game_test.py --long DIR     # the Character / Reputation / Achievements apps, a Legendary drop, a rare monster
+python -I tools/live/game_test.py --monsters DIR # the 15 monster types, a metro guardian, a fight, loot gear on you
 git push origin master                           # the deploy: Anvil pulls master
 ```
 

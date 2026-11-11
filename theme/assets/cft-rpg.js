@@ -1,8 +1,8 @@
 /* City Fun Time: the long game, built on what made World of Warcraft hard to put down, minus the parts that punish you for
    leaving. Data: D.RPG in cft-content.js. State: save.rpg.
 
-   - Loot in rarity colours (Junk grey -> Legendary orange): charms with random stats from monsters, chests, crates and missions,
-     three charm slots, a 30-slot bag, a pity timer (a Rare at least every 25 drops), compare against what you wear.
+   - Loot in rarity colours (Junk grey -> Legendary orange): charms and gear (weapon, head, body, feet: worn and visible, with
+     armour, health, speed or damage and magic affixes) from monsters, chests, crates and missions; three charm slots, a 30-slot bag, a pity timer (a Rare at least every 25 drops), compare against what you wear.
    - Talents: a point every level, three branches (Hustler, Charmer, Brawler), tiers that open as you invest, a capstone each.
    - Reputation: five neighbourhood factions earned from what you already do (counters), Neutral -> Exalted, rewards at each tier.
    - Achievements with points, titles to wear, a golden toast when one lands.
@@ -17,6 +17,7 @@
 (function () {
 'use strict';
 const STATS = ['fit', 'charm', 'smarts', 'style', 'cred'];
+const GEAR = ['weapon', 'head', 'body', 'feet'];  // gear you can see on your character (Diablo-style), next to three charms
 
 function attach(G, api) {
   const D = G.D, W = G.W, U = G.ui, X = D.RPG, THREE = W.THREE;
@@ -46,7 +47,11 @@ function attach(G, api) {
     const r = st(), acc = {};
     const add = (k, v) => { acc[k] = (acc[k] || 0) + v; };
     for (const t of X.TALENTS) { const n = r.tal[t.id] || 0; if (n) for (const k of Object.keys(t.fx)) add(k, t.fx[k] * (k === 'cap' ? 1 : n)); }
-    for (const slot of X.SLOTS) { const it = item(r.eq[slot]); if (!it) continue; for (const k of Object.keys(it.st || {})) add('stat_' + k, it.st[k]); for (const k of Object.keys(it.px || {})) add(k, it.px[k]); }
+    for (const slot of X.SLOTS.concat(GEAR)) {
+      const it = item(r.eq[slot]); if (!it) continue;
+      for (const k of Object.keys(it.st || {})) add('stat_' + k, it.st[k]); for (const k of Object.keys(it.px || {})) add(k, it.px[k]);
+      if (it.ar) add('armor', it.ar); if (it.lf) add('life', it.lf); if (it.sp) add('speed', it.sp);
+    }
     for (const f of X.FACTIONS) { const t = tier(f); for (let i = 1; i <= t; i++) { const rw = f.rewards[i]; if (rw && rw.fx) for (const k of Object.keys(rw.fx)) add(k, rw.fx[k]); } }
     return acc;
   }
@@ -54,15 +59,20 @@ function attach(G, api) {
 
   // ------------------------------------------------------------------ loot
   const item = id => id ? st().loot.find(x => x.id === id) || null : null;
-  const equipped = id => X.SLOTS.some(s => st().eq[s] === id);
-  function score(it) { if (!it) return -1; let v = 0; for (const k of Object.keys(it.st || {})) v += it.st[k]; if (it.px) v += 1.5 * (it.q >= 5 ? 1.6 : 1); return v; }
+  const equipped = id => X.SLOTS.concat(GEAR).some(s => st().eq[s] === id);
+  function score(it) { if (!it) return -1; let v = 0; for (const k of Object.keys(it.st || {})) v += it.st[k]; if (it.px) v += 1.5 * (it.q >= 5 ? 1.6 : 1); v += (it.ar || 0) * 0.12 + (it.lf || 0) * 0.06 + (it.sp || 0) * 40 + (it.dmg || 0) * 2.5; return v; }
   function perkText(it) {
     if (!it.px) return '';
     const k = Object.keys(it.px)[0], p = X.PERKS.find(x => x.k === k), v = it.px[k];
     return p ? p.d.replace('{p}', Math.round(v * 100)).replace('{n}', Math.round(v)) : '';
   }
   function statLine(it) {
-    const parts = Object.keys(it.st || {}).map(k => '+' + it.st[k] + ' ' + (D.STATS.find(x => x.id === k) || { name: k }).name);
+    const parts = [];
+    if (it.dmg) parts.push('Bonk ' + Math.round(it.dmg * 10));
+    if (it.ar) parts.push('Armour ' + it.ar);
+    if (it.lf) parts.push('+' + it.lf + ' health');
+    if (it.sp) parts.push('+' + Math.round(it.sp * 100) + '% speed');
+    parts.push(...Object.keys(it.st || {}).map(k => '+' + it.st[k] + ' ' + (D.STATS.find(x => x.id === k) || { name: k }).name));
     const pk = perkText(it); if (pk) parts.push(pk);
     return parts.join(' · ') || 'Sells for ' + fmt$(sellPrice(it));
   }
@@ -79,8 +89,10 @@ function attach(G, api) {
   }
   function make(q, il, o) {
     o = o || {};
-    const r = st(), id = 'L' + (r.n++);
-    if (q === 0) { const j = pick(X.JUNK); return { id, n: j[1], e: j[0], q: 0, il, st: {}, v: 2 + il }; }
+    const r = st();
+    if (q === 0) { const j = pick(X.JUNK); return { id: 'L' + (r.n++), n: j[1], e: j[0], q: 0, il, st: {}, v: 2 + il }; }
+    if (o.slot && o.slot !== 'charm') return makeGear(q, il, o.slot, o);
+    const id = 'L' + (r.n++);
     const base = o.e ? [o.e, o.n] : pick(X.CHARMS), focus = o.focus || pick(STATS);
     const budget = (0.5 + il * 0.11) * X.QUALITY[q].k, s = {};
     if (q <= 2) s[focus] = r1(budget);
@@ -94,6 +106,27 @@ function attach(G, api) {
     const n = o.n ? o.n : q >= 5 ? 'The ' + pick(X.LEGEND_ADJ) + ' ' + base[1] + ' ' + X.SUFFIX[focus] : (q >= 3 ? pick(X.ADJ) + ' ' : '') + base[1] + ' ' + X.SUFFIX[focus];
     return { id, n, e: base[0], q, il, st: s, px, v: Math.round((q + 1) * (q + 1) * (2 + il)) };
   }
+  // Gear: a base (a cap, a hoodie, work boots, a pool noodle...), armour / health / speed / damage by level and quality,
+  // magic affixes like Diablo's ("Sturdy Puffer Coat of the Sprinter"), a colour that shows how rare it is.
+  function makeGear(q, il, slot, o) {
+    const r = st(), id = 'L' + (r.n++), k = X.QUALITY[q].k, list = X.GEAR[slot];
+    const b = (o.base && list.find(x => x.id === o.base)) || pick(list);
+    const it = { id, slot, base: b.id, q, il, st: {}, px: null, col: pick(X.GEAR_COLS[q]), e: b.e };
+    if (slot === 'weapon') { const w = D.ITEMS[b.id].weapon; it.dmg = +(w.dmg * (0.85 + il * 0.05) * [1, 1, 1.15, 1.35, 1.6, 2][q]).toFixed(2); it.e = D.ITEMS[b.id].e; }
+    else {
+      it.ar = Math.max(1, Math.round(X.GEAR_AR[slot] * (1 + il * 0.25) * k));
+      if (slot === 'body') it.lf = Math.round((5 + il * 1.6) * k);
+      if (slot === 'feet') it.sp = +(0.012 * k).toFixed(3);
+    }
+    const budget = (0.3 + il * 0.07) * k;
+    if (q >= 2) { const f1 = o.focus || pick(STATS); it.st[f1] = r1(budget); if (q >= 3) it.st[pick(STATS.filter(x => x !== f1))] = r1(budget * 0.6); }
+    if (q >= 4) { const pk = X.PERKS.find(x => x.k === o.perk) || pick(X.PERKS); it.px = {}; it.px[pk.k] = +(pk.v * (q >= 5 ? 1.6 : 1)).toFixed(3); }
+    const focus = Object.keys(it.st)[0], suffix = focus ? ' ' + X.SUFFIX[focus] : '';
+    it.n = o.n || (q >= 5 ? 'The ' + pick(X.LEGEND_ADJ) + ' ' + b.n + suffix : (q >= 3 ? pick(X.PREFIX) + ' ' : '') + b.n + suffix);
+    it.v = Math.round((q + 1) * (q + 1) * (3 + il));
+    return it;
+  }
+  function pickSlot() { const x = Math.random(); return x < 0.3 ? 'charm' : x < 0.45 ? 'weapon' : x < 0.62 ? 'head' : x < 0.82 ? 'body' : 'feet'; }
   function ilvl(q) { return Math.max(1, G.level() + (q >= 4 ? 2 : 0) + Math.floor(rnd(-1, 2))); }
   // A drop from a source (D.RPG.SOURCES). Returns the item, or null when nothing dropped.
   function drop(src, o) {
@@ -102,7 +135,7 @@ function attach(G, api) {
     let minQ = (o && o.minQ) != null ? o.minQ : sc.minQ;
     if (src === 'rare' && bonus('rare') >= 1) minQ = 4;
     const q = rollQ(minQ, src);
-    return add(make(q, ilvl(q)), src);
+    return add(make(q, ilvl(q), { slot: pickSlot() }), src);
   }
   function add(it, src) {
     const r = st();
@@ -115,9 +148,10 @@ function attach(G, api) {
     r.loot.push(it);
     bump('loot'); bump('loot_' + it.q);
     if (it.q >= 3) r.pity = 0; else r.pity++;
-    // an empty slot takes it straight away
-    const empty = X.SLOTS.find(s => !item(r.eq[s]));
-    if (it.q >= 1 && empty) { r.eq[empty] = it.id; mark(); }
+    // an empty slot takes it straight away (a loot weapon only when you hold nothing from a shop)
+    const gear = it.slot && it.slot !== 'charm';
+    const empty = gear ? (!item(r.eq[it.slot]) && (it.slot !== 'weapon' || !save().equip.weapon) ? it.slot : null) : X.SLOTS.find(s => !item(r.eq[s]));
+    if (it.q >= 1 && empty) { if (gear) equip(it.id); else { r.eq[empty] = it.id; mark(); } }
     if (quiet) return it;
     const Q = X.QUALITY[it.q];
     if (it.q >= 3) {
@@ -132,17 +166,23 @@ function attach(G, api) {
   function equip(id, slot) {
     const r = st(), it = item(id);
     if (!it || it.q === 0) return false;
+    if (it.slot && it.slot !== 'charm') {
+      r.eq[it.slot] = id; it.fresh = 0;
+      if (it.slot === 'weapon') delete save().equip.weapon;  // one weapon in hand at a time
+      else W.setLook(G.playerLook());
+      mark(); G.dirty(); return true;
+    }
     for (const s of X.SLOTS) if (r.eq[s] === id) r.eq[s] = null;
     slot = slot || X.SLOTS.find(s => !item(r.eq[s])) || X.SLOTS.slice().sort((a, b) => score(item(r.eq[a])) - score(item(r.eq[b])))[0];
     r.eq[slot] = id; it.fresh = 0;
     mark(); G.dirty(); return true;
   }
-  function unequip(slot) { st().eq[slot] = null; mark(); G.dirty(); }
+  function unequip(slot) { const had = st().eq[slot]; st().eq[slot] = null; mark(); if (had && (slot === 'head' || slot === 'body' || slot === 'feet')) W.setLook(G.playerLook()); G.dirty(); }
   function sell(id, silent) {
     const r = st(), i = r.loot.findIndex(x => x.id === id);
     if (i < 0) return 0;
     const it = r.loot[i], v = sellPrice(it);
-    for (const s of X.SLOTS) if (r.eq[s] === id) r.eq[s] = null;
+    for (const s of X.SLOTS.concat(GEAR)) if (r.eq[s] === id) { r.eq[s] = null; if (s !== 'weapon') W.setLook(G.playerLook()); }
     r.loot.splice(i, 1);
     save().money += v;
     if (it.q === 0) bump('junksold');
@@ -158,7 +198,21 @@ function attach(G, api) {
     return tot;
   }
   // Better than the worst thing you wear? (the green arrow)
-  function upgrade(it) { if (!it || it.q === 0) return false; const r = st(); const worn = X.SLOTS.map(s => item(r.eq[s])); if (worn.some(x => !x)) return true; return score(it) > Math.min(...worn.map(score)); }
+  function upgrade(it) {
+    if (!it || it.q === 0) return false;
+    if (it.slot && it.slot !== 'charm') { const cur = item(st().eq[it.slot]); if (cur) return score(it) > score(cur); if (it.slot === 'weapon') { const sw = D.ITEMS[save().equip.weapon]; return !sw || !sw.weapon || it.dmg > sw.weapon.dmg; } return true; }
+    const r = st(); const worn = X.SLOTS.map(s => item(r.eq[s])); if (worn.some(x => !x)) return true; return score(it) > Math.min(...worn.map(score)); }
+
+  // what your gear looks like on you (cft-game.js playerLook)
+  function lookParts() {
+    const r = st(), o = {}, h = item(r.eq.head), b = item(r.eq.body), f = item(r.eq.feet);
+    if (h) { const base = X.GEAR.head.find(x => x.id === h.base) || {}; if (base.look === 'beanie') { o.beanie = h.col; o.hat = null; } else { o.hat = h.col; o.beanie = null; } }
+    if (b) { const L = (X.GEAR.body.find(x => x.id === b.base) || {}).look || {}; Object.assign(o, { shirt: b.col, sleeve: 'long', collar: !!L.collar, coat: L.coat ? b.col : null, stripes: L.stripes ? 0xf4f1ea : null, logo: null, tie: null }); }
+    if (f) o.shoe = f.col;
+    return o;
+  }
+  const weaponId = () => { const it = item(st().eq.weapon); return it ? it.id : null; };
+  function weapon() { const it = item(st().eq.weapon); if (!it) return null; const b = D.ITEMS[it.base]; return Object.assign({}, b.weapon, { dmg: it.dmg, e: it.e, n: it.n, mesh: b.weapon.mesh }); }
 
   // ------------------------------------------------------------------ talents
   const spentIn = b => X.TALENTS.filter(t => t.b === b).reduce((a, t) => a + (st().tal[t.id] || 0), 0);
@@ -381,7 +435,7 @@ function attach(G, api) {
     const r = st();
     if (r.pending.length >= 5) return;
     const lv = G.level(), focuses = STATS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
-    const items = focuses.map(f => { const q = Math.random() < 0.15 ? 3 : 2; return make(q, Math.max(1, lv), { focus: f }); });
+    const items = focuses.map(f => { const q = Math.random() < 0.15 ? 3 : 2; return make(q, Math.max(1, lv), { focus: f, slot: pickSlot() }); });
     r.pending.push({ t: m.title, items });
     U.feed('🎁', 'Reward to choose for "' + m.title + '" (tap the ✨ by your level)');
     G.dirty();
@@ -400,11 +454,11 @@ function attach(G, api) {
   // ------------------------------------------------------------------ for the phone apps
   function view() {
     const r = st(), s = save();
-    const worn = X.SLOTS.map(sl => ({ slot: sl, it: item(r.eq[sl]) }));
+    const worn = GEAR.concat(X.SLOTS).map(sl => ({ slot: sl, label: X.SLOT_NAMES[sl], it: item(r.eq[sl]) }));
     return {
       level: G.level(), points: points(), spent: spent(), respecCost: respecCost(), title: r.title, titles: r.titles.slice(), achPoints: achPoints(),
       rested: Math.round(r.rested || 0), pending: r.pending.length, worn, bag: r.loot.filter(x => !equipped(x.id)).sort((a, b) => b.q - a.q || score(b) - score(a)),
-      quality: X.QUALITY, statLine, sellPrice, upgrade,
+      quality: X.QUALITY, slotNames: X.SLOT_NAMES, statLine, sellPrice, upgrade, armor: Math.round(bonus('armor')), life: Math.round(bonus('life')),
       branches: X.BRANCHES.map(b => ({ b, spent: spentIn(b.id), talents: X.TALENTS.filter(t => t.b === b.id).map(t => ({ t, rank: r.tal[t.id] || 0, can: canLearn(t), open: spentIn(b.id) >= (t.tier - 1) * X.TIER_COST, text: talentText(t, r.tal[t.id] || 1) })) })),
       factions: X.FACTIONS.map(f => { const v = Math.round(r.rep[f.id] || 0), t = tier(f), next = X.TIERS[t + 1]; return { f, v, t, tier: X.TIERS[t][0], next: next ? next[0] : null, from: X.TIERS[t][1], to: next ? next[1] : X.TIERS[t][1], reward: f.rewards[Math.min(4, t + 1)] }; }),
       ach: X.ACH.map(a => ({ a, done: r.ach[a.id], v: Math.min(a.c, val(a.k)) })),
@@ -431,7 +485,7 @@ function attach(G, api) {
   quiet = true; repTick(); quiet = false;
   return {
     tick, bonus, xpMul, rested, onLevel, levelText, onKill, drop, add, make, questDone, claim, offline, onSleep, view, badge, equip, unequip, sell, sellJunk,
-    learn, respec, setTitle, modWeapon, spawnRare, points, achPoints, tier, val, statLine, perkText, upgrade, score, mark,
+    learn, respec, setTitle, modWeapon, spawnRare, lookParts, weapon, weaponId, makeGear, points, achPoints, tier, val, statLine, perkText, upgrade, score, mark,
     destroy() { alive = false; if (beam) W.scene.remove(beam.m); },
   };
 }

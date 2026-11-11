@@ -201,6 +201,33 @@ eq {c1, c2, c3}, tal {}, rep {}, seen {}, ach {}, title, titles[], streets[], bl
   hitMonster. 5% chance every 15 s when none is out (doubled by Legend of the Night).
 - Tests: `tools/live/rpgtest.js` (`game_test.py --rpg`; also runs last in the full test). Pictures: `--long DIR`.
 
+## Combat (Diablo-style, 2026-11-11: "fight monsters native to the city... a health bar and a respawn... big monsters at every metro")
+
+- **Framing (keep it):** an ordinary person in a new city; the city's noise sometimes takes shape as *figments* only they see
+  ("the Static"). Kind and light, no clinical labels; passers-by are friendly about it (`D.STATIC_LINES`); a good mood means
+  fewer figments; Max's side story `s-static` ends on friends, sleep and talking. Don't turn it into mockery of mental illness.
+- **Monsters** (`D.MONSTERS`, 15 kinds, models in cft-world.js `W.monster`): `atk` = health lost per hit before armour,
+  `steal` only for grabbers. Local names: `F.localName(kind)` = `D.CITY_MONSTERS[city][kind]` when home is inside a `D.CITIES`
+  box, else a pick from `D.MONSTER_LOCAL[kind]` by home coordinates. `spawnMonster(kind, x, z, {def, lvl, champ, hp, atkMul,
+  size, event, aggro, home, leash, guard, nightBorn})` scales hp by `1 + 0.18 × (level − 1)` and atk by `1 + 0.1 × (level − 1)`;
+  level = `F.monsterLevel(x, z)` = your level − 1 + one per 400 m from home (max yours + 4). Player damage × `1 + 0.15 × (level − 1)`.
+  Spawner: night 5 (low 3), day 2 (low 1, never within 90 m of home), × 0.6 when happy ≥ 75, × 1.4 under 30; 7% champion packs from
+  level 2. Sunrise clears only `nightBorn` ones.
+- **Health** (`save.fun.hp`): `F.maxHp()` = 60 + 8 × level + 3 × Fitness + loot `life`; `F.hurt(n)` applies armour
+  (`n × 100 / (100 + armor)`); 2.5%/s back after 5 s untouched; `addEnergy` heals 0.7 × the energy (all food); sleep heals fully;
+  `F.quaff()` (Q) picks the bag item closest to what's missing (`heal` items: tea, juice, smoothie, bandage). `die()`: 10% of
+  pocket money into `save.fun.wallet` (a 👛 pickup where you fell), comes to via `G.travel` at the nearest freed station or home.
+- **Guardians** (`D.GUARDIANS`): `guardTick` spawns one per station (entrances within 90 m share it) when you're within 70 m of
+  an unfreed real metro entrance; size 2.4, hp `base × 8 + 8`, atk × 1.3, leash 30 m (walks home and heals beyond it), despawns
+  beyond 140 m. Killed = `freeStation` → `save.fun.cleared`, `G.visitMetro` (the old "visit to unlock" now needs this), Epic+ loot.
+  `F.metroOpen(place)` gates the stairs (cft-game.js findInteraction + visit steps); stations visited before this update stay open.
+- **Gear** (cft-rpg.js `makeGear`, `D.RPG.GEAR` / `GEAR_AR` / `GEAR_COLS` / `PREFIX`): slots weapon, head, body, feet (+ charms
+  c1-c3). Items carry `slot, base, col` and `ar` / `lf` / `sp` / `dmg`; `R.lookParts()` feeds `playerLook()` (a crown still wins
+  over a hat); `R.weapon()` replaces the shop weapon in `F.weapon()` (one weapon at a time: buying or picking a shop weapon
+  unequips the loot one, equipping loot clears `save.equip.weapon`).
+- HUD: health chip (first), the foe bar `U.foe(info)`, red edge `U.hurt()`, the 🍵 button. Tests: `tools/live/combattest.js`
+  (`game_test.py --combat`, last in the full run); pictures `--monsters DIR`.
+
 ## Recipes
 
 - **New page:** copy a similar `client_code/Pages/<Name>/`, register it in `client_code/router.py`; new field on Life / Quests /
@@ -217,6 +244,9 @@ eq {c1, c2, c3}, tal {}, rep {}, seen {}, ach {}, title, titles[], streets[], bl
   its name in content_check.mjs `MESHES`. **New monster:** `D.MONSTERS` + a branch in `W.monster` / `W.animateMonster`.
 - **New place kind:** `D.KINDS` (+ `D.SIGN_COLS`, + the mapping in cft-tiles.js for real places, or `D.SHOP_MIX` + `NAME_B` for made-up ones).
 - **New street event:** `D.EVENTS` + a branch in `startEvent` and `updateEvent` (+ its id in content_check.mjs).
+- **New monster:** `D.MONSTERS` (+ `atk`, `steal`), a model branch in `W.monster` (+ `W.animateMonster`), names in
+  `D.MONSTER_LOCAL` and every `D.CITY_MONSTERS` city (content_check.mjs insists). **New city's names:** a `D.CITIES` box +
+  `D.CITY_MONSTERS[id]`. **New gear base:** `D.RPG.GEAR[slot]` (head/body need a `look`).
 - **New achievement / faction / talent / rare:** an entry in `D.RPG.ACH` / `FACTIONS` / `TALENTS` / `RARES`; a new bonus key
   also needs reading where it applies. **New loot source:** `D.RPG.SOURCES` + a `G.rpg.drop('name')` call.
 - **New street person:** `D.STREETFOLK` ({id, n, e, hi, story[2], look}); props per persona in `spawnFolk`.

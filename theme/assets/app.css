@@ -674,6 +674,16 @@ html.ui-dark .lp-svg .win { fill: #ffe27a; }
 .cft-sw button.on { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #6b4eff; }
 .cft-check { display: flex; gap: 8px; align-items: center; font-weight: 700; font-size: .9rem; margin: 8px 0; cursor: pointer; }
 .cft-check input { width: 18px; height: 18px; accent-color: #6b4eff; }
+/* combat: health, the foe bar, a red edge when you're hit */
+.cft-bar.hp > i { background: #ff3b30; } .cft-hp b { font: 700 .8rem var(--font-body); min-width: 2.2em; }
+.cft-foe { position: absolute; top: 124px; left: 50%; transform: translateX(-50%); width: min(380px, 70vw); background: #1f1a3d; color: #fff; border: 2.5px solid #1f1a3d; border-radius: 14px; padding: 6px 12px 8px; text-align: center; pointer-events: none; box-shadow: 3px 3px 0 rgba(0,0,0,.3); }
+.cft-foe b { font: 700 .9rem/1.3 var(--font-display); display: block; } .cft-foe.champ b { color: #8fbaff; } .cft-foe.rare b { color: #e3e7ee; } .cft-foe.boss b, .cft-foe.guard b { color: #ffc21f; }
+.cft-bar.foe { width: 100%; height: 12px; background: #3a3354; border-color: #000; margin-top: 4px; } .cft-bar.foe > i { background: #ff3b30; transition: width var(--dur-fast) var(--ease-out); }
+.cft-hurt { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 140px rgba(255,40,40,.7); opacity: 0; }
+.cft-hurt.low { opacity: .45; } .cft-hurt.go { animation: cft-hurt .5s ease-out; }
+@keyframes cft-hurt { from { opacity: 1; } to { opacity: 0; } }
+@media (max-width: 720px) { .cft-foe { top: 104px; } }
+
 /* the long game: rarity colours (WoW's grey, white, green, blue, purple, orange, darkened for a light page), talents, rested XP */
 .cft-lvl { cursor: pointer; position: relative; font: inherit; color: inherit; }
 .cft-bar.xp { position: relative; } .cft-bar.xp > i { position: relative; } .cft-bar.xp > s { position: absolute; inset: 0 auto 0 0; width: 0; background: #7fb2ff; transition: width var(--dur-slow) var(--ease-out); }

@@ -7,7 +7,11 @@
    F.tick(dt, paused) · F.interaction(p) -> {t, fn} | null · F.pedMenu(ped) · F.attack() · F.newDay(parts)
    F.shopGate(place) -> {t, fn} | null (a shop that banned you) · F.prank(place) · F.markers(list) · F.summary()
    F.speedMul() · F.happyBonus() · F.fortune() · F.destroy()
-   Everything it keeps is in save.fun: {hearts, king, folk{}, folkAt{}, crushes[], grudges{}, feats{}}. */
+   Combat (2026-11-11, Diablo-style): health, armour (G.rpg), monster levels by distance from home, champion packs, a foe bar,
+   damage numbers, blacking out and coming to at home or the nearest freed metro station (your wallet stays where you fell),
+   15 monster types named after your city, and a guardian at every metro entrance: beat it and the station opens.
+   F.maxHp() · F.hurt(n) · F.heal(n) · F.quaff() · F.metroOpen(place) · F.localName(kind) · F.cityName()
+   Everything it keeps is in save.fun: {hearts, king, folk{}, folkAt{}, crushes[], grudges{}, feats{}, hp, cleared{}, wallet}. */
 (function () {
 'use strict';
 
@@ -22,14 +26,15 @@ function attach(G, api) {
   const fmt$ = G.fmt$;
   const LOW = !W.renderer.shadowMap.enabled;
   const F = { monsters: [], folk: [], sweet: new Map(), chasers: [], peels: [], pads: [], shots: [], event: null, boost: 0, boostMul: 1 };
-  let alive = true, cool = 0, slow = 0, propT = 0, eventT = 45 + Math.random() * 25, shopT = 0, rivalCool = 0, weaponOn;
+  let alive = true, cool = 0, slow = 0, propT = 0, eventT = 45 + Math.random() * 25, shopT = 0, rivalCool = 0, weaponOn, lastHurt = -99, foeT = 0, guardT = 0;
+  F.guards = new Map();
 
   function fun() {
     const s = save();
     if (!s.fun || typeof s.fun !== 'object') s.fun = {};
     const f = s.fun;
     if (typeof f.hearts !== 'number') f.hearts = 0;
-    for (const k of ['folk', 'folkAt', 'grudges', 'feats']) if (!f[k] || typeof f[k] !== 'object') f[k] = {};
+    for (const k of ['folk', 'folkAt', 'grudges', 'feats', 'cleared']) if (!f[k] || typeof f[k] !== 'object') f[k] = {};
     if (!Array.isArray(f.crushes)) f.crushes = [];
     return f;
   }
@@ -86,18 +91,19 @@ function attach(G, api) {
   }
 
   // ------------------------------------------------------------------ weapons
-  function weapon() { const it = D.ITEMS[save().equip.weapon]; return it && it.weapon ? Object.assign({ e: it.e, n: it.n }, it.weapon) : Object.assign({ e: '🖐️', n: 'Bare hands' }, D.SLAP); }
+  function weapon() { const lw = G.rpg && G.rpg.weapon(); if (lw) return lw; const it = D.ITEMS[save().equip.weapon]; return it && it.weapon ? Object.assign({ e: it.e, n: it.n }, it.weapon) : Object.assign({ e: '🖐️', n: 'Bare hands' }, D.SLAP); }
   function syncWeapon() {
-    const id = save().equip.weapon || null;
+    const lw = G.rpg && G.rpg.weapon(), id = (lw ? 'loot:' + G.rpg.weaponId() : save().equip.weapon || null) + (onFoot() ? '' : ':ride');
     if (id === weaponOn) return;
     weaponOn = id;
-    const it = D.ITEMS[id];
-    W.setWeapon(it && it.weapon && onFoot() ? it.weapon.mesh : null);
+    const it = D.ITEMS[save().equip.weapon];
+    W.setWeapon(!onFoot() ? null : lw ? lw.mesh : it && it.weapon ? it.weapon.mesh : null);
   }
   F.attack = function () {
     if (!alive || quiet() || cool > 0) return false;
     if (!onFoot()) { U.toast('Hop off your ride to bonk things (V).'); cool = 0.6; return false; }
     const w = G.rpg ? G.rpg.modWeapon(weapon()) : weapon(), p = P(), f = facing();
+    w.dmg *= 1 + 0.15 * (G.level() - 1);  // you grow stronger with every level (monsters do too)
     cool = w.ranged === 'shot' ? 0.32 : 0.42;
     W.swing();
     G.sfx.swing();
@@ -125,7 +131,11 @@ function attach(G, api) {
       G.sfx.bonk();
     }
     if (cone) { W.burst(p.x + f.x * 2, p.y + 1.2, p.z + f.z * 2, w.puff || '💨', 7, { spread: 5, up: 1.5, size: 0.5, life: 0.7 }); for (const k of F.peels) if (dist2(k, p) < 7) { k.x += f.x * 5; k.z += f.z * 5; place(k.obj, k.x, k.z); } }
-    if (hits) { W.shake(0.22); return true; }
+    if (hits) {
+      W.shake(0.22);
+      if (Math.random() < 0.2) { const by = W.nearestPed(p.x, p.z, 10); if (by) { W.holdPed(by, 2, null); sayAt(by.obj, pick(D.STATIC_LINES), 2.2); } }  // they can't see what you're fighting
+      return true;
+    }
     // nothing monstrous in reach: a passer-by, a sweetheart, or a parked car's alarm
     const ped = W.nearestPed(p.x + f.x * 1.2, p.z + f.z * 1.2, 1.9);
     if (ped && !cone) { bonkPed(ped, w); return true; }
@@ -157,15 +167,40 @@ function attach(G, api) {
   }
 
   // ------------------------------------------------------------------ monsters
+  // Local names: the same monster is called something else in every city.
+  function cityOf() {
+    const h = save().home || {};
+    return D.CITIES.find(c => h.lat >= c.lat[0] && h.lat <= c.lat[1] && h.lon >= c.lon[0] && h.lon <= c.lon[1]) || null;
+  }
+  F.localName = function (kind) {
+    const c = cityOf(), h = save().home || {};
+    if (c && D.CITY_MONSTERS[c.id] && D.CITY_MONSTERS[c.id][kind]) return D.CITY_MONSTERS[c.id][kind];
+    const list = D.MONSTER_LOCAL[kind] || [(D.MONSTERS[kind] || {}).n || kind];
+    const key = Math.round((h.lat || 0) * 2) * 1000 + Math.round((h.lon || 0) * 2) + kind.length * 7 + kind.charCodeAt(0);
+    return list[Math.abs(key) % list.length];
+  };
+  F.cityName = () => { const c = cityOf(), h = save().home || {}; return c ? c.n : (h.short || h.label || 'the city').split(',').pop().trim(); };
+  // A monster's level: yours near home, higher the further you roam (up to yours + 4). Diablo's areas, on your real streets.
+  function monsterLevel(x, z) { const home = G.homeSpot(), L = G.level(); return Math.max(1, Math.min(L + 4, L - 1 + Math.floor(Math.hypot(x - home.x, z - home.z) / 400))); }
+  F.monsterLevel = monsterLevel;
   function spawnMonster(kind, x, z, o) {
-    const def = D.MONSTERS[kind];
-    if (!def) return null;
-    const obj = W.monster(kind), size = def.size || 1;
+    const base = D.MONSTERS[kind];
+    if (!base) return null;
+    o = o || {};
+    const def = o.def || Object.assign({}, base, { n: F.localName(kind) });
+    const lvl = o.lvl || monsterLevel(x, z) + (o.champ ? 1 : 0);
+    const size = (o.size || def.size || 1) * (o.champ ? 1.15 : 1);
+    const obj = W.monster(kind);
     obj.userData.size = size; obj.scale.setScalar(size);
-    const m = Object.assign({ kind, def, obj, x, z, hp: def.hp, carry: 0, state: 'idle', t: 0, stun: 0, kx: 0, kz: 0, grab: 0, wanderA: Math.random() * 6.28, r: (kind === 'blob' ? 1.6 : 0.6) * size, born: G.rt.t, say: 2 + Math.random() * 6 }, o || {});
+    const hp = (o.hp || def.hp) * (1 + 0.18 * (lvl - 1)) * (o.champ ? 2.5 : 1);
+    const atk = (def.atk || 6) * (1 + 0.1 * (lvl - 1)) * (o.champ ? 1.4 : 1) * (o.atkMul || 1);
+    const m = Object.assign({ kind, obj, x, z, carry: 0, state: 'idle', t: 0, stun: 0, kx: 0, kz: 0, grab: 0, wanderA: Math.random() * 6.28,
+      r: (kind === 'blob' ? 1.6 : kind === 'brute' || kind === 'worm' ? 0.85 : 0.6) * size, born: G.rt.t, say: 2 + Math.random() * 6 }, o,
+      { def, hp, mhp: hp, atk, lvl, xpv: def.xp * (1 + 0.12 * (lvl - 1)) * (o.champ ? 2.5 : 1) });
     place(obj, x, z, Math.random() * 6.28);
     W.scene.add(obj);
     if (def.boss) { const tag = nameTag(def.e + ' ' + def.n, 3.7); obj.add(tag); }
+    if (o.champ) { const tag = W.label('🔵 ' + def.n, { size: 32, height: 0.46, bg: 'rgba(28,80,190,.92)', fg: '#ffffff', border: '#0c2a6b' }); tag.position.y = (def.size ? 2.2 : 2.0) / size + 0.4; obj.add(tag); }
     F.monsters.push(m);
     W.burst(x, obj.position.y + 0.8, z, '💨', 4, { spread: 1.5, up: 1.5, size: 0.5, life: 0.5 });
     return m;
@@ -181,11 +216,13 @@ function attach(G, api) {
   const isNight = () => { const h = save().clock; return h >= 21.5 || h < 5; };
   function hitMonster(m, w, f) {
     if (m.dead) return;
-    m.hp -= w.dmg; m.stun = Math.max(m.stun, 0.5 + (w.stun || 0));
+    m.hp -= w.dmg; m.stun = Math.max(m.stun, 0.5 + (w.stun || 0) * (m.guard ? 0.25 : 1));
+    F.lastFoe = m; foeT = 0;
     m.kx = f.x * (w.knock || 3) * 2.2; m.kz = f.z * (w.knock || 3) * 2.2;
     m.obj.userData.hurt = 0.3;
     const y = m.obj.position.y + m.obj.userData.h * (m.obj.userData.size || 1);
     W.pop(m.x, y + 0.6, m.z, w.word, m.hp <= 0 ? '#ff5c8a' : '#ffc21f');
+    W.pop(m.x + 0.7, y + 1.35, m.z, String(Math.max(1, Math.round(w.dmg * 10))), /CRIT/.test(w.word) ? '#ffc21f' : '#ffffff', 0.7);  // damage numbers (x10)
     if (w.puff) W.burst(m.x, y, m.z, w.puff, 5, { spread: 2.5, up: 2.5, size: 0.4 });
     G.sfx.bonk();
     if (m.hp > 0) return;
@@ -193,12 +230,15 @@ function attach(G, api) {
     m.dead = true;
     const def = m.def;
     api.bump('bonks'); api.bump('bonk_' + m.kind);
-    const n = Math.round(rnd(def.coins[0], def.coins[1]) / 2);
+    const n = Math.round(rnd(def.coins[0], def.coins[1]) / 2 * (m.champ ? 1.6 : 1) * (m.guard ? 1.8 : 1));
     for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r = 1.2 + Math.random() * 2.4; let cx = m.x + Math.cos(a) * r, cz = m.z + Math.sin(a) * r; if (W.heightAt(cx, cz)) { cx = m.x; cz = m.z; } api.spawnPickup(def.cash && i === 0 ? 'cash' : 'coin', cx, cz); }
     if (m.carry > 0) { save().money += m.carry; U.feed('💰', 'Got your ' + fmt$(m.carry) + ' back'); U.hud.bump('money'); }
-    G.addXp(def.xp, 'monster');
-    G.addStat('cred', def.boss ? 0.5 : 0.05, true);
-    U.feed(def.e, 'Bonked: ' + def.n + ' · +' + Math.round(def.xp * G.xpMul()) + ' XP');
+    G.addXp(m.xpv || def.xp, 'monster');
+    G.addStat('cred', def.boss || m.guard ? 0.5 : 0.05, true);
+    U.feed(def.e, 'Bonked: ' + def.n + ' (level ' + (m.lvl || 1) + ') · +' + Math.round((m.xpv || def.xp) * G.xpMul()) + ' XP');
+    if (m.champ) api.bump('champions');
+    if (m.guard) freeStation(m);
+    if (F.lastFoe === m) F.lastFoe = null;
     W.burst(m.x, y, m.z, '⭐', def.boss ? 16 : 7, { spread: 4, up: 5 });
     W.burst(m.x, y, m.z, '🪙', def.boss ? 12 : 4, { spread: 3, up: 6, size: 0.45 });
     W.shake(def.boss ? 0.6 : 0.3);
@@ -216,19 +256,23 @@ function attach(G, api) {
   function updateMonsters(dt) {
     const p = P(), s = save(), night = isNight(), home = G.homeSpot();
     if (slow <= 0 && onStory() && !calm()) {
-      // who is out tonight
-      const wild = F.monsters.filter(m => !m.event && !m.def.boss).length, want = night ? (LOW ? 3 : 5) : 0;
+      // who is out: more at night, a couple by day (never close to home), fewer when you're happy, more when you're not
+      const wild = F.monsters.filter(m => !m.event && !m.def.boss && !m.guard).length, mood = s.happy >= 75 ? 0.6 : s.happy < 30 ? 1.4 : 1;
+      const want = Math.round((night ? (LOW ? 3 : 5) : (LOW ? 1 : 2)) * mood);
       if (wild < want && !quiet()) {
-        const sp = W.randomWalkSpot(p.x, p.z, 30, 85, (x, z) => Math.hypot(x - home.x, z - home.z) > 30);
+        const sp = W.randomWalkSpot(p.x, p.z, 30, 85, (x, z) => Math.hypot(x - home.x, z - home.z) > (night ? 30 : 90));
         if (sp) {
-          const pool = Object.keys(D.MONSTERS).filter(k => D.MONSTERS[k].w > 0);
+          const pool = Object.keys(D.MONSTERS).filter(k => D.MONSTERS[k].w > 0 && (night || !D.MONSTERS[k].night));
           let tot = 0; for (const k of pool) tot += D.MONSTERS[k].w;
           let r = Math.random() * tot, kind = pool[0];
           for (const k of pool) { if (r < D.MONSTERS[k].w) { kind = k; break; } r -= D.MONSTERS[k].w; }
-          spawnMonster(kind, sp.x, sp.z);
+          if (G.level() >= 2 && Math.random() < 0.07) { // a champion pack: three, tougher, blue name tags, better pay
+            for (let i = 0; i < 3; i++) spawnMonster(kind, sp.x + rnd(-2, 2), sp.z + rnd(-2, 2), { champ: true, nightBorn: night });
+            U.banner('🔵 Champions nearby', 'Three ' + F.localName(kind) + 's, tougher than usual. Worth it.', 'fail');
+          } else spawnMonster(kind, sp.x, sp.z, { nightBorn: night });
           if (F.nightNote !== s.day && s.clock >= 21) { // once a night: what is going on, and what to do about it
             F.nightNote = s.day;
-            U.banner('🌙 The monsters are out', 'They grab coins. Bonk them (F) and the coins come back. Or just outrun them.', 'day');
+            U.banner('🌙 The Static is loud tonight', 'Since you moved here, the city\'s noise sometimes takes shape: figments only you can see. Face them (F) and they fade. Sleep, friends and a good mood keep them quiet.', 'day');
           }
         }
       }
@@ -244,7 +288,7 @@ function attach(G, api) {
       const m = F.monsters[i], def = m.def, d = Math.hypot(m.x - p.x, m.z - p.z);
       m.t += dt;
       // sunrise, or left far behind
-      if ((!night && !m.event && !def.boss && m.t > 3) || d > 170 || (m.event && m.t > m.event) || (def.boss && !night && m.t > 20)) { removeMonster(m, d < 80); continue; }
+      if ((!night && m.nightBorn && !m.event && !def.boss && m.t > 3) || d > 170 || (m.event && m.t > m.event) || (def.boss && !night && m.t > 20)) { removeMonster(m, d < 80); continue; }
       let sp = 0;
       if (Math.abs(m.kx) + Math.abs(m.kz) > 0.2) { // flying back from a bonk
         const e = { x: m.x, z: m.z }; e.x += m.kx * dt; e.z += m.kz * dt; W.collide(e, m.r); m.x = e.x; m.z = e.z;
@@ -255,14 +299,17 @@ function attach(G, api) {
       else if (m.grab > 0) { // it got what it wanted: backs off for a moment
         m.grab -= dt; sp = def.speed * 0.8;
         walk(m, m.x + (m.x - p.x), m.z + (m.z - p.z), sp, dt, m.r);
-      } else if (d < (m.aggro || 17) && onFoot() && !quiet() && Math.hypot(p.x - home.x, p.z - home.z) > 14) {
+      } else if (m.home && Math.hypot(m.x - m.home.x, m.z - m.home.z) > (m.leash || 30)) { // a guardian never strays far from its station
+        sp = def.speed; walk(m, m.home.x, m.home.z, sp, dt, m.r); m.hp = Math.min(m.mhp, m.hp + m.mhp * 0.1 * dt);
+      } else if (d < (m.aggro || 17) && onFoot() && !quiet() && !F.dying && Math.hypot(p.x - home.x, p.z - home.z) > 14 && (!m.home || Math.hypot(p.x - m.home.x, p.z - m.home.z) < (m.leash || 30) + 4)) {
         sp = def.speed;
         walk(m, p.x, p.z, sp, dt, m.r);
         if (d < m.r + 0.75 && Math.abs(p.y - m.obj.position.y) < 2.2) touch(m);
       } else { // wandering
         sp = def.speed * 0.3;
         if (Math.random() < dt * 0.5) m.wanderA += rnd(-1.5, 1.5);
-        walk(m, m.x + Math.cos(m.wanderA) * 4, m.z + Math.sin(m.wanderA) * 4, sp, dt, m.r);
+        if (m.home && Math.hypot(m.x - m.home.x, m.z - m.home.z) > 6) walk(m, m.home.x, m.home.z, sp, dt, m.r);
+        else walk(m, m.x + Math.cos(m.wanderA) * 4, m.z + Math.sin(m.wanderA) * 4, sp, dt, m.r);
       }
       W.animateMonster(m.obj, dt, sp);
       m.say -= dt;
@@ -271,14 +318,146 @@ function attach(G, api) {
   }
   function touch(m) {
     const s = save(), p = P();
-    m.grab = 1.6;
-    const amt = Math.min(Math.floor(s.money), Math.round(rnd(m.def.steal[0], m.def.steal[1]) * Math.max(0, 1 - (G.rpg ? G.rpg.bonus('steal') : 0))));
-    if (amt > 0) { s.money -= amt; m.carry += amt; U.feed(m.def.e, m.def.n + ' grabbed ' + fmt$(amt) + '! Bonk it to get it back (F)'); U.hud.bump('money'); }
-    else sayAt(m.obj, 'Pfffbt!', 1.5);
-    W.pop(p.x, p.y + 2.4, p.z, m.kind === 'goose' ? 'HONK!' : 'YOINK!', '#ff5c8a');
-    W.shake(0.35); G.sfx.fail();
+    m.grab = m.guard ? 1.1 : 1.6;
+    const st = m.def.steal || [0, 0];
+    let amt = 0;
+    if (st[1] > 0) {
+      amt = Math.min(Math.floor(s.money), Math.round(rnd(st[0], st[1]) * Math.max(0, 1 - (G.rpg ? G.rpg.bonus('steal') : 0))));
+      if (amt > 0) { s.money -= amt; m.carry += amt; U.feed(m.def.e, m.def.n + ' grabbed ' + fmt$(amt) + '! Bonk it to get it back (F)'); U.hud.bump('money'); }
+    }
+    W.pop(p.x, p.y + 2.4, p.z, m.kind === 'goose' ? 'HONK!' : amt ? 'YOINK!' : pick(['BAM!', 'OOF!', 'WHAM!', 'THUD!']), '#ff5c8a');
     if (m.kind === 'goose') m.touched = true;
+    F.hurt(m.atk || 5, m);
     G.dirty();
+  }
+  // ------------------------------------------------------------------ health: armour, regeneration, healing, blacking out
+  F.maxHp = () => Math.round(60 + G.level() * 8 + G.stat('fit') * 3 + (G.rpg ? G.rpg.bonus('life') : 0));
+  function hp() { const f = fun(); if (typeof f.hp !== 'number' || f.hp !== f.hp) f.hp = F.maxHp(); return f.hp; }
+  F.hp = hp;
+  F.armor = () => Math.round(G.rpg ? G.rpg.bonus('armor') : 0);
+  F.hurt = function (n, src) {
+    if (F.dying || !alive) return 0;
+    const f = fun(), dmg = Math.max(1, n * 100 / (100 + F.armor()));
+    f.hp = Math.max(0, hp() - dmg); lastHurt = G.rt.t;
+    const p = P();
+    W.pop(p.x - 0.6, p.y + 2.0, p.z, '-' + Math.round(dmg), '#ff3b30', 0.7);
+    if (U.hurt) U.hurt(); W.shake(0.35); G.sfx.bonk();
+    api.bump('hurt', Math.round(dmg));
+    if (f.hp <= 0) die(src);
+    return dmg;
+  };
+  F.heal = function (n) { if (!(n > 0)) return; const f = fun(); f.hp = Math.min(F.maxHp(), hp() + n); };
+  // Q / the 🍵 button: the best healing thing in your bag
+  F.quaff = function () {
+    const s = save();
+    if (hp() >= F.maxHp() - 0.5) { U.toast('You feel fine already.'); return false; }
+    const opts = Object.keys(s.bag).filter(k => s.bag[k] > 0 && D.ITEMS[k] && (D.ITEMS[k].heal || (D.ITEMS[k].type === 'snack' && D.ITEMS[k].energy > 0)));
+    if (!opts.length) { U.toast('Nothing to eat or drink. Cafés sell calm tea 🍵 and smoothies 🫐; groceries sell juice boxes 🧃.'); return false; }
+    const need = F.maxHp() - hp(), val = k => (D.ITEMS[k].heal || 0) + (D.ITEMS[k].energy || 0) * 0.7;
+    const k = opts.sort((a, b) => Math.abs(val(a) - need) - Math.abs(val(b) - need))[0], it = D.ITEMS[k];
+    G.giveItem(k, -1);
+    if (it.energy) G.addEnergy(it.energy);
+    F.heal(it.heal || 0);
+    U.feed(it.e, it.n + ' · ❤️ ' + Math.round(hp()) + '/' + F.maxHp());
+    G.sfx.pick(); G.dirty();
+    return true;
+  };
+  async function die() {
+    if (F.dying) return;
+    F.dying = true;
+    const s = save(), f = fun(), p = P();
+    api.bump('deaths');
+    const lost = Math.floor(s.money * 0.1);
+    if (lost > 0) { s.money -= lost; const a = G.ll(p.x, p.z); f.wallet = { lat: Math.round(a.lat * 1e6) / 1e6, lon: Math.round(a.lon * 1e6) / 1e6, amount: (f.wallet ? f.wallet.amount : 0) + lost }; }
+    W.burst(p.x, p.y + 1, p.z, '💫', 10, { spread: 2, up: 3 });
+    for (const m of F.monsters.slice()) { if (m.guard) { m.hp = m.mhp; m.x = m.home.x; m.z = m.home.z; } else if (Math.hypot(m.x - p.x, m.z - p.z) < 120) removeMonster(m, true); }
+    for (const c of F.chasers.slice()) endChase(c, false);
+    // where you come to: the nearest metro station you freed, or home
+    const home = G.homeSpot();
+    let to = { x: home.x, z: home.z }, where = 'home';
+    for (const st of s.metro || []) { const q = G.xz(st); if (Math.hypot(q.x - p.x, q.z - p.z) < Math.hypot(to.x - p.x, to.z - p.z)) { to = q; where = st.name + ' station'; } }
+    api.setBusy(true);
+    try { await U.fade(() => {}, '💫 ...everything goes quiet'); await G.travel(to); }
+    finally { api.setBusy(false); }
+    f.hp = F.maxHp(); F.dying = false; F.lastFoe = null;
+    U.banner('💫 You blacked out', 'You come to at ' + where + '. ' + (lost ? 'Your wallet fell out where you went down: ' + fmt$(f.wallet.amount) + ' (👛 on the map).' : 'Take it easy for a bit.'), 'fail');
+    G.log('Blacked out and came to at ' + where, '💫');
+    G.dirty(true);
+  }
+  // your dropped wallet waits where you fell
+  function walletTick() {
+    const f = fun();
+    if (!f.wallet || G.rt.pickups.some(k => k.type === 'wallet' && !k.dead)) return;
+    const q = G.xz(f.wallet), p = P();
+    if (Math.hypot(q.x - p.x, q.z - p.z) < 350) api.spawnPickup('wallet', q.x, q.z);
+  }
+  F.gotWallet = function () {
+    const f = fun();
+    if (!f.wallet) return;
+    save().money += f.wallet.amount;
+    U.feed('👛', 'Got your wallet back: ' + fmt$(f.wallet.amount)); U.hud.bump('money'); G.sfx.cash();
+    f.wallet = null; G.dirty();
+  };
+
+  // ------------------------------------------------------------------ metro guardians: a big one at every station; beat it, ride from there
+  // one station, several entrances: freeing one frees every entrance within 90 m; unnamed entrances take the station's name
+  F.metroOpen = pl => !!pl && (pl.virtual || !!fun().cleared[pl.id] || (save().metro || []).some(m => m.id === pl.id || (() => { const q = G.xz(m); return Math.hypot(q.x - pl.pin.x, q.z - pl.pin.z) < 90; })()));
+  F.stationName = function (pl) {
+    if (pl.name) return pl.name;
+    let best = null, bd = 160;
+    for (const q of W.places) if (q.kind === 'metro' && q.name) { const d = Math.hypot(q.pin.x - pl.pin.x, q.pin.z - pl.pin.z); if (d < bd) { bd = d; best = q.name; } }
+    const st = W.streetAt(pl.pin.x, pl.pin.z);
+    return best || (st ? st + ' station' : 'the Station');
+  };
+  function guardTick() {
+    if (!onStory() || calm()) return;
+    const p = P();
+    for (const pl of W.places) {
+      if (pl.kind !== 'metro' || pl.virtual || F.guards.has(pl.id) || F.metroOpen(pl)) continue;
+      if (Math.hypot(pl.pin.x - p.x, pl.pin.z - p.z) > 70) continue;
+      if ([...F.guards.values()].some(g => Math.hypot(g.home.x - pl.pin.x, g.home.z - pl.pin.z) < 90)) continue;  // this station already has its guardian
+      spawnGuardian(pl);
+    }
+    for (const [id, g] of F.guards) {
+      if (!F.monsters.includes(g)) { F.guards.delete(id); continue; }
+      if (Math.hypot(g.home.x - p.x, g.home.z - p.z) > 140) { removeMonster(g, false); F.guards.delete(id); }
+    }
+  }
+  function spawnGuardian(pl) {
+    const kinds = Object.keys(D.GUARDIANS), seed = (pl.id || '').split('').reduce((a, ch) => a * 31 + ch.charCodeAt(0) | 0, 7);
+    const kind = kinds[Math.abs(seed) % kinds.length], base = D.MONSTERS[kind];
+    const where = F.stationName(pl);
+    const name = D.GUARDIANS[kind] + ' of ' + where;
+    const def = Object.assign({}, base, { n: name, e: '🚇', guard: true, night: false, xp: base.xp * 10, steal: [0, 0], coins: base.coins });
+    const g = spawnMonster(kind, pl.pin.x, pl.pin.z, { def, hp: base.hp * 8 + 8, atkMul: 1.3, size: 2.4, event: 1e9, aggro: 24, leash: 30, home: { x: pl.pin.x, z: pl.pin.z }, guard: pl.id, station: pl, lvl: monsterLevel(pl.pin.x, pl.pin.z) + 1 });
+    if (!g) return;
+    const tag = W.label('🚇 ' + name, { size: 34, height: 0.55, bg: 'rgba(255,194,31,.95)', fg: '#1f1a3d', border: '#1f1a3d' });
+    tag.position.y = 2.6; g.obj.add(tag);
+    F.guards.set(pl.id, g);
+    U.banner('🚇 A guardian blocks ' + where, 'Beat the ' + D.GUARDIANS[kind] + ' and this station joins your metro network.', 'fail');
+    G.sfx.fail();
+  }
+  function freeStation(m) {
+    const f = fun(), pl = m.station;
+    f.cleared[m.guard] = save().day;
+    F.guards.delete(m.guard);
+    api.bump('guardians');
+    if (pl && G.visitMetro) G.visitMetro(pl);
+    const st = pl ? F.stationName(pl) : 'The station';
+    U.banner('🚇 ' + st + ' is free!', 'The metro is open here: ride between every station you\'ve freed. You also come to here if you black out nearby.', 'done');
+    U.confetti(); G.sfx.done();
+    G.log('Freed ' + st + ' metro station', '🚇');
+    if (G.rpg) G.rpg.drop('boss');
+  }
+  // the bar at the top of the screen: what you're fighting
+  function foeTick(dt) {
+    foeT -= dt;
+    if (foeT > 0 || !U.foe) return;
+    foeT = 0.12;
+    const p = P();
+    let m = F.lastFoe && F.monsters.includes(F.lastFoe) && !F.lastFoe.dead && Math.hypot(F.lastFoe.x - p.x, F.lastFoe.z - p.z) < 30 ? F.lastFoe : null;
+    if (!m) { let bd = 14; for (const q of F.monsters) { const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < bd && !q.dead) { bd = d; m = q; } } }
+    U.foe(m ? { name: m.def.n, lvl: m.lvl || 1, pct: Math.max(0, m.hp / (m.mhp || m.hp || 1)), rank: m.guard ? 'guard' : m.def.boss ? 'boss' : m.def.rare ? 'rare' : m.champ ? 'champ' : '' } : null);
   }
   const onStory = () => { const m = save().m['c1-couch']; return !!(m && m.s === 'done'); };
 
@@ -942,7 +1121,9 @@ function attach(G, api) {
     const f = fun(), p = P();
     for (const a of F.folk) out.push({ x: a.x, z: a.z, color: '#ff8a3d', r: 5, emoji: '🧡', ring: '#fff' });
     for (const c of f.crushes) { const q = G.xz(c); out.push({ x: q.x, z: q.z, color: '#ff5c8a', r: 5.5, emoji: '💕', ring: '#fff' }); }
-    for (const m of F.monsters) out.push({ x: m.x, z: m.z, color: m.def.boss ? '#9b5cf6' : m.def.rare ? '#d6dbe3' : '#35e06a', r: m.def.boss || m.def.rare ? 8 : 4, emoji: m.def.boss ? '👑' : m.def.rare ? '💀' : '', ring: '#1f1a3d', edge: !!(m.def.boss || m.def.rare) });
+    for (const m of F.monsters) { if (m.guard) continue; out.push({ x: m.x, z: m.z, color: m.def.boss ? '#9b5cf6' : m.def.rare ? '#d6dbe3' : m.champ ? '#3b82f6' : '#35e06a', r: m.def.boss || m.def.rare ? 8 : 4, emoji: m.def.boss ? '👑' : m.def.rare ? '💀' : '', ring: '#1f1a3d', edge: !!(m.def.boss || m.def.rare) }); }
+    for (const pl of W.places) if (pl.kind === 'metro' && !pl.virtual && Math.hypot(pl.pin.x - p.x, pl.pin.z - p.z) < 700) { const open = F.metroOpen(pl); out.push({ x: pl.pin.x, z: pl.pin.z, color: open ? '#1971c2' : '#ff3b30', r: 6.5, emoji: open ? '🚇' : '💀', ring: '#fff', edge: !open }); }
+    if (f.wallet) { const q = G.xz(f.wallet); out.push({ x: q.x, z: q.z, color: '#ffd54a', r: 7, emoji: '👛', ring: '#1f1a3d', edge: true }); }
     for (const c of F.chasers) out.push({ x: c.x, z: c.z, color: '#ff3b30', r: 6, emoji: '💢', ring: '#fff', edge: true });
     for (const q of F.pads) out.push({ x: q.x, z: q.z, color: '#ff5c8a', r: 3.5, ring: '#1f1a3d' });
     for (const id of Object.keys(f.grudges)) { const pl = gplace[id] || (gplace[id] = W.places.find(x => x.id === id)); if (pl && f.grudges[id] > save().day && Math.hypot(pl.pin.x - p.x, pl.pin.z - p.z) < 500) out.push({ x: pl.pin.x, z: pl.pin.z, color: '#ffffff', r: 5.5, emoji: '💢', ring: '#ff3b30' }); }
@@ -990,6 +1171,11 @@ function attach(G, api) {
     updateRivals(dt);
     updateProps(dt);
     updateEvent(dt);
+    foeTick(dt);
+    if (!F.dying && G.rt.t - lastHurt > 5) F.heal(F.maxHp() * 0.025 * dt);  // catching your breath
+    if (hp() > F.maxHp()) fun().hp = F.maxHp();
+    guardT -= dt;
+    if (guardT <= 0) { guardT = 1; guardTick(); walletTick(); }
     if (slow <= 0) { slow = 1; api.bumpTo('weapons', Object.keys(save().owned).filter(k => D.ITEMS[k] && D.ITEMS[k].weapon).length); }
   };
   F.rideChanged = function () { weaponOn = undefined; };

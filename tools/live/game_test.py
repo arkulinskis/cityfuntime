@@ -2,8 +2,10 @@
 
     python -I tools/live/game_test.py [OUTDIR]            the whole game: gametest.js (missions, shops, turf...), funtest.js, rpgtest.js
     python -I tools/live/game_test.py --fun [OUTDIR]      only funtest.js (monsters, weapons, strangers, street folk, pranks, events)
+    python -I tools/live/game_test.py --combat [OUTDIR]   only combattest.js (monsters, health, guardians, gear you wear)
     python -I tools/live/game_test.py --rpg [OUTDIR]      only rpgtest.js (loot, talents, rested XP, discovery, reputation, achievements, rares)
     python -I tools/live/game_test.py --shots [OUTDIR]    no tests: screenshots of the city by day, at dusk and at night
+    python -I tools/live/game_test.py --monsters [OUTDIR] no tests: the 15 monster types, a metro guardian, a fight, loot gear on you
     python -I tools/live/game_test.py --long [OUTDIR]     no tests: the Character / Reputation / Achievements apps, a Legendary drop, a rare monster, a level-up
     python -I tools/live/game_test.py --people [OUTDIR]   no tests: close-ups of the characters (you, passers-by in poses, the look editor)
     python -I tools/live/game_test.py --eval FILE.js [OUTDIR]   start a game, run FILE.js in the page, print what it returns
@@ -111,6 +113,22 @@ LONG = (
     + scene("l7-levelup", "G.ui.closeAll(); for (const m of G.fun.monsters) m.t = 9999; G.addXp(G.xpAt(G.level() + 1) - s.xp + 5, 'quest'); W.cam.dist = W.cam.cur = 8; W.cam.pitch = 0.25;", 6, 600)
 )
 
+# Combat: the 15 monster types in a row, a metro guardian, a fight with the health and foe bars, loot gear on you.
+MONSTERS = (
+    scene("c1-lineup", "s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11; const home = G.homeSpot(); const q = W.randomWalkSpot(home.x, home.z, 150, 260, (x, z, sg) => sg.car && sg.w >= 11) || W.nearestWalk(home.x, home.z, 200); W.teleport(q.x, q.z, q.yaw);"
+          "G.stepSim(200); W.cam.pitch = 0.12; W.cam.dist = W.cam.cur = 3; const f = { x: -Math.sin(W.cam.yaw), z: -Math.cos(W.cam.yaw) };"
+          "Object.keys(G.D.MONSTERS).forEach((k, i) => { const row = i < 8 ? 0 : 1, col = (i < 8 ? i - 3.5 : i - 11) * 2.1, dd = 9 + row * 4.5; const m = G.fun.spawnMonster(k, p.x + f.x * dd + f.z * col, p.z + f.z * dd - f.x * col, { event: 600, aggro: 0, lvl: 1 }); m.obj.rotation.y = W.cam.yaw; m.wanderA = 0; });"
+          "W.avatar.visible = false;", 2, 1500)
+    + scene("c2-guardian", "for (const m of G.fun.monsters.slice()) { m.t = 1e9; m.event = 1; } G.stepSim(3); const mt = W.places.filter(x => x.kind === 'metro' && !x.virtual && !G.fun.metroOpen(x)).sort((a, b) => Math.hypot(a.pin.x - p.x, a.pin.z - p.z) - Math.hypot(b.pin.x - p.x, b.pin.z - p.z))[0];"
+            "if (mt) { const w = W.nearestWalk(mt.pin.x + 14, mt.pin.z + 6, 30) || { x: mt.pin.x + 14, z: mt.pin.z }; W.teleport(w.x, w.z); window.CFT_TEST.calm = false; for (let i = 0; i < 20 && !G.fun.guards.has(mt.id); i++) G.stepSim(15); window.CFT_TEST.calm = true; const g = G.fun.guards.get(mt.id); if (g) { g.aggro = 0; look(g.x, g.z, 9, 0.18); } }", 3, 1500)
+    + scene("c3-fight", "for (const m of G.fun.monsters.slice()) { m.t = 1e9; m.event = 1; } G.stepSim(3); W.avatar.visible = true; const f = { x: -Math.sin(W.player.face), z: -Math.cos(W.player.face) };"
+            "for (let i = 0; i < 3; i++) G.fun.spawnMonster('gargoyle', p.x + f.x * (3 + i) + f.z * (i - 1) * 1.5, p.z + f.z * (3 + i) - f.x * (i - 1) * 1.5, { event: 300, champ: true }); G.fun.hurt(45);"
+            "const m0 = G.fun.monsters[G.fun.monsters.length - 1]; W.player.face = W.player.heading = Math.atan2(-(m0.x - p.x), -(m0.z - p.z)); W.controls.enabled = true; G.attack(); look(m0.x, m0.z, 6, 0.25);", 4, 900)
+    + scene("c4-gear", "for (const m of G.fun.monsters.slice()) { m.t = 1e9; m.event = 1; } G.stepSim(3); const R = G.rpg; for (const [sl, b] of [['head', 'beanie'], ['body', 'puffer'], ['feet', 'boots'], ['weapon', 'w_guitar']]) { const it = R.add(R.makeGear(4, 12, sl, { base: b }), 'test'); R.equip(it.id); }"
+            "W.showOff = true; W.cam.pitch = 0.1;", 40, 2000)
+    + scene("c5-character", "W.showOff = false; G.ui.phone('hero');", 3, 1500)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
 elif "--shots" in flags:
@@ -119,9 +137,13 @@ elif "--people" in flags:
     steps = START + PEOPLE
 elif "--long" in flags:
     steps = START + LONG
+elif "--monsters" in flags:
+    steps = START + MONSTERS
 else:
     steps = START + [{"shot": "start"}]
-    if "--rpg" in flags:
+    if "--combat" in flags:
+        steps += script("combattest.js", "__cmbDone", "__cmbOut", 500000)
+    elif "--rpg" in flags:
         steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
     else:
         if "--fun" not in flags:
@@ -129,6 +151,7 @@ else:
         steps += script("funtest.js", "__funDone", "__funOut", 500000)
         if "--fun" not in flags:
             steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
+            steps += script("combattest.js", "__cmbDone", "__cmbOut", 500000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"
@@ -145,13 +168,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--people" in flags or "--long" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--people" in flags or "--long" in flags or evalfile:
+if "--shots" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

@@ -28,6 +28,7 @@ function create(G, root) {
     <canvas class="cft-canvas"></canvas>
     <div class="cft-hud" hidden>
       <div class="cft-tl">
+        <div class="cft-chip cft-meter cft-hp" title="Health"><span>❤️</span><div class="cft-bar hp"><i data-hpbar></i></div><b data-hptext></b></div>
         <div class="cft-chip cft-money" data-money-chip><span>💵</span><b data-money>$0</b></div>
         <button type="button" class="cft-chip cft-lvl" title="Level: open your Character (talents, charms)"><span class="cft-star">⭐</span><b data-lvl>1</b><div class="cft-bar xp"><s data-restbar></s><i data-xpbar></i></div><i class="cft-pts" data-pts hidden></i></button>
         <div class="cft-chip cft-meter" title="Energy"><span>⚡</span><div class="cft-bar e"><i data-ebar></i></div></div>
@@ -40,11 +41,13 @@ function create(G, root) {
           <span class="cft-qtext"><b data-qtitle></b><span data-qstep></span></span><em data-qdist></em>
         </button>
       </div>
+      <div class="cft-foe" data-foe hidden><b data-foename></b><div class="cft-bar foe"><i data-foebar></i></div></div>
       <div class="cft-feed" data-feed></div>
       <div class="cft-mmwrap" data-mmwrap title="Minimap: click to zoom (M)"><canvas class="cft-mm" data-mm></canvas><span data-mmzoom></span></div>
       <div class="cft-br">
         <button class="cft-act" data-act type="button" hidden><kbd>E</kbd><span data-acttext></span></button>
         <div class="cft-btns">
+          <button type="button" data-quaff title="Eat or drink to heal (Q)" aria-label="Heal">🍵</button>
           <button type="button" data-bonk title="Bonk (F)" aria-label="Bonk">🖐️</button>
           <button type="button" data-ride title="Ride (V)">🛹</button>
           <button type="button" data-phone title="Phone (P)">📱</button>
@@ -59,6 +62,7 @@ function create(G, root) {
     <div class="cft-layer" data-layer></div>
     <div class="cft-loading" data-loading hidden><div class="cft-spin">🏙️</div><p data-loadtext></p><div data-loadbtns></div><p class="cft-tip" data-tip></p></div>
     <div class="cft-flash" data-flash></div>
+    <div class="cft-hurt" data-hurt></div>
     <canvas class="cft-confetti" data-confetti></canvas>
   </div>`;
   const shell = root.firstElementChild;
@@ -135,6 +139,13 @@ function create(G, root) {
     $('[data-loadtext]').textContent = text;
     $('[data-tip]').textContent = '💡 ' + D.TIPS[Math.floor(Date.now() / 6000) % D.TIPS.length];
     $('[data-loadbtns]').innerHTML = error ? '<button class="cft-btn" type="button" onclick="location.reload()">Try again</button>' : '';
+  };
+  U.hurt = function () { const f = $('[data-hurt]'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); };
+  U.foe = function (o) {
+    const el = $('[data-foe]');
+    if (!o) { if (!el.hidden) el.hidden = true; return; }
+    el.hidden = false; el.className = 'cft-foe ' + (o.rank || '');
+    setText('foe', '[data-foename]', o.name + ' · level ' + o.lvl); $('[data-foebar]').style.width = Math.round(o.pct * 100) + '%';
   };
   U.flash = function () { const f = $('[data-flash]'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); };
   U.fade = async function (fn, text) {
@@ -399,7 +410,7 @@ function create(G, root) {
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
       '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>📱</kbd> your phone</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
       '</div><p class="muted">The <b>gold arrow</b> over your head always points to your current goal. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
@@ -523,6 +534,7 @@ function create(G, root) {
       const lv = G.level(), a = G.xpAt(lv), b = G.xpAt(lv + 1);
       setText('lvl', '[data-lvl]', String(lv));
       $('[data-xpbar]').style.width = Math.round((s.xp - a) / (b - a) * 100) + '%';
+      if (G.fun && G.fun.maxHp) { const hp = G.fun.hp(), mx = G.fun.maxHp(); $('[data-hpbar]').style.width = Math.round(hp / mx * 100) + '%'; setText('hp', '[data-hptext]', Math.ceil(hp) + ''); $('[data-hurt]').classList.toggle('low', hp < mx * 0.25); }
       if (s.rpg) $('[data-restbar]').style.width = Math.min(100, Math.round((s.xp - a + (s.rpg.rested || 0)) / (b - a) * 100)) + '%';  // rested XP: the blue part ahead of your bar
       $('[data-ebar]').style.width = Math.round(s.energy / G.maxEnergy() * 100) + '%';
       $('[data-hbar]').style.width = Math.round(s.happy) + '%';
@@ -546,7 +558,8 @@ function create(G, root) {
         setText('qd', '[data-qdist]', goal && goal.d != null ? fmtDist(goal.d) : '');
         $('[data-ride]').textContent = s.equip.ride ? D.ITEMS[s.equip.ride].e : '🚶';
         if (G.rpg) { const bd = G.rpg.badge(); setText('pts', '[data-pts]', bd ? '✨' + bd : ''); $('[data-pts]').hidden = !bd; }
-        setText('bonk', '[data-bonk]', s.equip.weapon && D.ITEMS[s.equip.weapon] ? D.ITEMS[s.equip.weapon].e : '🖐️');
+        const lw = G.rpg && G.rpg.weapon();
+        setText('bonk', '[data-bonk]', lw ? lw.e : s.equip.weapon && D.ITEMS[s.equip.weapon] ? D.ITEMS[s.equip.weapon].e : '🖐️');
       }
       const goal = G.rt.goal;
       if (goal) {
@@ -604,6 +617,7 @@ function create(G, root) {
     else if (e.code === 'KeyP' || e.code === 'Tab' || e.code === 'Escape') { e.preventDefault(); U.phone(); }
     else if (e.code === 'KeyV') G.toggleRide();
     else if (e.code === 'KeyF') { if (!e.repeat) G.attack(); }
+    else if (e.code === 'KeyQ') { if (!e.repeat && G.fun) G.fun.quaff(); }
     else if (e.code === 'KeyM') toggleZoom();
     else if (e.code === 'KeyH') U.help();
   }
@@ -612,6 +626,7 @@ function create(G, root) {
   $('[data-phone]').addEventListener('click', () => U.phone());
   $('[data-ride]').addEventListener('click', () => G.toggleRide());
   $('[data-bonk]').addEventListener('click', () => G.attack());
+  $('[data-quaff]').addEventListener('click', () => G.fun && G.fun.quaff());
   $('.cft-lvl').addEventListener('click', () => U.phone('hero'));
   // with the mouse captured, a left click bonks
   U.canvas.addEventListener('mousedown', e => { if (e.button === 0 && G.W && G.W.isLocked() && G.state() === 'play' && !stack.length) G.attack(); });
@@ -809,7 +824,7 @@ function create(G, root) {
         ['🍌 Banana slides', v.slides], ['🤸 Bounces', v.bounces], ['😂 Jokes told', v.jokes], ['🎪 Street events', v.events]].map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
   };
   // ---- the long game (cft-rpg.js): Character, Reputation, Achievements
-  const lootRow = (v, it, btns) => '<div class="cft-li cft-loot q' + it.q + '"><span>' + it.e + '</span><div><b>' + esc(it.n) + (it.fresh ? ' <i class="cft-new">new</i>' : '') + '</b><small>' +
+  const lootRow = (v, it, btns, label) => '<div class="cft-li cft-loot q' + it.q + '"><span>' + it.e + '</span><div><b>' + esc(it.n) + (it.fresh ? ' <i class="cft-new">new</i>' : '') + '</b><small>' + (label || (it.slot && it.slot !== 'charm' ? v.slotNames[it.slot] : 'Charm')) + ' · ' +
     v.quality[it.q].n + ' · item level ' + it.il + ' · ' + esc(v.statLine(it)) + '</small></div>' + (btns || '') + '</div>';
   VIEWS.hero = function () {
     if (!G.rpg) return '<div class="cft-empty">🧙<p>Still loading.</p></div>';
@@ -820,8 +835,8 @@ function create(G, root) {
         v.titles.map(t => '<button type="button" class="cft-chipb ' + (v.title === t ? 'on' : '') + '" data-act="title" data-id="' + esc(t) + '">' + esc(t) + '</button>').join('') + '</div>'
         : '<small>Titles come from achievements and Exalted factions.</small>') + '</div>';
     if (v.pending) h += '<div class="cft-sec"><div class="cft-li"><span>🎁</span><div><b>' + v.pending + ' mission reward' + (v.pending > 1 ? 's' : '') + ' to choose</b><small>Pick one of three charms for each</small></div><button type="button" class="cft-btn sm primary" data-act="claim">Choose</button></div></div>';
-    h += '<div class="cft-sec"><h4>🧿 Charms you wear</h4>' + v.worn.map(w => w.it ? lootRow(v, w.it, '<button type="button" class="cft-btn sm ghost" data-act="unequipc" data-id="' + w.slot + '">Take off</button>')
-      : '<div class="cft-li cft-loot empty"><span>⬚</span><div><b>Empty charm slot</b><small>Monsters, treasure chests, crates and missions drop charms</small></div></div>').join('') + '</div>';
+    h += '<div class="cft-sec"><h4>🛡️ What you wear · ❤️ ' + (G.fun ? Math.ceil(G.fun.hp()) + '/' + G.fun.maxHp() : '') + ' health · armour ' + v.armor + '</h4>' + v.worn.map(w => w.it ? lootRow(v, w.it, '<button type="button" class="cft-btn sm ghost" data-act="unequipc" data-id="' + w.slot + '">Take off</button>', w.label)
+      : '<div class="cft-li cft-loot empty"><span>⬚</span><div><b>' + w.label + ': empty</b><small>' + (w.slot === 'weapon' ? 'Your shop weapon (or bare hands) until loot gives you one' : 'Monsters, treasure chests, crates and missions drop these') + '</small></div></div>').join('') + '</div>';
     const junk = v.bag.filter(x => x.q === 0).length;
     h += '<div class="cft-sec"><h4>🎒 Bag (' + v.bag.length + ' of 30)</h4>' + (junk ? '<div class="cft-row"><button type="button" class="cft-btn sm" data-act="selljunk">🧾 Sell ' + junk + ' junk</button></div>' : '') +
       (v.bag.length ? v.bag.map(it => lootRow(v, it, (it.q ? '<button type="button" class="cft-btn sm ' + (v.upgrade(it) ? 'primary' : '') + '" data-act="equipc" data-id="' + it.id + '">' + (v.upgrade(it) ? '▲ Wear' : 'Wear') + '</button>' : '') +
@@ -915,7 +930,7 @@ function create(G, root) {
       case 'selljunk': G.rpg.sellJunk(); U.refreshPhone(); break;
       case 'title': G.rpg.setTitle(id || null); U.refreshPhone(); break;
       case 'claim': await G.rpg.claim(); U.refreshPhone(); break;
-      case 'weapon': if (s.equip.weapon === id) delete s.equip.weapon; else s.equip.weapon = id; U.refreshPhone(); G.dirty(); break;
+      case 'weapon': if (s.equip.weapon === id) delete s.equip.weapon; else { s.equip.weapon = id; if (G.rpg) G.rpg.unequip('weapon'); } U.refreshPhone(); G.dirty(); break;
       case 'swap': await swapStickers(); U.refreshPhone(); break;
       case 'rename': { const n = await U.ask('Your name', s.name); if (n && n.trim()) { s.name = n.trim().slice(0, 20); G.dirty(); } U.refreshPhone(); break; }
       case 'look': phoneOv.close(); U.lookEditor(); break;
@@ -1023,9 +1038,9 @@ function create(G, root) {
   U.metroPanel = function (here) {
     const s = save();
     const list = s.metro.filter(m => m.id !== here.id);
-    const ov = overlay('<div class="cft-card cft-shop"><div class="cft-shop-h"><span>🚇</span><div><b>' + esc(here.name || 'Metro') + '</b><small>Ride to any station you\'ve visited · $3</small></div><button type="button" class="cft-pbtn" data-x>✕</button></div>' +
+    const ov = overlay('<div class="cft-card cft-shop"><div class="cft-shop-h"><span>🚇</span><div><b>' + esc(here.name || 'Metro') + '</b><small>Ride to any station you\'ve freed from its guardian · $3</small></div><button type="button" class="cft-pbtn" data-x>✕</button></div>' +
       (list.length ? list.map((m, i) => '<div class="cft-li"><span>🚉</span><div><b>' + esc(m.name) + '</b><small>' + (G.W ? Math.round(Math.hypot(G.xz(m).x - G.W.player.pos.x, G.xz(m).z - G.W.player.pos.z)) + ' m away' : '') + '</small></div><button type="button" class="cft-btn sm primary" data-i="' + i + '">Ride</button></div>').join('')
-        : '<p class="muted">Visit other metro entrances 🚇 to unlock them. Then you can ride between them in seconds.</p>') + '</div>', 'cft-center', { dismiss: true });
+        : '<p class="muted">Every metro entrance has a guardian (💀 on the map). Beat it and the station joins your network: ride between them in seconds.</p>') + '</div>', 'cft-center', { dismiss: true });
     ov.el.querySelector('[data-x]').onclick = () => ov.close();
     ov.el.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) { ov.close(); G.metroTo(list[+b.dataset.i]); } });
   };

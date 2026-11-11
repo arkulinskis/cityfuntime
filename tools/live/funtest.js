@@ -98,13 +98,13 @@ window.__funOut = []; window.__funDone = false;
     ok(s.stickers.bonker > 0, 'the first bonk earns the Monster bonker sticker');
     const hp = F.spawnMonster('cone', pp.x + 2, pp.z, { event: 120 });
     W.teleport(hp.x + 1.2, hp.z); face(hp.x, hp.z); s.equip.weapon = null; sim(2); G.attack(); sim(3);
-    ok(hp.hp === D.MONSTERS.cone.hp - 0.5, 'bare hands slap for half a point');
+    ok(hp.hp < hp.mhp && hp.mhp - hp.hp <= 0.5 * (1 + 0.15 * (G.level() - 1)) + 0.01, 'bare hands slap for half a point (more as you level)');
     s.equip.weapon = 'w_baguette'; sim(30);
     const myBiz = s.biz; s.biz = {};               // (no rival shopkeepers running out while we wait for the night)
     T.calm = false; s.clock = 23; sim(240);
     ok(F.monsters.filter(x => !x.event).length >= 2, 'monsters come out at night by themselves: ' + F.monsters.filter(x => !x.event).length + ' (' + [...new Set(F.monsters.map(x => x.kind))].join(', ') + ')');
     s.clock = 9; sim(150);
-    ok(F.monsters.filter(x => !x.event).length === 0, 'and they are gone in the morning');
+    ok(F.monsters.filter(x => !x.event && x.nightBorn).length === 0, 'the night-time figments are gone in the morning');
     T.calm = true; s.biz = myBiz;
     for (const x of F.monsters.slice()) { x.t = 9999; } sim(5);
 

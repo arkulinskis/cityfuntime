@@ -975,18 +975,68 @@ D.KINDS.music.sells.push('w_guitar');
 D.KINDS.tech.sells.push('w_bubble');
 D.SLAP = { dmg: 0.5, reach: 2.1, knock: 2, mesh: null, word: 'SLAP!' };   // bare hands
 
-// Monsters. hp, speed (m/s; your sprint beats all of them), steal = coins they grab when they touch you,
-// coins = what pops out, night: only after dark, boss: one at a time, announced.
+// Monsters ("figments": the city's noise taking shape, only you see them). hp, speed (m/s; your sprint beats all of them),
+// atk = health you lose per hit (before armour), steal = coins grabbers take ([0, 0] = they only hit), coins = what pops out,
+// w = spawn weight, night: only after dark, boss: one at a time, announced. Levels scale with yours and with the distance from home.
 D.MONSTERS = {
-  slime: { n: 'Sidewalk slime', e: '🟢', hp: 2, speed: 3.2, steal: [1, 4], coins: [3, 5], xp: 12, w: 10 },
-  cone: { n: 'Cone gremlin', e: '🚧', hp: 2, speed: 5.2, steal: [1, 3], coins: [3, 5], xp: 14, w: 7 },
-  bin: { n: 'Trash goblin', e: '🗑️', hp: 3, speed: 4.2, steal: [2, 6], coins: [4, 7], xp: 18, w: 7 },
-  sock: { n: 'Lost-sock ghost', e: '🧦', hp: 3, speed: 3.7, steal: [2, 5], coins: [5, 7], xp: 20, w: 5, night: true },
-  pigeon: { n: 'Pigeonzilla', e: '🐦', hp: 7, speed: 4.6, steal: [5, 12], coins: [11, 15], xp: 60, w: 1.2, size: 1.5, cash: true },
-  blob: { n: 'King Blob', e: '👑', hp: 16, speed: 3.6, steal: [10, 25], coins: [22, 28], xp: 180, w: 0, boss: true, gem: true },
-  goose: { n: 'Furious goose', e: '🪿', hp: 4, speed: 6.6, steal: [1, 2], coins: [6, 8], xp: 30, w: 0 },
+  slime: { n: 'Sidewalk slime', e: '🟢', hp: 2, speed: 3.2, atk: 5, steal: [1, 4], coins: [3, 5], xp: 12, w: 10 },
+  cone: { n: 'Cone gremlin', e: '🚧', hp: 2, speed: 5.2, atk: 5, steal: [1, 3], coins: [3, 5], xp: 14, w: 7 },
+  bin: { n: 'Trash goblin', e: '🗑️', hp: 3, speed: 4.2, atk: 7, steal: [2, 6], coins: [4, 7], xp: 18, w: 7 },
+  sock: { n: 'Lost-sock ghost', e: '🧦', hp: 3, speed: 3.7, atk: 6, steal: [2, 5], coins: [5, 7], xp: 20, w: 5, night: true },
+  pigeon: { n: 'Pigeonzilla', e: '🐦', hp: 7, speed: 4.6, atk: 12, steal: [5, 12], coins: [11, 15], xp: 60, w: 1.2, size: 1.5, cash: true },
+  blob: { n: 'King Blob', e: '👑', hp: 16, speed: 3.6, atk: 20, steal: [10, 25], coins: [22, 28], xp: 180, w: 0, boss: true, gem: true },
+  goose: { n: 'Furious goose', e: '🪿', hp: 4, speed: 6.6, atk: 4, steal: [1, 2], coins: [6, 8], xp: 30, w: 0 },
+  rat: { n: 'Gutter rat', e: '🐀', hp: 2, speed: 6.4, atk: 4, steal: [1, 3], coins: [2, 4], xp: 10, w: 9 },
+  raccoon: { n: 'Trash bandit', e: '🦝', hp: 3, speed: 5.6, atk: 6, steal: [3, 8], coins: [4, 7], xp: 18, w: 6 },
+  wisp: { n: 'Static wisp', e: '👻', hp: 3, speed: 3.6, atk: 8, steal: [0, 0], coins: [4, 7], xp: 22, w: 5, night: true },
+  cart: { n: 'Cart golem', e: '🛒', hp: 5, speed: 4.8, atk: 10, steal: [0, 0], coins: [6, 9], xp: 30, w: 4 },
+  spider: { n: 'Cable spider', e: '🕷️', hp: 3, speed: 5.8, atk: 7, steal: [0, 0], coins: [4, 7], xp: 22, w: 5, night: true },
+  worm: { n: 'Subway worm', e: '🪱', hp: 7, speed: 3.0, atk: 14, steal: [0, 0], coins: [8, 12], xp: 45, w: 2 },
+  gargoyle: { n: 'Rooftop gargoyle', e: '🗿', hp: 6, speed: 4.4, atk: 12, steal: [0, 0], coins: [8, 12], xp: 40, w: 2.5 },
+  brute: { n: 'Brick brute', e: '🧱', hp: 9, speed: 3.2, atk: 18, steal: [0, 0], coins: [10, 15], xp: 60, w: 1.5, size: 1.3 },
 };
+// Same monster, a local name: hand-written for some cities (by map box), otherwise picked from these by where you live.
+D.CITIES = [
+  { id: 'montreal', n: 'Montréal', lat: [45.38, 45.72], lon: [-74.0, -73.45] }, { id: 'newyork', n: 'New York', lat: [40.48, 40.95], lon: [-74.3, -73.68] },
+  { id: 'paris', n: 'Paris', lat: [48.78, 48.95], lon: [2.2, 2.48] }, { id: 'london', n: 'London', lat: [51.35, 51.65], lon: [-0.45, 0.25] },
+  { id: 'riga', n: 'Riga', lat: [56.88, 57.05], lon: [23.95, 24.3] }, { id: 'tokyo', n: 'Tokyo', lat: [35.5, 35.85], lon: [139.5, 139.95] },
+];
+D.CITY_MONSTERS = {
+  montreal: { slime: 'Slush Slurper', cone: 'Orange Cone Goblin', bin: 'Compost-Bin Gobbler', sock: 'Lost Mitten Ghost', pigeon: 'Grand Pigeon du Plateau', blob: 'King Poutine',
+    goose: 'Goose of Doom', rat: 'Ruelle Rat', raccoon: 'Mountain Bandit', wisp: 'River Fog Wisp', cart: 'Dépanneur Cart Golem', spider: 'Hydro-Pole Spider',
+    worm: 'Orange Line Worm', gargoyle: 'Church-Roof Gargoyle', brute: 'Triplex Brute' },
+  newyork: { slime: 'Subway Slime', cone: 'Detour Cone Imp', bin: 'Bodega Bin Goblin', sock: 'Laundromat Ghost', pigeon: 'Big Apple Pigeon', blob: 'King Bagel',
+    goose: 'Park Goose', rat: 'Pizza Rat', raccoon: 'Brooklyn Bandit', wisp: 'Steam-Vent Wisp', cart: 'Bodega Cart Golem', spider: 'Fire-Escape Spider',
+    worm: 'Express-Track Worm', gargoyle: 'Skyscraper Gargoyle', brute: 'Brownstone Brute' },
+  paris: { slime: 'Slime du Caniveau', cone: 'Bollard Gremlin', bin: 'Poubelle Goblin', sock: 'Lost Beret Ghost', pigeon: 'Bridge Pigeon', blob: 'King Croissant',
+    goose: 'River Goose', rat: 'Catacomb Rat', raccoon: 'Boulevard Bandit', wisp: 'Seine Mist', cart: 'Market Cart Golem', spider: 'Balcony Spider',
+    worm: 'Métro Worm', gargoyle: 'Cathedral Gargoyle', brute: 'Limestone Brute' },
+  london: { slime: 'Drizzle Slime', cone: 'Roadworks Imp', bin: 'Wheelie-Bin Goblin', sock: 'Lost Brolly Ghost', pigeon: 'Square Pigeon', blob: 'King Pudding',
+    goose: 'Pond Goose', rat: 'Tube Rat', raccoon: 'Urban Fox Bandit', wisp: 'Pea-Souper Wisp', cart: 'Market Barrow Golem', spider: 'Chimney Spider',
+    worm: 'Deep-Line Worm', gargoyle: 'Abbey Gargoyle', brute: 'Terrace Brute' },
+  riga: { slime: 'River Slime', cone: 'Cobble Cone Imp', bin: 'Courtyard Bin Goblin', sock: 'Lost Mitten Ghost', pigeon: 'Old Town Pigeon', blob: 'King Rye Bread',
+    goose: 'Canal Goose', rat: 'Market-Hall Rat', raccoon: 'Art Nouveau Bandit', wisp: 'Baltic Fog Wisp', cart: 'Market Cart Golem', spider: 'Spire Spider',
+    worm: 'Tram-Track Worm', gargoyle: 'Black-Cat Gargoyle', brute: 'Wooden-House Brute' },
+  tokyo: { slime: 'Rainy-Season Slime', cone: 'Roadwork Cone Imp', bin: 'Konbini Bin Goblin', sock: 'Lost Umbrella Ghost', pigeon: 'Shrine Pigeon', blob: 'King Mochi',
+    goose: 'Moat Goose', rat: 'Alley Rat', raccoon: 'Tanuki Bandit', wisp: 'Neon Wisp', cart: 'Vending Cart Golem', spider: 'Wire Spider',
+    worm: 'Loop-Line Worm', gargoyle: 'Shrine-Roof Gargoyle', brute: 'Concrete Brute' },
+};
+D.MONSTER_LOCAL = {
+  slime: ['Sidewalk Slime', 'Puddle Slurper', 'Drain Ooze', 'Gutter Gloop'], cone: ['Cone Gremlin', 'Detour Imp', 'Roadblock Goblin', 'Pylon Pest'],
+  bin: ['Trash Goblin', 'Bin Gobbler', 'Rubbish Grub', 'Dumpster Imp'], sock: ['Lost-Sock Ghost', 'Odd-Glove Ghost', 'Laundry Spook', 'Missing-Mitten Ghost'],
+  pigeon: ['Pigeonzilla', 'Mega Pigeon', 'Colossal Coo', 'Pigeon Prime'], blob: ['King Blob', 'Emperor Ooze', 'Grand Gloop', 'Sovereign Slime'],
+  goose: ['Furious Goose', 'Honk Beast', 'Goose of Grudges', 'Hissing Goose'], rat: ['Gutter Rat', 'Alley Rat', 'Sewer Scamp', 'Curb Rat'],
+  raccoon: ['Trash Bandit', 'Masked Bandit', 'Bin Burglar', 'Night Bandit'], wisp: ['Static Wisp', 'Fog Wisp', 'Streetlight Wisp', 'Hum Wisp'],
+  cart: ['Cart Golem', 'Trolley Golem', 'Rogue Cart', 'Wonky-Wheel Golem'], spider: ['Cable Spider', 'Wire Weaver', 'Pole Spider', 'Gutter Spider'],
+  worm: ['Subway Worm', 'Tunnel Worm', 'Manhole Worm', 'Pipe Worm'], gargoyle: ['Rooftop Gargoyle', 'Ledge Gargoyle', 'Cornice Gargoyle', 'Gutter-Spout Gargoyle'],
+  brute: ['Brick Brute', 'Masonry Brute', 'Rubble Brute', 'Wall Brute'],
+};
+// metro guardians: a big monster at every station entrance; beat it and the station joins your metro network
+D.GUARDIANS = { brute: 'Turnstile Titan', worm: 'Tunnel Wyrm', gargoyle: 'Platform Gargoyle', cart: 'Rush-Hour Juggernaut', spider: 'Escalator Weaver' };
+// what passers-by say when you fight things they can't see (kindly)
+D.STATIC_LINES = ['Nice shadow-boxing!', 'Ooh, karate?', 'Rough day? Me too.', 'You good? ...You got this.', 'Is that a new workout?', 'Whatever it is, you won.'];
 D.MONSTER_LINES = ['Blorp!', 'Grrr!', 'Mine! MINE!', 'Coins... coooins...', 'Boo!', 'Nom nom nom', 'Rawr (small)', 'Gimme!'];
+D.MONSTER_LINES.push('Bzzzt...', '*static*', 'You can\'t ignore me!', 'Hssss!');
 D.MONSTER_TITLES = [[1, 'Monster bonker'], [10, 'Night watch'], [30, 'Slime time'], [75, 'Monster hunter'], [150, 'Legend of the night shift']];
 
 // Shenanigans with strangers
@@ -1288,6 +1338,45 @@ D.RPG = {
 D.PICKUPS.chest = { e: '🧰', n: 'Treasure chest', bg: '#ffd27a', w: 0, loot: true, beam: true };
 D.CHATTER.push('Did you see that silver-tagged monster? Folks say it drops the good stuff.', 'Have a nap at home now and then. You come back sharper.',
   'My cousin found a purple charm under a bench. PURPLE.', 'The Night Watch is recruiting, apparently.');
+
+// Gear you can see on yourself (Diablo-style loot): bases per slot, armour per slot, colours by quality
+Object.assign(D.RPG, {
+  SLOT_NAMES: { weapon: 'Weapon', head: 'Head', body: 'Body', feet: 'Feet', c1: 'Charm', c2: 'Charm', c3: 'Charm' },
+  GEAR: {
+    weapon: [{ id: 'w_baguette', n: 'Baguette' }, { id: 'w_chicken', n: 'Rubber Chicken' }, { id: 'w_pillow', n: 'Pillow' }, { id: 'w_noodle', n: 'Pool Noodle' },
+      { id: 'w_fish', n: 'Frozen Fish' }, { id: 'w_plunger', n: 'Plunger' }, { id: 'w_guitar', n: 'Guitar' }],
+    head: [{ id: 'cap', n: 'Ball Cap', e: '🧢', look: 'hat' }, { id: 'beanie', n: 'Beanie', e: '🧶', look: 'beanie' }, { id: 'helmet', n: 'Bike Helmet', e: '⛑️', look: 'hat' },
+      { id: 'bucket', n: 'Bucket Hat', e: '👒', look: 'hat' }, { id: 'hardhat', n: 'Hard Hat', e: '👷', look: 'hat' }],
+    body: [{ id: 'hoodie', n: 'Hoodie', e: '🧥', look: {} }, { id: 'denim', n: 'Denim Jacket', e: '🧥', look: { collar: true } }, { id: 'leather', n: 'Leather Jacket', e: '🧥', look: { collar: true } },
+      { id: 'puffer', n: 'Puffer Coat', e: '🧥', look: { coat: true } }, { id: 'trench', n: 'Trench Coat', e: '🧥', look: { coat: true, collar: true } }, { id: 'track', n: 'Track Jacket', e: '🥋', look: { stripes: true } }],
+    feet: [{ id: 'sneakers', n: 'Sneakers', e: '👟' }, { id: 'hightops', n: 'High-Tops', e: '👟' }, { id: 'boots', n: 'Work Boots', e: '🥾' }, { id: 'runners', n: 'Running Shoes', e: '👟' }, { id: 'rain', n: 'Rain Boots', e: '🥾' }],
+  },
+  GEAR_AR: { head: 2, body: 4, feet: 1 },
+  GEAR_COLS: [[0x8a8a8a], [0x6b7280, 0x2b4c7e, 0x5b4636, 0x1f2937, 0x9aa3ad], [0x2f9e44, 0x3aa6b9, 0xe8453c, 0xf2b134, 0x6d8b3a], [0x0a6fd6, 0x1c7ed6, 0x3b5bdb, 0x15aabf],
+    [0x9b3de0, 0x7b2fbe, 0xb05cff, 0xd6336c], [0xe0700a, 0xf2b134, 0xffcc33, 0xff8a1a]],
+  PREFIX: ['Sturdy', 'Reinforced', 'Swift', 'Fierce', 'Glowing', 'Fresh', 'Gilded', 'Battle-Worn', 'Lucky', 'Neon'],
+});
+// healing (Q or the 🍵 button eats the best one in your bag; food heals too)
+Object.assign(D.ITEMS, {
+  tea: { n: 'Calm tea', e: '🍵', p: 6, type: 'snack', energy: 10, heal: 40 },
+  juice: { n: 'Juice box', e: '🧃', p: 4, type: 'snack', energy: 8, heal: 25 },
+  smoothie: { n: 'Blueberry smoothie', e: '🫐', p: 15, type: 'snack', energy: 20, heal: 80 },
+});
+D.ITEMS.bandage.heal = 30;
+D.KINDS.cafe.sells.push('tea', 'smoothie');
+D.KINDS.grocery.sells.push('juice', 'tea');
+D.KINDS.pharmacy.sells.push('tea');
+D.PICKUPS.wallet = { e: '👛', n: 'Your dropped wallet', bg: '#ffd54a', w: 0, wallet: true, beam: true };
+D.TIPS.push('Your health is the red bar. Food and calm tea 🍵 heal (Q). Every metro entrance has a guardian: beat it and the station opens.',
+  'Figments get tougher the further you roam from home. Home is always calm.',
+  'Loot hats, jackets, shoes and weapons show on your character. Phone → Character to swap them.');
+D.CHATTER.push('Big thing by the metro last night. Swear I heard it roar.', 'You look tired. Get some sleep, friend.');
+S('s-static', 'The Static', 'max', 'home', { m: ['c1-couch'] }, ['Max: Hey cuz... you okay? I saw you swatting at the air out there like it owed you money.',
+  'Max: New city, no sleep, a million noises. My first month here my brain did weird stuff too. You\'re not the only one.',
+  'Max: Whatever you\'re seeing, face it. Then let\'s get you checked out and get some proper sleep.'],
+  [{ do: 'count', key: 'bonks', n: 3, text: 'Face 3 figments (press F)' }, { do: 'buy', item: 'checkup', text: 'Get a free check-up at a clinic 🩺' }, { do: 'sleep', text: 'Get a good night\'s sleep at home 😴' }],
+  ['Max: Better? Good. They might come back now and then, when the city gets loud. Friends, sleep and a good mood keep them quiet. And you can always talk to me.'],
+  { money: 50, xp: 220, happy: 10, rel: { max: 10 } });
 
 window.CFT_DATA = D;
 })();

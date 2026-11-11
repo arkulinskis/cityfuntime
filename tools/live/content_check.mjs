@@ -60,6 +60,14 @@ for (const [id, it] of Object.entries(D.ITEMS)) {
   if (!(it.weapon.dmg > 0 && it.weapon.reach > 0 && it.weapon.word)) bad.push(id + ': weapon needs dmg, reach, word');
   if (!Object.values(D.KINDS).some(k => k.sells.includes(id))) bad.push(id + ': no shop sells it');
 }
+if (Object.keys(D.MONSTERS).length < 15) bad.push('fewer than 15 monster types');
+for (const [k, m] of Object.entries(D.MONSTERS)) {
+  if (!(m.atk > 0)) bad.push('monster ' + k + ': needs atk');
+  if (!(D.MONSTER_LOCAL[k] && D.MONSTER_LOCAL[k].length >= 3)) bad.push('monster ' + k + ': needs local names');
+  for (const c of D.CITIES) if (!(D.CITY_MONSTERS[c.id] || {})[k]) bad.push('monster ' + k + ': no name in ' + c.n);
+}
+for (const k of Object.keys(D.GUARDIANS)) if (!D.MONSTERS[k]) bad.push('guardian kind ' + k + ' is not a monster');
+for (const slot of ['weapon', 'head', 'body', 'feet']) for (const b of D.RPG.GEAR[slot]) if (slot === 'weapon' ? !(D.ITEMS[b.id] && D.ITEMS[b.id].weapon) : !b.e) bad.push('gear ' + slot + ' ' + b.id + ': bad base');
 for (const [k, m] of Object.entries(D.MONSTERS)) { if (!(m.hp > 0 && m.speed > 0 && m.speed < D.WALK.run && m.coins && m.steal)) bad.push('monster ' + k + ': needs hp, speed below your sprint, coins, steal'); }
 for (const [k] of D.SHOP_MIX) { if (!D.KINDS[k]) bad.push('SHOP_MIX: unknown kind ' + k); else if (!D.shopName(k, 0.5) || !D.shopName(k, 0.123)) bad.push('SHOP_MIX: no name for ' + k); }
 for (const k of Object.keys(D.KINDS)) if (!D.SIGN_COLS[k]) bad.push('no sign colour for ' + k);

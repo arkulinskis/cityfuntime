@@ -236,7 +236,7 @@ function mount(root, opts) {
     else if (!quiet && st) U.feed(st.e, '+' + n + ' ' + st.name);
   }
   function addHappy(n) { save.happy = clamp(save.happy + n, 0, 100); }
-  function addEnergy(n) { save.energy = clamp(save.energy + n, 0, G.maxEnergy()); }
+  function addEnergy(n) { save.energy = clamp(save.energy + n, 0, G.maxEnergy()); if (n > 0 && G.fun && G.fun.heal) G.fun.heal(n * 0.7); }  // food heals too
   function addRel(id, n) {
     if (!D.CAST[id]) return;
     const before = save.rel[id] || 0;
@@ -698,7 +698,7 @@ function mount(root, opts) {
           if (slow) for (const k of step.kinds) {
             if (ms.p.includes(k)) continue;
             const pl = placesOf(k).find(q => dist(q.pin, p) < 10);
-            if (pl) { ms.p.push(k); U.feed(D.KINDS[k].e, 'Visited ' + pl.name + ' (' + ms.p.length + '/' + step.kinds.length + ')'); G.sfx.pick(); if (k === 'metro') visitMetro(pl); updateBeam(); dirty(); }
+            if (pl) { ms.p.push(k); U.feed(D.KINDS[k].e, 'Visited ' + pl.name + ' (' + ms.p.length + '/' + step.kinds.length + ')'); G.sfx.pick(); if (k === 'metro' && metroOpen(pl)) visitMetro(pl); updateBeam(); dirty(); }
           }
           if (ms.p.length >= step.kinds.length) completeStep(id);
           break;
@@ -1051,6 +1051,7 @@ function mount(root, opts) {
     }
     for (const id of G.activeMissions()) { const s = curStep(id); if (s && s.do === 'collect' && s.what === k.type && !save.m[id].items) save.m[id].p++; }
     if (pk.loot) { bump('chests'); if (G.rpg) G.rpg.drop('chest'); }
+    if (pk.wallet && G.fun) G.fun.gotWallet();
     if (pk.money) { const amt = Math.round(rnd(pk.money[0], pk.money[1]) * (1 + G.level() * 0.06) * (1 + (G.rpg ? G.rpg.bonus('coin') : 0))); save.money += amt; bump('coins', k.type === 'coin' ? 1 : 0); U.feed(pk.e, '+' + fmt$(amt)); U.hud.bump('money'); G.sfx.coin(); }
     if (pk.energy) { addEnergy(pk.energy * G.foodMul()); U.feed(pk.e, '+' + Math.round(pk.energy * G.foodMul()) + ' ⚡'); G.sfx.pick(); }
     if (pk.stat) { addStat(pk.stat, 0.25); G.sfx.pick(); }
@@ -1256,7 +1257,7 @@ function mount(root, opts) {
     switch (it.type) {
       case 'food': addEnergy((it.energy || 0) * G.foodMul()); if (it.happy) addHappy(it.happy); if (it.stats) for (const k in it.stats) addStat(k, it.stats[k], true); U.feed(it.e, 'Yum! +' + Math.round((it.energy || 0) * G.foodMul()) + ' ⚡'); break;
       case 'snack': case 'gift': case 'quest': giveItem(it.give || id, 1); U.feed(it.e, it.n + ' added to your bag'); break;
-      case 'gear': save.owned[id] = true; save.equip[it.slot] = id; if (it.slot !== 'weapon') W.setLook(playerLook()); U.feed(it.e, (it.weapon ? 'Armed with: ' : 'Wearing ') + it.n + (it.weapon ? ' (F to bonk)' : '')); if (it.happy) addHappy(it.happy); break;
+      case 'gear': save.owned[id] = true; save.equip[it.slot] = id; if (it.weapon && G.rpg) G.rpg.unequip('weapon'); if (it.slot !== 'weapon') W.setLook(playerLook()); U.feed(it.e, (it.weapon ? 'Armed with: ' : 'Wearing ') + it.n + (it.weapon ? ' (F to bonk)' : '')); if (it.happy) addHappy(it.happy); break;
       case 'vehicle': save.owned[id] = true; setRide(id); U.banner(it.e + ' ' + it.n + '!', 'Press V (or the ride button) to hop on and off.', 'done'); log('Bought a ' + it.n, it.e); break;
       case 'furniture': save.owned[id] = true; if (it.energy) save.maxE = (save.maxE || 0) + it.energy; U.feed(it.e, it.n + ' delivered home. +' + it.happy + ' 😊 every day'); log('Bought ' + it.n, it.e); break;
       case 'pet': save.pets.push({ kind: it.pet, name: it.pet === 'dog' ? 'Biscuit' : 'Mochi', since: save.day }); addHappy(10); refreshFollowers(); U.banner(it.e + ' New best friend!', 'Your ' + it.pet + ' follows you everywhere.', 'friend'); log('Adopted a ' + it.pet, it.e); break;
@@ -1298,7 +1299,8 @@ function mount(root, opts) {
     if (eq.acc === 'headphones') base.phones = 0xff5c8a;
     if (eq.acc === 'fakenose') base.glasses = true;
     if (eq.hat === 'helmet') base.hat = 0xf2b134;
-    if (save.fun && save.fun.king) { base.crown = true; base.hat = null; }
+    if (G.rpg) Object.assign(base, G.rpg.lookParts());  // loot hats, jackets and shoes
+    if (save.fun && save.fun.king) { base.crown = true; base.hat = null; base.beanie = null; }
     return base;
   }
   G.playerLook = playerLook;
@@ -1755,11 +1757,13 @@ function mount(root, opts) {
   function visitMetro(pl) {
     if (save.metro.some(m => m.id === pl.id)) return;
     const a = ll(pl.pin.x, pl.pin.z);
-    save.metro.push({ id: pl.id, name: pl.name || W.streetAt(pl.pin.x, pl.pin.z) || 'Station', lat: a.lat, lon: a.lon });
+    save.metro.push({ id: pl.id, name: (G.fun && G.fun.stationName ? G.fun.stationName(pl) : pl.name) || W.streetAt(pl.pin.x, pl.pin.z) || 'Station', lat: a.lat, lon: a.lon });
     if (save.metro.length > 40) save.metro.shift();
     U.feed('🚇', 'Station unlocked: ' + (pl.name || 'Metro'));
     dirty();
   }
+  G.visitMetro = visitMetro;
+  const metroOpen = pl => !G.fun || G.fun.metroOpen(pl);  // a guardian holds every station until you beat it
   G.metroTo = async function (st) {
     const fare = isFriend('bouchard') ? 0 : 3;
     if (save.money < fare) { U.toast('A ride costs $3.'); return; }
@@ -1824,6 +1828,7 @@ function mount(root, opts) {
     const until = 7, add = h < until ? until - h : 24 - h + until;
     await U.fade(() => { advanceClock(add); save.energy = G.maxEnergy(); addHappy(2); }, '😴 Zzz...');
     if (G.rpg) G.rpg.onSleep();
+    if (G.fun) G.fun.heal(1e9);
     for (const id of G.activeMissions()) { const s = curStep(id); if (s && s.do === 'sleep') await completeStep(id); }
   }
   G.sleep = sleep;
@@ -1900,11 +1905,11 @@ function mount(root, opts) {
     let pl = null, pd = 9;
     for (const q of G.allPlaces()) { const d = Math.hypot(q.pin.x - p.x, q.pin.z - p.z); if (d < pd) { pd = d; pl = q; } }
     if (pl) {
-      if (pl.kind === 'metro') visitMetro(pl);
+      if (pl.kind === 'metro' && metroOpen(pl)) visitMetro(pl);
       const gate = G.fun && G.fun.shopGate(pl); // a made-up shop that banned you after a prank
       if (gate) return gate;
       const k = D.KINDS[pl.kind];
-      if (pl.kind === 'metro') return { t: '🚇 Ride the metro', fn: () => U.metroPanel(pl) };
+      if (pl.kind === 'metro') return metroOpen(pl) ? { t: '🚇 Ride the metro', fn: () => U.metroPanel(pl) } : { t: '🚇 ' + (G.fun ? G.fun.stationName(pl) : pl.name || 'Metro') + ': a guardian blocks the stairs', fn: () => U.toast('Beat the guardian here and this station joins your metro network.') };
       if (pl.kind === 'bank') return { t: '🏦 ' + (pl.name || 'Bank'), fn: () => U.bankPanel(pl) };
       if (k && k.sells.length) return { t: k.e + ' ' + (pl.name || k.n), fn: () => U.shopPanel(pl) };
     }
