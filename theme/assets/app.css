@@ -674,6 +674,11 @@ html.ui-dark .lp-svg .win { fill: #ffe27a; }
 .cft-sw button.on { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #6b4eff; }
 .cft-check { display: flex; gap: 8px; align-items: center; font-weight: 700; font-size: .9rem; margin: 8px 0; cursor: pointer; }
 .cft-check input { width: 18px; height: 18px; accent-color: #6b4eff; }
+.cft-styles { align-items: flex-start; } .cft-styles .cft-chipb { width: auto; height: auto; border-radius: 99px; border-width: 2px; padding: 5px 10px; } .cft-styles .cft-chipb.on { box-shadow: none; }
+.cft-lookwrap { display: flex; justify-content: flex-end; align-items: center; padding: 16px; pointer-events: none; }
+.cft-look { pointer-events: auto; width: min(380px, 100%); } .cft-look .cft-row { flex-wrap: wrap; gap: 4px 14px; }
+button.cft-face { cursor: pointer; padding: 0; } button.cft-face:active { transform: translate(2px, 2px); }
+@media (max-width: 720px) { .cft-lookwrap { align-items: flex-end; justify-content: center; padding: 8px; } .cft-look { max-height: 52%; padding: 14px; } }
 .cft-search { display: flex; gap: 8px; }
 .cft-search-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0 6px; }
 .cft-msg { font-weight: 700; font-size: .88rem; color: #6b4eff; }

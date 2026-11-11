@@ -108,10 +108,30 @@ window.__funOut = []; window.__funDone = false;
     T.calm = true; s.biz = myBiz;
     for (const x of F.monsters.slice()) { x.t = 9999; } sim(5);
 
+    // ---------- the people themselves: rounded bodies with joints
+    {
+      const u = W.life.peds[0].fig.userData, tris = o => { let n = 0; o.traverse(m => { if (m.isMesh) n += m.geometry.attributes.position.count / 3; }); return Math.round(n); };
+      ok(!!(u.head && u.kneeL && u.kneeR && u.elbowL && u.elbowR && u.handR), 'people have heads that turn, knees, elbows and hands');
+      const t1 = tris(W.life.peds[0].fig);
+      ok(t1 > 1000 && t1 < 3600, 'a passer-by is built from ' + t1 + ' triangles (the old box figures had about 130)');
+      const walker = W.life.peds.find(q => q.type === 'walk' && !q.pause && !q.hold);
+      if (walker) { let bend = 0; for (let i = 0; i < 40; i++) { sim(1); bend = Math.min(bend, walker.fig.userData.kneeL.rotation.x, walker.fig.userData.kneeR.rotation.x); } ok(bend < -0.1, 'knees bend when they walk (' + bend.toFixed(2) + ' rad)'); }
+      const me = G.playerLook();
+      ok(me.bag && me.style != null && !me.glasses, 'you: a tee, jeans, a backpack; hair style ' + W.HAIR_STYLES[me.style]);
+      s.look = Object.assign({}, s.look, { style: 4, glasses: true }); W.setLook(G.playerLook());
+      ok(G.playerLook().style === 4 && G.playerLook().glasses === true, 'changing your look redraws you (curly hair, glasses)');
+      U.lookEditor(); await sleep(150);
+      ok(!!document.querySelector('.cft-look [data-style="4"].on') && W.showOff === true, 'the look editor opens with your choices and turns you to the camera');
+      document.querySelector('.cft-look [data-style="0"]').click(); document.querySelector('.cft-look [data-x]').click(); await sleep(100);
+      ok(s.look.style === 0 && !W.showOff && !U.isOpen(), 'picking a style in the editor saves it');
+    }
+
     // ---------- strangers: a joke, a pick-up line, a sweetheart
     sim(60);
-    const ped = () => W.life.peds.filter(q => q.type === 'walk' && !q.flirted && !q.ctl).sort((a, b) => Math.hypot(a.obj.position.x - pp.x, a.obj.position.z - pp.z) - Math.hypot(b.obj.position.x - pp.x, b.obj.position.z - pp.z))[0];
+    const clear = o => !G.allPlaces().some(q => Math.hypot(q.pin.x - o.x, q.pin.z - o.z) < 12) && Math.hypot(o.x - G.homeSpot().x, o.z - G.homeSpot().z) > 14;  // not at a shop door: shops win the E key
+    const ped = () => W.life.peds.filter(q => q.type === 'walk' && !q.flirted && !q.ctl && clear(q.obj.position)).sort((a, b) => Math.hypot(a.obj.position.x - pp.x, a.obj.position.z - pp.z) - Math.hypot(b.obj.position.x - pp.x, b.obj.position.z - pp.z))[0];
     let pd = ped();
+    for (let i = 0; i < 40 && !pd; i++) { sim(30); pd = ped(); }
     go(pd.obj.position.x + 1, pd.obj.position.z); sim(1);
     const it = G.peek();
     ok(!!it && /stranger/.test(it.t), 'next to a passer-by, E offers to talk: ' + (it && it.t));

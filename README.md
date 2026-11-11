@@ -50,6 +50,12 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
   joggers, kids, elders, skaters and cyclists; cars, taxis, vans, buses, police cars and an ice cream truck that stop and honk;
   pigeons; metro entrances as fast travel; a phone (P) with Quests, Map, Me, Bag, People, Homes, Business, Turf, Street life,
   Album, Diary, Settings.
+- **People:** you, the story's cast and everyone on the pavement are rounded cartoon figures with a face (eyes, brows, nose,
+  mouth, ears), nine hair styles, caps, beanies, glasses, beards, headphones, backpacks, dresses, shorts, striped and logo
+  shirts, and knees and elbows that bend when they walk, run, sit, pedal, wave and dance. Your character starts in a tee and
+  jeans with the backpack you arrived with; outfits, shoes, headphones and the helmet from the shops show on you. Change skin,
+  hair colour, hair style, glasses, beard and backpack any time: phone → Settings (or Me) → **Change your look**, with your
+  character turning to face you.
 - **Made-up shops and signs:** besides the real places from the map, about one building in four along the streets holds a
   made-up shop (26 kinds, generated names, always the same shop in the same building). Every place, real or made-up, has a
   sign on its wall in its kind's colour, a striped awning and a round blade sign.
@@ -146,6 +152,7 @@ python -I tools/ui_test.py                       # the app in the Anvil App Serv
 node tools/live/content_check.mjs                # missions, items, weapons, monsters, shops: every reference checks out
 python -I tools/live/game_test.py                # plays the 3D game for real (needs internet): missions, then street life
 python -I tools/live/game_test.py --shots DIR    # pictures of the city by day, at dusk and at night
+python -I tools/live/game_test.py --people DIR   # close-ups of the characters: you, passers-by in poses, the look editor
 git push origin master                           # the deploy: Anvil pulls master
 ```
 

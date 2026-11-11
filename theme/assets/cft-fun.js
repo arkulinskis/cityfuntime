@@ -443,7 +443,7 @@ function attach(G, api) {
   }
 
   // ------------------------------------------------------------------ street folk
-  function folkLook(d) { return Object.assign(W.randomLook(d.id.length * 913 + d.id.charCodeAt(0) * 7), { hat: null, bag: null, dress: false, shirt: 0x6b7280, pants: 0x3a3f4a }, d.look); }
+  function folkLook(d) { return Object.assign(W.randomLook(d.id.length * 913 + d.id.charCodeAt(0) * 7), { hat: null, bag: null, dress: false, shorts: false, glasses: false, beard: false, stripes: null, logo: null, phones: null, scarf: null, sleeve: 'long', shirt: 0x6b7280, pants: 0x3a3f4a }, d.look); }
   function spawnFolk(d) {
     const f = fun(), s = save(), p = P();
     let at = f.folkAt[d.id], q = at && at.day === s.day ? G.xz(at) : null, yaw = at ? at.yaw : 0;
@@ -480,9 +480,10 @@ function attach(G, api) {
     }
     for (const a of F.folk) {
       const d = Math.hypot(a.x - p.x, a.z - p.z), rec = folkRec(a.d.id);
-      a.tag.visible = d < 40;
+      const sitting = !a.up && !(a.bow > 0);
+      a.tag.visible = d < 40; a.tag.position.y = sitting ? 1.5 : 2.3;
       a.mark.visible = rec.got < 4 && d < 60;
-      a.mark.position.y = 2.55 + Math.sin(G.rt.t * 3 + a.x) * 0.08 - (a.up ? 0 : 0.5);
+      a.mark.position.y = (sitting ? 2.0 : 2.85) + Math.sin(G.rt.t * 3 + a.x) * 0.08;
       if (a.up === 1) { // walking over to ask
         const left = walk(a, p.x, p.z, 2.6, dt);
         W.animate(a.fig, 2.6, dt);
@@ -497,8 +498,7 @@ function attach(G, api) {
         continue;
       }
       if (a.bow > 0) { a.bow -= dt; W.animate(a.fig, 0, dt, 'wave'); continue; }
-      W.animate(a.fig, 0, dt, 'sit');
-      a.fig.userData.armR.rotation.z = 0;
+      W.animate(a.fig, 0, dt, 'ground');
       if (quiet() || !onFoot()) continue;
       if (king && d < 9 && G.rt.t - a.asked > 40) { a.asked = G.rt.t; a.bow = 2.2; a.fig.userData.body.position.y = 0; a.fig.userData.legL.rotation.x = a.fig.userData.legR.rotation.x = 0; sayAt(a.obj, pick(D.FOLK_KING), 2.4); }
       // some get up and come over to ask (walk away and they shrug it off)
@@ -589,8 +589,8 @@ function attach(G, api) {
   }
   function keeperObj(pl) {
     const seed = (pl.name || 'x').length * 131 + (pl.name || 'x').charCodeAt(0) * 7;
-    const g = W.person(Object.assign(W.randomLook(seed), { apron: 0xf4f1ea, hat: pl.kind === 'bakery' || pl.kind === 'restaurant' ? 0xffffff : null, bag: null, dress: false }));
-    const pin = W.propMesh('pin'); pin.position.set(0, -0.56, -0.02); pin.rotation.x = -0.6; g.userData.armR.add(pin);
+    const g = W.person(Object.assign(W.randomLook(seed), { apron: 0xf4f1ea, hat: pl.kind === 'bakery' || pl.kind === 'restaurant' ? 0xffffff : null, bag: null, dress: false, shorts: false, mood: 'angry', sleeve: 'short' }));
+    const pin = W.propMesh('pin'); pin.position.set(0, -0.03, 0); pin.rotation.x = 0.4; g.userData.handR.add(pin);
     const tag = W.label('💢', { bg: '#ff5c8a', fg: '#fff', size: 56, height: 0.8, border: '#1f1a3d', depthTest: false }); tag.position.y = 2.9; g.add(tag);
     return g;
   }
@@ -620,7 +620,7 @@ function attach(G, api) {
       const sp = Math.max(3.2, Math.min(onFoot() ? top * 0.86 : 9, 11.5));
       walk(c, p.x, p.z, sp, dt);
       W.animate(c.obj, sp, dt);
-      if (c.obj.userData.armR) c.obj.userData.armR.rotation.x = -2.6 + Math.sin(c.t * 9) * 0.4;
+      if (c.kind !== 'sweet') { c.obj.userData.armR.rotation.x = 2.7 + Math.sin(c.t * 9) * 0.35; c.obj.userData.elbowR.rotation.x = 0.5; }  // the rolling pin, held high
       c.shout -= dt;
       if (c.shout <= 0) { c.shout = 2.6 + Math.random() * 1.6; sayAt(c.obj, G.text(pick(c.lines)), 2); }
       // the royal guard: street folk trip up anyone chasing their monarch

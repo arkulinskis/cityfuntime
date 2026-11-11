@@ -16,6 +16,8 @@ const SKIN = ['#f6d7c0', '#f1c9a5', '#e9b98f', '#d39d6c', '#b57b4a', '#8d5a33', 
 const HAIR = ['#1d1d1d', '#3a2618', '#6b4423', '#b98545', '#e1c06a', '#b24a2a', '#d9d4cc', '#7b52c7', '#ef6aa5'];
 const SHIRT = ['#e8453c', '#2b6cb0', '#2f9e6e', '#f2b134', '#7b52c7', '#ef6aa5', '#1f2937', '#3aa6b9', '#ff8a3d'];
 const hexN = h => parseInt(h.slice(1), 16);
+const STYLES = ['Short', 'Long', 'Bun', 'Ponytail', 'Curly', 'Spiky', 'Bob', 'Thin on top', 'Side part'];
+const toHex = n => '#' + ('000000' + (n >>> 0).toString(16)).slice(-6);
 
 function create(G, root) {
   const D = G.D;
@@ -404,7 +406,7 @@ function create(G, root) {
   };
   U.startScreen = function (me) {
     return new Promise(resolve => {
-      const look = { skin: hexN(SKIN[2]), hair: hexN(HAIR[1]), shirt: hexN(SHIRT[0]), long: false };
+      const look = { skin: hexN(SKIN[2]), hair: hexN(HAIR[1]), shirt: hexN(SHIRT[0]), style: 0, glasses: false, beard: false };
       const sw = (name, list, key) => '<div class="cft-sw" data-sw="' + key + '"><span>' + name + '</span>' + list.map((c, k) => '<button type="button" style="background:' + c + '" data-c="' + c + '" class="' + (k === (key === 'skin' ? 2 : key === 'hair' ? 1 : 0) ? 'on' : '') + '" aria-label="' + name + ' ' + (k + 1) + '"></button>').join('') + '</div>';
       const ov = overlay(`<div class="cft-start">
         <div class="cft-start-in">
@@ -413,7 +415,8 @@ function create(G, root) {
             <h3>1 · Who are you?</h3>
             <label class="cft-field"><span>Your name</span><input name="name" maxlength="20" required value="${esc(me && me.name ? me.name.split(' ')[0] : '')}" placeholder="Alex"></label>
             ${sw('Skin', SKIN, 'skin')}${sw('Hair', HAIR, 'hair')}${sw('Shirt', SHIRT, 'shirt')}
-            <label class="cft-check"><input type="checkbox" name="long"> Long hair</label>
+            <div class="cft-sw cft-styles" data-styles><span>Style</span>${STYLES.map((n, k) => '<button type="button" class="cft-chipb ' + (k ? '' : 'on') + '" data-style="' + k + '">' + n + '</button>').join('')}</div>
+            <div class="cft-row"><label class="cft-check"><input type="checkbox" name="glasses"> Glasses</label><label class="cft-check"><input type="checkbox" name="beard"> Beard</label></div>
             <h3>2 · Where do you live?</h3>
             <p class="muted small">Type your address or any place on Earth. The city around it becomes your game world. (The address is looked up on OpenStreetMap.)</p>
             <div class="cft-search"><input name="q" placeholder="1234 Rue Saint-Denis, Montréal" autocomplete="street-address"><button class="cft-btn primary" type="submit">Move in</button></div>
@@ -428,10 +431,15 @@ function create(G, root) {
         row.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
         look[row.dataset.sw] = hexN(b.dataset.c);
       }));
+      ov.el.querySelector('[data-styles]').addEventListener('click', e => {
+        const b = e.target.closest('[data-style]'); if (!b) return;
+        ov.el.querySelectorAll('[data-style]').forEach(x => x.classList.toggle('on', x === b));
+        look.style = +b.dataset.style;
+      });
       ov.el.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => e.stopPropagation()));
       const done = home => {
         const name = (f.elements.name.value || '').trim() || (me && me.name ? me.name.split(' ')[0] : 'Alex');
-        look.long = f.elements.long.checked;
+        look.glasses = f.elements.glasses.checked; look.beard = f.elements.beard.checked; look.long = [1, 2, 3, 6].includes(look.style);
         ov.close();
         resolve({ name: name.slice(0, 20), look, home });
       };
@@ -451,6 +459,26 @@ function create(G, root) {
       };
       ov.el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const p = PLACES[+b.dataset.p]; done({ lat: p.lat, lon: p.lon, label: p.name + ', ' + p.city, short: p.name }); });
     });
+  };
+  U.lookEditor = function () {
+    const s = save(), W = G.W;
+    const cur = Object.assign({ skin: hexN(SKIN[2]), hair: hexN(HAIR[1]), shirt: hexN(SHIRT[0]), style: s.look && s.look.long ? 1 : 0, glasses: false, beard: false, pack: true }, s.look || {});
+    const sw = (name, list, key) => '<div class="cft-sw" data-sw="' + key + '"><span>' + name + '</span>' + list.map((c, k) => '<button type="button" style="background:' + c + '" data-c="' + c + '" class="' + (c === toHex(cur[key]) ? 'on' : '') + '" aria-label="' + name + ' ' + (k + 1) + '"></button>').join('') + '</div>';
+    const ov = overlay('<div class="cft-card cft-look"><h3>🪞 Your look</h3>' + sw('Skin', SKIN, 'skin') + sw('Hair', HAIR, 'hair') + sw('Shirt', SHIRT, 'shirt') +
+      '<div class="cft-sw cft-styles" data-styles><span>Style</span>' + STYLES.map((n, k) => '<button type="button" class="cft-chipb ' + (k === cur.style ? 'on' : '') + '" data-style="' + k + '">' + n + '</button>').join('') + '</div>' +
+      '<div class="cft-row"><label class="cft-check"><input type="checkbox" data-flag="glasses" ' + (cur.glasses ? 'checked' : '') + '> Glasses</label><label class="cft-check"><input type="checkbox" data-flag="beard" ' + (cur.beard ? 'checked' : '') + '> Beard</label>' +
+      '<label class="cft-check"><input type="checkbox" data-flag="pack" ' + (cur.pack !== false ? 'checked' : '') + '> Backpack</label></div>' +
+      '<p class="muted small">Outfits, shoes and headphones from the shops show on you too. An outfit sets your shirt colour.</p>' +
+      '<div class="cft-opts row"><button type="button" class="cft-btn primary" data-x>Looks good</button></div></div>', 'cft-lookwrap', { onclose: () => { W.showOff = false; G.dirty(); } });
+    const apply = () => { cur.long = [1, 2, 3, 6].includes(cur.style); s.look = cur; W.setLook(G.playerLook()); };
+    W.showOff = true;
+    ov.el.addEventListener('click', e => {
+      const c = e.target.closest('[data-c]'), st = e.target.closest('[data-style]');
+      if (c) { const row = c.closest('[data-sw]'); row.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === c)); cur[row.dataset.sw] = hexN(c.dataset.c); apply(); }
+      else if (st) { ov.el.querySelectorAll('[data-style]').forEach(x => x.classList.toggle('on', x === st)); cur.style = +st.dataset.style; apply(); }
+      else if (e.target.closest('[data-x]')) ov.close();
+    });
+    ov.el.addEventListener('change', e => { const f = e.target.closest('[data-flag]'); if (f) { cur[f.dataset.flag] = f.checked; apply(); } });
   };
   async function geocode(q) {
     const m = q.match(/^\s*(-?\d{1,2}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
@@ -668,7 +696,7 @@ function create(G, root) {
   VIEWS.me = function () {
     const s = save(), lv = G.level(), a = G.xpAt(lv), b = G.xpAt(lv + 1), sum = window.CFTGame.summary(s);
     const eq = ['outfit', 'shoes', 'hat', 'acc', 'phone', 'bag'].map(k => { const it = D.ITEMS[s.equip[k]]; return '<div class="cft-slot"><span>' + (it ? it.e : '·') + '</span><small>' + (it ? esc(it.n) : k) + '</small></div>'; }).join('');
-    return '<div class="cft-me"><div class="cft-me-h"><div class="cft-face big">🙂</div><div><b>' + esc(s.name) + '</b><span>Level ' + lv + ' · ' + (s.xp - a) + ' / ' + (b - a) + ' XP</span>' + bar(s.xp - a, b - a, 'xp') + '</div></div>' +
+    return '<div class="cft-me"><div class="cft-me-h"><button type="button" class="cft-face big" data-act="look" title="Change your look" aria-label="Change your look">🪞</button><div><b>' + esc(s.name) + '</b><span>Level ' + lv + ' · ' + (s.xp - a) + ' / ' + (b - a) + ' XP</span>' + bar(s.xp - a, b - a, 'xp') + '</div></div>' +
       '<div class="cft-grid2"><div class="cft-mini"><small>Cash</small><b>' + G.fmt$(s.money) + '</b></div><div class="cft-mini"><small>Net worth</small><b>' + G.fmt$(sum.worth) + '</b></div>' +
       '<div class="cft-mini"><small>⚡ Energy</small><b>' + Math.round(s.energy) + ' / ' + G.maxEnergy() + '</b></div><div class="cft-mini"><small>😊 Happiness</small><b>' + Math.round(s.happy) + '% → ' + Math.round(G.happyTarget()) + '%</b></div></div>' +
       '<div class="cft-sec"><h4>Stats</h4>' + D.STATS.map(st => { const v = G.stat(st.id); return '<div class="cft-stat"><span>' + st.e + '</span><div><b>' + st.name + ' ' + Math.floor(v) + '</b><small>' + esc(st.blurb) + '</small>' + bar(v % 1 || (v >= 1 ? 0 : 0), 1, 'st') + '</div></div>'; }).join('') + '</div>' +
@@ -791,6 +819,7 @@ function create(G, root) {
   VIEWS.settings = function () {
     const s = save(), st = s.settings;
     return '<div class="cft-sec"><h4>You</h4><div class="cft-row"><span>Name: <b>' + esc(s.name) + '</b></span><button type="button" class="cft-btn sm" data-act="rename">Change</button></div>' +
+      '<div class="cft-row"><span>Skin, hair, style, glasses...</span><button type="button" class="cft-btn sm primary" data-act="look">🪞 Change your look</button></div>' +
       (s.pref ? '<div class="cft-row"><span>Looking for: <b>' + (s.pref === 'bf' ? 'a boyfriend' : 'a girlfriend') + '</b></span><button type="button" class="cft-btn sm" data-act="pref">Switch</button></div>' : '') + '</div>' +
       '<div class="cft-sec"><h4>Game</h4><label class="cft-check"><input type="checkbox" data-set="sound" ' + (st.sound ? 'checked' : '') + '> Sound effects</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="music" ' + (st.music !== false ? 'checked' : '') + '> Music</label>' +
@@ -835,6 +864,7 @@ function create(G, root) {
       case 'weapon': if (s.equip.weapon === id) delete s.equip.weapon; else s.equip.weapon = id; U.refreshPhone(); G.dirty(); break;
       case 'swap': await swapStickers(); U.refreshPhone(); break;
       case 'rename': { const n = await U.ask('Your name', s.name); if (n && n.trim()) { s.name = n.trim().slice(0, 20); G.dirty(); } U.refreshPhone(); break; }
+      case 'look': phoneOv.close(); U.lookEditor(); break;
       case 'pref': s.pref = s.pref === 'bf' ? 'gf' : 'bf'; G.refreshFollowers(); G.dirty(); U.refreshPhone(); break;
       case 'quality': s.settings.quality = id; G.dirty(); U.refreshPhone(); break;
       case 'reset': if (await U.confirm('Start a brand-new life? Your money, missions, home and everything else will be gone for good.', 'Yes, start over')) G.reset(); break;

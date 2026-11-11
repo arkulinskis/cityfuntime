@@ -1443,56 +1443,141 @@ function create(opts) {
   const HAIRS = [0x2b1a10, 0x3a2618, 0x6b4423, 0xb98545, 0xe1c06a, 0x1d1d1d, 0x8a8a8a, 0xb24a2a, 0xd9d4cc];
   const CLOTH = [0xe8453c, 0x2b6cb0, 0x2f9e6e, 0xf2b134, 0x7b52c7, 0xef6aa5, 0x1f2937, 0xf4f1ea, 0x3aa6b9, 0xff8a3d, 0x6d8b3a, 0x9b2c4f];
   const PANTS = [0x2b4c7e, 0x1f2937, 0x5b4636, 0x6b7280, 0x2d3a2e, 0x8a6e4b, 0x24324a, 0xc2b59b];
+  const SHOES = [0xf2f2f2, 0x222222, 0xe8453c, 0x2b6cb0, 0x8a5a2b, 0xf2b134, 0x3a3f4a];
   W.randomLook = function (seed) {
     const r = i => hash(seed * 31 + i);
     const pick = (a, i) => a[Math.floor(r(i) * a.length) % a.length];
-    return { skin: pick(SKINS, 1), hair: pick(HAIRS, 2), shirt: pick(CLOTH, 3), pants: pick(PANTS, 4), shoe: r(5) < 0.5 ? 0xf2f2f2 : 0x222222,
-      long: r(6) < 0.4, dress: r(7) < 0.15, hat: r(8) < 0.12 ? pick(CLOTH, 9) : null, bag: r(10) < 0.25 ? pick(CLOTH, 11) : null, h: 0.92 + r(12) * 0.16 };
+    return { skin: pick(SKINS, 1), hair: pick(HAIRS, 2), shirt: pick(CLOTH, 3), pants: pick(PANTS, 4), shoe: pick(SHOES, 5),
+      long: r(6) < 0.4, dress: r(7) < 0.15, hat: r(8) < 0.12 ? pick(CLOTH, 9) : null, bag: r(10) < 0.25 ? pick(CLOTH, 11) : null, h: 0.92 + r(12) * 0.16,
+      hs: Math.floor(r(13) * 24), sleeve: r(14) < 0.45 ? 'short' : 'long', shorts: r(15) < 0.14, glasses: r(16) < 0.14, beard: r(17) < 0.1 && r(6) >= 0.4,
+      stripes: r(18) < 0.16 ? pick(CLOTH, 19) : null, logo: r(20) < 0.2 ? pick(CLOTH, 21) : null, phones: r(22) < 0.07 ? pick(CLOTH, 23) : null,
+      build: 0.92 + r(24) * 0.2, scarf: r(25) < 0.06 ? pick(CLOTH, 26) : null, collar: r(27) < 0.2 };
   };
-  // A person: groups for body / legs / arms, so it can walk. look: {skin, hair, shirt, pants, shoe, long, dress, hat, bag, h, glasses, beard, apron}
-  W.person = function (look) {
+  // The shapes people are made of (rounded, smooth-shaded). Fewer facets on low quality.
+  // Three levels of roundness: you and the story's cast get the smoothest, the dozens of passers-by a lighter one.
+  const prims = (su, sv, mu, mv, cs, cr, du, dv, rr) => ({
+    sph: new THREE.SphereGeometry(0.5, su, sv).toNonIndexed(), sm: new THREE.SphereGeometry(0.5, mu, mv).toNonIndexed(),
+    cap: new THREE.CapsuleGeometry(0.5, 1, cs, cr).toNonIndexed(),                                  // 2 tall, 1 wide
+    dome: new THREE.SphereGeometry(0.5, du, dv, 0, Math.PI * 2, 0, Math.PI * 0.46).toNonIndexed(),
+    skirt: new THREE.CylinderGeometry(0.3, 0.5, 1, rr).toNonIndexed(), ring: new THREE.CylinderGeometry(0.5, 0.5, 1, rr, 1, true).toNonIndexed() });
+  const PRIM_HI = prims(16, 12, 10, 7, 4, 12, 16, 6, 14), PRIM_MID = prims(10, 7, 6, 4, 2, 8, 10, 4, 10), PRIM_LO = prims(8, 5, 5, 3, 1, 6, 8, 3, 8);
+  const shade = (c, k) => { _c.set(c).multiplyScalar(k); return _c.getHex(); };
+  const LONG_HAIR = [1, 3, 6, 2, 1, 6], SHORT_HAIR = [0, 4, 5, 0, 8, 0, 7, 4];
+  W.HAIR_STYLES = ['Short', 'Long', 'Bun', 'Ponytail', 'Curly', 'Spiky', 'Bob', 'Thin on top', 'Side part'];
+  // A person, facing -z. Rounded body, a face (eyes, brows, nose, mouth, ears), nine hair styles, and joints: the body
+  // group holds a head and four limbs, each limb a pivot with a second pivot (knee / elbow) inside, so people can walk,
+  // run, sit, pedal, wave and dance. userData: {body, head, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, handL, handR}.
+  // look: {skin, hair, shirt, pants, shoe, h, build, style | long + hs, sleeve: 'short' | 'long' | 'none', shorts, dress,
+  //   hat, beanie, crown, glasses, beard, bag, apron, cape, coat, scarf, stripes, logo, phones, collar, tie, mood: 'angry'}.
+  // npc: true = only the big parts cast shadows (the streets hold dozens of people).
+  W.person = function (look, npc) {
     look = look || W.randomLook(Math.random() * 1e6 | 0);
+    const { sph: P_SPH, sm: P_SM, cap: P_CAP, dome: P_DOME, skirt: P_SKIRT, ring: P_RING } = npc ? (LOW ? PRIM_LO : PRIM_MID) : (LOW ? PRIM_MID : PRIM_HI);
     const g = new THREE.Group(), body = new THREE.Group();
     g.add(body);
-    const top = new Merge();
-    top.box(0.5, 0.62, 0.28, look.shirt, 0, 1.17, 0);
-    top.box(0.3, 0.32, 0.3, look.skin, 0, 1.66, 0);
-    top.box(0.33, 0.1, 0.33, look.hair, 0, 1.84, 0.01);
-    top.box(0.33, look.long ? 0.42 : 0.12, 0.08, look.hair, 0, look.long ? 1.6 : 1.76, 0.17);
-    top.box(0.05, 0.05, 0.02, 0x222222, -0.07, 1.69, -0.155); top.box(0.05, 0.05, 0.02, 0x222222, 0.07, 1.69, -0.155);
-    if (look.dress) top.box(0.56, 0.42, 0.34, look.shirt, 0, 0.72, 0);
-    if (look.hat) { top.box(0.36, 0.12, 0.36, look.hat, 0, 1.9, 0); top.box(0.36, 0.03, 0.2, look.hat, 0, 1.85, -0.25); }
-    if (look.bag) top.box(0.3, 0.38, 0.14, look.bag, 0, 1.15, 0.2);
-    if (look.glasses) { top.box(0.3, 0.07, 0.02, 0x111111, 0, 1.7, -0.165); }
-    if (look.beard) top.box(0.28, 0.12, 0.04, look.hair, 0, 1.55, -0.15);
-    if (look.apron) top.box(0.44, 0.7, 0.03, look.apron, 0, 1.0, -0.15);
-    if (look.cape) top.box(0.5, 0.8, 0.04, look.cape, 0, 1.1, 0.17);
-    if (look.coat) top.box(0.58, 0.62, 0.36, look.coat, 0, 0.82, 0);
-    if (look.scarf) top.box(0.36, 0.1, 0.36, look.scarf, 0, 1.5, 0);
-    if (look.beanie) top.box(0.35, 0.16, 0.35, look.beanie, 0, 1.9, 0.01);
-    if (look.crown) { // a cardboard crown, worn with pride
-      top.box(0.36, 0.1, 0.36, 0xf2c14e, 0, 1.92, 0.01);
-      for (const [cx, cz] of [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.16], [0.14, 0.16], [0, -0.16]]) top.box(0.08, 0.14, 0.08, 0xf2c14e, cx, 2.03, cz);
-      top.box(0.07, 0.07, 0.03, 0xe8453c, 0, 1.93, -0.18);
+    const skin = look.skin, hair = look.hair, shirt = look.coat || look.shirt, pants = look.pants, shoe = look.shoe == null ? 0x222222 : look.shoe;
+    const kid = (look.h || 1) < 0.78;
+    const part = (m, shadow) => { const mesh = m.mesh(); mesh.castShadow = !LOW && (shadow || !npc); return mesh; };
+    // ---- torso
+    const t = new Merge();
+    t.add(P_SPH, look.dress ? shirt : pants, 0, 0.93, 0, 0, 0, 0, 0.44, 0.3, 0.3);                    // hips
+    t.add(P_CAP, shirt, 0, 1.2, 0, 0, 0, 0, 0.47, 0.31, 0.3);                                         // chest
+    t.add(P_SPH, shirt, 0, 1.41, 0, 0, 0, 0, 0.6, 0.2, 0.3);                                          // shoulders
+    t.add(CYL8, skin, 0, 1.53, 0, 0, 0, 0, 0.14, 0.12, 0.14);                                         // neck
+    if (look.dress) t.add(P_SKIRT, shirt, 0, 0.74, 0, 0, 0, 0, 0.72, 0.46, 0.6);
+    else if (!look.coat) t.add(P_RING, shade(pants, 0.55), 0, 1.0, 0, 0, 0, 0, 0.455, 0.05, 0.31);    // belt
+    if (look.coat) t.add(P_SKIRT, look.coat, 0, 0.84, 0, 0, 0, 0, 0.66, 0.42, 0.52);
+    if (look.stripes) for (const y of [1.1, 1.24]) t.add(P_RING, look.stripes, 0, y, 0, 0, 0, 0, 0.482, 0.055, 0.312);
+    if (look.logo && !look.apron && !look.tie) t.add(P_SM, look.logo, 0, 1.27, -0.148, 0, 0, 0, 0.13, 0.13, 0.03);
+    if (look.collar || look.tie) { t.box(0.1, 0.07, 0.05, 0xf4f1ea, -0.07, 1.47, -0.13, 0, 0, 0.5); t.box(0.1, 0.07, 0.05, 0xf4f1ea, 0.07, 1.47, -0.13, 0, 0, -0.5); }
+    if (look.tie) { t.box(0.06, 0.3, 0.02, look.tie, 0, 1.28, -0.158); t.box(0.08, 0.06, 0.03, look.tie, 0, 1.44, -0.15); }
+    if (look.apron) { t.box(0.4, 0.62, 0.03, look.apron, 0, 1.05, -0.158); t.box(0.3, 0.04, 0.03, look.apron, 0, 1.4, -0.14); }
+    if (look.cape) t.box(0.52, 0.85, 0.04, look.cape, 0, 1.08, 0.18, -0.08);
+    if (look.scarf) { t.add(P_RING, look.scarf, 0, 1.51, 0, 0, 0, 0, 0.3, 0.1, 0.3); t.box(0.1, 0.3, 0.04, look.scarf, 0.08, 1.36, -0.15); }
+    if (look.bag) { // a backpack, with straps
+      t.add(P_CAP, look.bag, 0, 1.2, 0.21, 0, 0, 0, 0.34, 0.2, 0.2);
+      t.add(P_SM, shade(look.bag, 0.75), 0, 1.12, 0.31, 0, 0, 0, 0.22, 0.16, 0.06);
+      t.box(0.05, 0.44, 0.02, shade(look.bag, 0.75), -0.15, 1.25, -0.15); t.box(0.05, 0.44, 0.02, shade(look.bag, 0.75), 0.15, 1.25, -0.15);
     }
-    body.add(top.mesh());
-    const limb = (x, y, color, len, w, foot) => {
+    body.add(part(t, true));
+    // ---- head (its own group: it can turn and nod)
+    const head = new THREE.Group();
+    head.position.set(0, 1.56, 0);
+    if (kid) head.scale.setScalar(1.22);
+    body.add(head);
+    const hm = new Merge(), dark = 0x1c1a24;
+    hm.add(P_SPH, skin, 0, 0.175, 0, 0, 0, 0, 0.38, 0.4, 0.38);
+    hm.add(P_SM, skin, -0.188, 0.15, 0.01, 0, 0, 0, 0.06, 0.1, 0.07); hm.add(P_SM, skin, 0.188, 0.15, 0.01, 0, 0, 0, 0.06, 0.1, 0.07);     // ears
+    hm.add(P_SM, shade(skin, 0.9), 0, 0.118, -0.192, 0, 0, 0, 0.055, 0.055, 0.06);                                                         // nose
+    const angry = look.mood === 'angry';
+    for (const sx of [-1, 1]) {
+      hm.add(P_SM, 0xffffff, sx * 0.08, 0.18, -0.166, 0, 0, 0, 0.1, 0.115, 0.05);                                                          // eye
+      hm.add(P_SM, dark, sx * 0.08, 0.178, -0.186, 0, 0, 0, 0.055, 0.07, 0.03);                                                            // pupil
+      hm.add(P_SM, 0xffffff, sx * 0.08 + 0.014, 0.196, -0.198, 0, 0, 0, 0.018, 0.018, 0.01);                                               // glint
+      hm.box(0.09, 0.022, 0.02, shade(hair, 0.8), sx * 0.082, angry ? 0.25 : 0.262, -0.162, 0, 0, angry ? sx * 0.45 : -sx * 0.1);          // brow
+    }
+    if (look.beard) {
+      hm.add(P_SPH, hair, 0, 0.0, -0.06, 0, 0, 0, 0.35, 0.2, 0.3);
+      hm.box(0.14, 0.03, 0.03, hair, 0, 0.076, -0.187);
+    } else if (angry) hm.box(0.1, 0.025, 0.02, 0x7a2a2a, 0, 0.046, -0.158);
+    else { hm.box(0.09, 0.022, 0.02, 0x8a3a3a, 0, 0.048, -0.158); hm.box(0.03, 0.02, 0.02, 0x8a3a3a, -0.055, 0.057, -0.152, 0, 0, -0.6); hm.box(0.03, 0.02, 0.02, 0x8a3a3a, 0.055, 0.057, -0.152, 0, 0, 0.6); }
+    if (look.glasses) {
+      for (const sx of [-1, 1]) { hm.box(0.13, 0.014, 0.014, dark, sx * 0.083, 0.236, -0.205); hm.box(0.13, 0.014, 0.014, dark, sx * 0.083, 0.124, -0.205); hm.box(0.014, 0.112, 0.014, dark, sx * 0.02, 0.18, -0.205); hm.box(0.014, 0.112, 0.014, dark, sx * 0.146, 0.18, -0.205); hm.box(0.014, 0.014, 0.21, dark, sx * 0.183, 0.19, -0.1); }
+      hm.box(0.04, 0.014, 0.014, dark, 0, 0.19, -0.205);
+    }
+    // hair: style 0 short, 1 long, 2 bun, 3 ponytail, 4 curly, 5 spiky, 6 bob, 7 thin on top, 8 side part
+    const style = look.style != null ? look.style : (look.long ? LONG_HAIR[(look.hs || 0) % LONG_HAIR.length] : SHORT_HAIR[(look.hs || 0) % SHORT_HAIR.length]);
+    const covered = look.hat || look.beanie;
+    if (style === 4) hm.add(P_SPH, hair, 0, 0.26, 0.035, 0, 0, 0, covered ? 0.44 : 0.53, covered ? 0.38 : 0.48, 0.49);
+    else if (style === 7) { hm.add(P_SM, hair, -0.175, 0.2, 0.04, 0, 0, 0, 0.1, 0.17, 0.26); hm.add(P_SM, hair, 0.175, 0.2, 0.04, 0, 0, 0, 0.1, 0.17, 0.26); hm.add(P_SM, hair, 0, 0.16, 0.16, 0, 0, 0, 0.32, 0.22, 0.1); }
+    else {
+      hm.add(P_DOME, hair, 0, 0.17, 0.012, 0.5, 0, 0, 0.405, 0.44, 0.415);                              // the cap of hair, tipped back off the forehead
+      if (!covered && style !== 5) hm.add(P_SM, hair, style === 8 ? -0.05 : 0, 0.325, -0.105, 0.55, 0, style === 8 ? 0.35 : 0, 0.33, 0.1, 0.2);   // a fringe
+    }
+    if (style === 1) { hm.add(P_CAP, hair, 0, 0, 0.14, 0.12, 0, 0, 0.38, 0.27, 0.16); hm.add(P_CAP, hair, -0.18, 0.06, 0.03, 0, 0, 0, 0.09, 0.2, 0.17); hm.add(P_CAP, hair, 0.18, 0.06, 0.03, 0, 0, 0, 0.09, 0.2, 0.17); }
+    if (style === 2) hm.add(P_SM, hair, 0, 0.39, 0.1, 0, 0, 0, 0.18, 0.17, 0.18);
+    if (style === 3) { hm.add(P_SM, hair, 0, 0.31, 0.2, 0, 0, 0, 0.1, 0.1, 0.1); hm.add(P_CAP, hair, 0, 0.14, 0.29, 0.5, 0, 0, 0.1, 0.18, 0.1); }
+    if (style === 5 && !covered) for (let k = 0; k < 5; k++) hm.add(CONE, hair, 0, 0.405 - Math.abs(k - 2) * 0.012, -0.12 + k * 0.068, -0.5 + k * 0.25, 0, 0, 0.12, 0.18, 0.12);
+    if (style === 6) hm.add(P_CAP, hair, 0, 0.12, 0.075, 0, 0, 0, 0.45, 0.2, 0.31);
+    if (look.hat) { hm.add(P_DOME, look.hat, 0, 0.235, 0.005, 0.1, 0, 0, 0.425, 0.39, 0.435); hm.add(P_SM, look.hat, 0, 0.272, -0.25, 0.1, 0, 0, 0.31, 0.035, 0.27); hm.add(P_SM, shade(look.hat, 0.7), 0, 0.43, 0.03, 0, 0, 0, 0.05, 0.03, 0.05); }
+    if (look.beanie) { hm.add(P_DOME, look.beanie, 0, 0.21, 0.01, 0.3, 0, 0, 0.432, 0.46, 0.44); hm.add(P_RING, shade(look.beanie, 0.8), 0, 0.272, 0.012, 0.3, 0, 0, 0.437, 0.08, 0.445); hm.add(P_SM, 0xf4f1ea, 0, 0.46, 0.05, 0, 0, 0, 0.1, 0.1, 0.1); }
+    if (look.crown) { // a cardboard crown, worn with pride
+      hm.add(P_RING, 0xf2c14e, 0, 0.385, 0.01, 0, 0, 0, 0.32, 0.1, 0.32);
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; hm.add(CONE, 0xf2c14e, Math.sin(a) * 0.145, 0.475, 0.01 - Math.cos(a) * 0.145, 0, 0, 0, 0.09, 0.12, 0.09); }
+      hm.add(P_SM, 0xe8453c, 0, 0.385, -0.155, 0, 0, 0, 0.06, 0.06, 0.03);
+    }
+    if (look.phones) { hm.add(P_RING, 0x24262e, 0, 0.2, 0.01, 0, 0, Math.PI / 2, 0.44, 0.04, 0.42); for (const sx of [-1, 1]) hm.add(P_SM, look.phones, sx * 0.21, 0.15, 0.01, 0, 0, 0, 0.07, 0.15, 0.15); }
+    head.add(part(hm, true));
+    // ---- limbs: a pivot at the hip / shoulder, a second one at the knee / elbow
+    const limb = (x, y, upper, lower, lenA, lenB, wA, wB, end) => {
       const pivot = new THREE.Group(); pivot.position.set(x, y, 0); body.add(pivot);
-      const m = new Merge();
-      m.box(w, len, w + 0.02, color, 0, -len / 2, 0);
-      if (foot != null) m.box(w + 0.03, 0.1, 0.3, foot, 0, -len - 0.02, -0.05);
-      else m.box(w - 0.02, 0.12, w, look.skin, 0, -len - 0.05, 0);
-      pivot.add(m.mesh());
-      return pivot;
+      const a = new Merge();
+      a.add(P_CAP, upper, 0, -lenA / 2 + wA * 0.2, 0, 0, 0, 0, wA, (lenA + wA * 0.6) / 2, wA);
+      pivot.add(part(a, true));
+      const joint = new THREE.Group(); joint.position.set(0, -lenA, 0); pivot.add(joint);
+      const b = new Merge();
+      b.add(P_CAP, lower, 0, -lenB / 2 + wB * 0.15, 0, 0, 0, 0, wB, (lenB + wB * 0.5) / 2, wB);
+      end(b, lenB);
+      joint.add(part(b, false));
+      const tip = new THREE.Group(); tip.position.set(0, -lenB, 0); joint.add(tip);
+      return [pivot, joint, tip];
     };
-    const legC = look.dress ? look.skin : look.pants;
-    const legL = limb(-0.13, 0.86, legC, 0.78, 0.19, look.shoe), legR = limb(0.13, 0.86, legC, 0.78, 0.19, look.shoe);
-    const armL = limb(-0.33, 1.44, look.shirt, 0.52, 0.14), armR = limb(0.33, 1.44, look.shirt, 0.52, 0.14);
-    g.userData = { body, legL, legR, armL, armR, phase: Math.random() * 6, kind: 'person' };
+    const bare = look.dress || look.shorts, legC = look.dress ? skin : pants;
+    const foot = (m, len) => { m.add(P_SM, shoe, 0, -len - 0.002, -0.06, 0, 0, 0, 0.21, 0.14, 0.34); m.box(0.185, 0.035, 0.3, shade(shoe, 0.5), 0, -len - 0.054, -0.055); if (bare) m.add(P_RING, 0xf4f1ea, 0, -len + 0.09, 0, 0, 0, 0, 0.17, 0.08, 0.17); };
+    const hand = (m, len) => { m.add(P_SM, skin, 0, -len - 0.02, 0, 0, 0, 0, 0.13, 0.15, 0.12); if (look.sleeve !== 'short' && look.sleeve !== 'none' && !look.dress) m.add(P_RING, shade(shirt, 0.8), 0, -len + 0.06, 0, 0, 0, 0, 0.135, 0.04, 0.135); };
+    const [legL, kneeL] = limb(-0.12, 0.9, legC, bare ? skin : pants, 0.42, 0.42, 0.225, 0.185, foot);
+    const [legR, kneeR] = limb(0.12, 0.9, legC, bare ? skin : pants, 0.42, 0.42, 0.225, 0.185, foot);
+    const up = look.sleeve === 'none' ? skin : shirt, low = look.sleeve === 'long' || (look.sleeve == null && !look.dress) || look.coat ? shirt : skin;
+    const [armL, elbowL, handL] = limb(-0.315, 1.42, up, low, 0.29, 0.28, 0.15, 0.125, hand);
+    const [armR, elbowR, handR] = limb(0.315, 1.42, up, low, 0.29, 0.28, 0.15, 0.125, hand);
+    armL.rotation.z = -0.08; armR.rotation.z = 0.08;
+    g.userData = { body, head, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, handL, handR, phase: Math.random() * 6, kind: 'person', kid };
+    body.scale.x = look.build || 1;
     g.scale.setScalar(look.h || 1);
     return g;
   };
-  // Walk/idle/sit/wave animation for anything made by W.person or W.animal
+  // Walk / run / idle and the poses (sit, ground, ride, pedal, air, wave, dance) for anything made by W.person or W.animal.
+  // Limbs hang down, so a positive rotation.x swings them forward; knees bend back (negative), elbows forward (positive).
   W.animate = function (g, speed, dt, pose) {
     const u = g.userData;
     if (u.kind === 'animal') {
@@ -1503,19 +1588,56 @@ function create(opts) {
       if (u.head && speed < 0.1) u.head.rotation.x = Math.max(0, Math.sin(u.phase * 0.5)) * 0.5;
       return;
     }
-    if (pose === 'sit') { u.legL.rotation.x = u.legR.rotation.x = -1.4; u.body.position.y = -0.45; u.armL.rotation.x = u.armR.rotation.x = -0.4; return; }
-    if (pose === 'ride') { u.legL.rotation.x = -0.25; u.legR.rotation.x = 0.15; u.armL.rotation.x = u.armR.rotation.x = -0.25; u.body.position.y = 0; u.body.rotation.x = -0.12; return; }
-    if (pose === 'pedal') { u.phase += dt * (2 + speed); u.legL.rotation.x = -1.1 + Math.sin(u.phase) * 0.5; u.legR.rotation.x = -1.1 - Math.sin(u.phase) * 0.5; u.armL.rotation.x = u.armR.rotation.x = -1.0; u.body.position.y = -0.3; u.body.rotation.x = -0.25; return; }
-    if (pose === 'air') { u.legL.rotation.x = 0.6; u.legR.rotation.x = -0.3; u.armL.rotation.x = -2.4; u.armR.rotation.x = -2.6; return; }
-    if (pose === 'wave') { u.phase += dt * 6; u.armR.rotation.x = Math.PI; u.armR.rotation.z = 0.4 + Math.sin(u.phase) * 0.35; u.legL.rotation.x = u.legR.rotation.x = 0; u.body.position.y = 0; return; }
-    if (pose === 'dance') { u.phase += dt * 7; const s = Math.sin(u.phase); u.armL.rotation.x = -2 + s; u.armR.rotation.x = -2 - s; u.legL.rotation.x = s * 0.4; u.legR.rotation.x = -s * 0.4; u.body.position.y = Math.abs(s) * 0.12; u.body.rotation.y = s * 0.3; return; }
-    u.armR.rotation.z = 0; u.body.rotation.y = 0;
+    const L = u.legL.rotation, R = u.legR.rotation, KL = u.kneeL.rotation, KR = u.kneeR.rotation, AL = u.armL.rotation, AR = u.armR.rotation, EL = u.elbowL.rotation, ER = u.elbowR.rotation, B = u.body, H = u.head.rotation;
+    L.z = R.z = 0; AL.z = -0.08; AR.z = 0.08; EL.z = ER.z = 0; B.rotation.set(0, 0, 0); H.x = H.y = H.z = 0; B.position.y = 0;
+    if (pose === 'sit') { L.x = R.x = 1.45; KL.x = KR.x = -1.45; B.position.y = -0.45; AL.x = AR.x = 0.35; EL.x = ER.x = 0.5; return; }
+    if (pose === 'ground') { // on a blanket, legs crossed, hands in the lap
+      u.phase += dt;
+      L.x = R.x = 1.4; L.z = -0.55; R.z = 0.55; KL.x = KR.x = -2.0; B.position.y = -0.74; B.rotation.x = -0.06;
+      AL.x = AR.x = 0.5; AL.z = -0.2; AR.z = 0.2; EL.x = ER.x = 0.9; H.y = Math.sin(u.phase * 0.5) * 0.35; H.x = Math.sin(u.phase * 0.31) * 0.08;
+      return;
+    }
+    if (pose === 'ride') { L.x = 0.3; R.x = 0.12; KL.x = -0.5; KR.x = -0.35; AL.x = 0.25; AR.x = 0.25; AL.z = -0.45; AR.z = 0.45; EL.x = ER.x = 0.4; B.rotation.x = -0.12; B.position.y = -0.03; return; }
+    if (pose === 'pedal') {
+      u.phase += dt * (2 + speed);
+      const s = Math.sin(u.phase);
+      L.x = 1.0 + s * 0.42; R.x = 1.0 - s * 0.42; KL.x = -1.25 - s * 0.45; KR.x = -1.25 + s * 0.45;
+      AL.x = AR.x = 1.05; EL.x = ER.x = 0.25; B.position.y = -0.3; B.rotation.x = -0.28; H.x = 0.2;
+      return;
+    }
+    if (pose === 'air') { L.x = 0.75; KL.x = -1.0; R.x = -0.3; KR.x = -0.55; AL.x = 2.5; AR.x = 2.7; AL.z = -0.35; AR.z = 0.35; EL.x = ER.x = 0.3; return; }
+    if (pose === 'wave') {
+      u.phase += dt * 6;
+      const s = Math.sin(u.phase);
+      L.x = R.x = KL.x = KR.x = 0; AL.x = 0; EL.x = 0.15;
+      AR.x = 0; AR.z = 2.5 + s * 0.12; ER.x = 0; ER.z = 0.55 + s * 0.45; H.z = -0.08; H.y = 0;
+      return;
+    }
+    if (pose === 'dance') {
+      u.phase += dt * 7;
+      const s = Math.sin(u.phase), c = Math.cos(u.phase);
+      AL.x = 2.3 + s * 0.7; AR.x = 2.3 - s * 0.7; AL.z = -0.3; AR.z = 0.3; EL.x = 0.7 + c * 0.4; ER.x = 0.7 - c * 0.4;
+      L.x = s * 0.4; R.x = -s * 0.4; KL.x = -Math.max(0, c) * 0.9; KR.x = -Math.max(0, -c) * 0.9;
+      B.position.y = Math.abs(s) * 0.12; B.rotation.y = s * 0.3; H.z = s * 0.15;
+      return;
+    }
+    // walking and running: legs swing, the knee of the leg coming forward folds, arms counter-swing with bent elbows
     u.phase += dt * (3 + speed * 1.25);
-    const amp = Math.min(1, speed / 6) * 0.9, sw = Math.sin(u.phase) * amp;
-    u.legL.rotation.x = sw; u.legR.rotation.x = -sw;
-    u.armL.rotation.x = -sw * 0.9; u.armR.rotation.x = sw * 0.9;
-    u.body.position.y = Math.abs(Math.cos(u.phase)) * 0.07 * amp;
-    u.body.rotation.x = -Math.min(0.25, speed / 40);
+    const run = Math.min(1, Math.max(0, (speed - 6) / 5)), amp = Math.min(1, speed / 6) * (0.75 + run * 0.3);
+    const s = Math.sin(u.phase), c = Math.cos(u.phase);
+    L.x = s * amp; R.x = -s * amp;
+    KL.x = -(Math.max(0, c) * (1.0 + run * 0.7) + 0.08) * amp; KR.x = -(Math.max(0, -c) * (1.0 + run * 0.7) + 0.08) * amp;
+    AL.x = -s * amp * (0.8 + run * 0.4); AR.x = s * amp * (0.8 + run * 0.4);
+    EL.x = 0.12 + amp * (0.35 + run * 0.9) + Math.max(0, -s) * amp * 0.3; ER.x = 0.12 + amp * (0.35 + run * 0.9) + Math.max(0, s) * amp * 0.3;
+    B.position.y = Math.abs(c) * 0.06 * amp;
+    B.rotation.x = -Math.min(0.3, speed / 36);
+    B.rotation.y = -s * amp * 0.12;
+    H.y = s * amp * 0.1;
+    if (amp < 0.05) { // standing: breathing, a look around now and then
+      const k = Math.sin(u.phase * 0.5);
+      AL.z = -0.08 - k * 0.012; AR.z = 0.08 + k * 0.012; EL.x = ER.x = 0.14;
+      H.y = Math.sin(u.phase * 0.17) * 0.3; H.x = Math.sin(u.phase * 0.11) * 0.06;
+    }
   };
   // Animals: dog, cat, pigeon, duck
   W.animal = function (kind, color) {
@@ -1755,9 +1877,9 @@ function create(opts) {
     weaponMesh = null;
     if (!weaponKind || !body) return;
     weaponMesh = W.propMesh(weaponKind);
-    weaponMesh.position.set(0, -0.58, -0.02);
-    weaponMesh.rotation.x = -0.5;
-    body.userData.armR.add(weaponMesh);
+    weaponMesh.position.set(0, -0.03, -0.02);
+    weaponMesh.rotation.x = 0.3;
+    body.userData.handR.add(weaponMesh);
   }
   W.setWeapon = function (kind) { weaponKind = kind || null; holdWeapon(); };
   W.swing = function () { swingT = 0.3; };
@@ -1919,9 +2041,9 @@ function create(opts) {
       if (swingT > 0) { // an overhead smash: up fast, down hard
         swingT -= dt;
         const t = 1 - Math.max(0, swingT) / 0.3;
-        body.userData.armR.rotation.x = t < 0.3 ? -t / 0.3 * 3.0 : -3.0 + (t - 0.3) / 0.7 * 2.3;
-        body.userData.armR.rotation.z = 0;
-        if (swingT <= 0) body.userData.armR.rotation.x = 0;
+        body.userData.armR.rotation.x = t < 0.3 ? 0.5 + t / 0.3 * 2.5 : 3.0 - (t - 0.3) / 0.7 * 2.3;   // up over the head, then down in front
+        body.userData.armR.rotation.z = 0.08;
+        body.userData.elbowR.rotation.x = t < 0.3 ? 1.0 : 0.15;
       }
     }
     avatar.position.copy(player.pos);
@@ -1938,7 +2060,7 @@ function create(opts) {
 
   function updateCamera(dt) {
     const target = _v.set(player.pos.x, player.pos.y + (ride.mode === 'drive' ? 1.4 : 1.6), player.pos.z);
-    const dist = cam.dist * (ride.mode === 'drive' ? 1.35 : 1);
+    const dist = W.showOff ? 3.4 : cam.dist * (ride.mode === 'drive' ? 1.35 : 1);
     const cp = Math.cos(cam.pitch);
     const dx = Math.sin(cam.yaw) * cp, dy = Math.sin(cam.pitch), dz = Math.cos(cam.yaw) * cp;
     let maxD = dist;
@@ -1959,6 +2081,7 @@ function create(opts) {
     const fov = 62 + Math.max(0, Math.min(13, (sp - 7) * 0.85));
     if (Math.abs(fov - camera.fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
     avatar.visible = cam.cur > 1.1;
+    if (W.showOff) { avatar.rotation.y = cam.yaw + Math.PI + Math.sin(performance.now() / 1400) * 0.5; avatar.rotation.x = 0; if (body && !ride.kind) W.animate(body, 0, dt); }
     const snap = 240 / 2048;
     const px = Math.round(player.pos.x / snap) * snap, pz = Math.round(player.pos.z / snap) * snap, py = Math.round(player.pos.y / snap) * snap;
     sun.target.position.set(px, py, pz);
@@ -2086,7 +2209,7 @@ function create(opts) {
     else if (q < 0.27) { type = 'elder'; speed = 0.65 + Math.random() * 0.2; look.hair = 0xd9d4cc; look.glasses = true; look.h = 0.9; }
     else if (q < 0.33) { type = 'skate'; speed = 4 + Math.random() * 1.5; wheels = 'skateboard'; look.dress = false; }
     else if (q < 0.41) { type = 'bike'; speed = 4.8 + Math.random() * 1.6; wheels = 'bike'; look.dress = false; look.hat = 0xf2b134; }
-    const fig = W.person(look);
+    const fig = W.person(look, true);
     let obj = fig;
     if (wheels) { // the figure stands on (or sits over) its wheels inside a holder that does the moving
       obj = new THREE.Group();

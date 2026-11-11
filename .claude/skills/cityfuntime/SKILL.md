@@ -51,8 +51,9 @@ shops (see Gotchas: real places).
    `gametest.js` (Max, coins, café, bakery, delivery, race, chase, escort, business + rush, moving house, midnight, a turf
    takeover, minigames, every phone app, hills) then `funtest.js` (made-up shops, signs, lights, furniture, speed, monsters,
    weapons, jokes, flirting, a date, street folk, the crown, a prank + chase + ban, peels, trampolines, events, the new missions).
-   `--fun` runs only funtest.js; `--shots DIR` stages nine scenes and saves pictures (Read them); `--eval FILE.js` runs your
-   own script in the page. Add a check for any new mechanic.
+   `--fun` runs only funtest.js; `--shots DIR` stages nine scenes and saves pictures (Read them); `--people DIR` = close-ups of
+   the characters (you from the front, a line-up of passers-by in poses, the look editor); `--eval FILE.js` runs your own
+   script in the page. Add a check for any new mechanic.
 5. **Pages:** `python -I tools/ui_test.py` (Docker Desktop running) → **ALL UI TESTS PASSED** (tools/ui/smoke.js at desktop and
    phone width; `--only a11y.js` / `--only design.js`; `--shots DIR`; server edits need `--restart`; `--stop` when done).
 6. Commit only your files as arkulinskis with the Co-Authored-By line; `git push origin master`. New tables or columns: tell
@@ -126,6 +127,20 @@ mobs, events.
   hands a ped to the game). Traffic kinds: car, suv, sports, taxi, van, bus, truck (ice cream), police; headlights are unlit
   materials so they glow at night.
 - **Player:** double jump (`player.jumps`), FOV widens with speed, `W.shake`, `W.setWeapon(mesh name)` + `W.swing()`, `look.crown`.
+- **People (2026-11-11, second pass: "higher detail models"):** `W.person(look, npc)` builds a rounded figure from spheres,
+  capsules and domes (`prims(...)`: `PRIM_HI` for you and the cast, `PRIM_MID` for passers-by, one step down each on low
+  quality; about 6,500 / 2,500 triangles). Structure: `body` group → torso mesh, `head` group (turns, nods), four limb pivots
+  (`legL/R`, `armL/R`) each holding a second pivot (`kneeL/R`, `elbowL/R`) and a tip (`handL/R`: weapons and the rolling pin
+  attach to `handR`). All in `userData`. **Limbs hang down, so a positive `rotation.x` swings them forward; knees bend
+  negative, elbows positive.** `W.animate(fig, speed, dt, pose)` resets every joint each call; poses: sit (bench / moped),
+  ground (cross-legged on a blanket: street folk), ride, pedal, air, wave, dance; no pose = walk / run / idle (breathing, looking
+  around). Look fields: skin, hair, shirt, pants, shoe, h, build, `style` 0-8 (`W.HAIR_STYLES`; without it `long` + `hs`
+  pick one), sleeve short | long | none, shorts, dress, hat (a cap), beanie, crown, glasses, beard, bag (a backpack), apron,
+  cape, coat, scarf, stripes, logo, phones, collar, tie, mood 'angry' (shopkeepers). Face details sit on the head's curve:
+  if you resize the head, move the eyes, brows and mouth z with it. `h < 0.78` = a child (bigger head).
+- **Your look:** `playerLook()` in cft-game.js = defaults (tee, jeans, backpack) + `save.look` {skin, hair, shirt, style, glasses,
+  beard, pack} + what you wear (outfit colour and details, shoe colour, headphones, helmet, crown). `U.lookEditor()` (phone →
+  Settings / Me) edits `save.look` live; `W.showOff = true` turns the avatar to the camera and brings the camera close.
 - **Monsters and props:** `W.monster(kind)` + `W.animateMonster`; `W.propMesh(name)` (weapons, blanket, cart, peel, pad, ufo, crate...).
 
 ## Street life (cft-fun.js)

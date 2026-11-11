@@ -3,6 +3,7 @@
     python -I tools/live/game_test.py [OUTDIR]            the whole game: gametest.js (missions, shops, turf...) then funtest.js
     python -I tools/live/game_test.py --fun [OUTDIR]      only funtest.js (monsters, weapons, strangers, street folk, pranks, events)
     python -I tools/live/game_test.py --shots [OUTDIR]    no tests: screenshots of the city by day, at dusk and at night
+    python -I tools/live/game_test.py --people [OUTDIR]   no tests: close-ups of the characters (you, passers-by in poses, the look editor)
     python -I tools/live/game_test.py --eval FILE.js [OUTDIR]   start a game, run FILE.js in the page, print what it returns
 
 It serves the game from theme/assets with tools/live/harness.py (a plain page, no Anvil), starts a fresh guest game in
@@ -76,10 +77,28 @@ SCENES = (
     + scene("9-dusk-wide", "s.clock = 19.1; W.cam.pitch = 0.5; W.cam.dist = W.cam.cur = 18;", 30)
 )
 
+# Close-ups of the people: you from the front, a line-up of passers-by in different poses, the look editor.
+PEOPLE = (
+    scene("p1-you", "s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11; s.money = 400; s.owned.w_baguette = true; s.equip.weapon = 'w_baguette';"
+          "const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 11) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.12; W.showOff = true;", 300)
+    + scene("p2-lineup", "W.showOff = false; W.cam.pitch = 0.1; W.cam.dist = W.cam.cur = 2.2; const f = { x: -Math.sin(W.cam.yaw), z: -Math.cos(W.cam.yaw) };"
+            "const peds = W.life.peds.filter(q => q.type !== 'bike' && q.type !== 'skate').slice(0, 7), poses = [null, 'wave', null, 'dance', null, 'air', null];"
+            "peds.forEach((q, i) => { q.ctl = true; q.keep = true; const o = (i - 3) * 1.15, x = p.x + f.x * 5.2 + f.z * o, z = p.z + f.z * 5.2 - f.x * o;"
+            "q.obj.position.set(x, W.groundAt(x, z), z); q.obj.rotation.y = W.cam.yaw + Math.PI; W.animate(q.fig, 0, 0.4 + i * 0.3, poses[i]); });"
+            "W.avatar.visible = false; window.__lineup = peds;", 3)
+    + scene("p3-walkers", "(window.__lineup || []).forEach(q => { q.ctl = false; q.keep = false; }); W.cam.dist = W.cam.cur = 6; W.cam.pitch = 0.16;"
+            "const t = near(W.life.peds.filter(q => !q.ctl && q.type === 'walk'), q => q.obj.position); if (t) { const o = t.obj.position; W.teleport(o.x + 3, o.z + 2); look(o.x, o.z, 5, 0.14); }", 25)
+    + scene("p4-cast", "const a = [...G.rt.actors.values()][0]; if (a) { W.teleport(a.x + 2.2, a.z + 1.5); look(a.x, a.z, 4.5, 0.12); }", 40)
+    + scene("p5-look-editor", "G.ui.lookEditor();", 5, 2500)
+    + scene("p6-run", "G.ui.closeAll(); W.showOff = false; W.controls.enabled = true; W.cam.dist = W.cam.cur = 5; W.cam.pitch = 0.18; W.cam.yaw += 2.4; W.input.f = 1; W.input.sprint = true; s.energy = 100;", 40)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
 elif "--shots" in flags:
     steps = START + SCENES
+elif "--people" in flags:
+    steps = START + PEOPLE
 else:
     steps = START + [{"shot": "start"}]
     if "--fun" not in flags:
@@ -101,13 +120,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--people" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or evalfile:
+if "--shots" in flags or "--people" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

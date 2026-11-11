@@ -1247,7 +1247,7 @@ function mount(root, opts) {
     switch (it.type) {
       case 'food': addEnergy((it.energy || 0) * G.foodMul()); if (it.happy) addHappy(it.happy); if (it.stats) for (const k in it.stats) addStat(k, it.stats[k], true); U.feed(it.e, 'Yum! +' + Math.round((it.energy || 0) * G.foodMul()) + ' ⚡'); break;
       case 'snack': case 'gift': case 'quest': giveItem(it.give || id, 1); U.feed(it.e, it.n + ' added to your bag'); break;
-      case 'gear': save.owned[id] = true; save.equip[it.slot] = id; if (it.slot === 'outfit') W.setLook(playerLook()); U.feed(it.e, (it.weapon ? 'Armed with: ' : 'Wearing ') + it.n + (it.weapon ? ' (F to bonk)' : '')); if (it.happy) addHappy(it.happy); break;
+      case 'gear': save.owned[id] = true; save.equip[it.slot] = id; if (it.slot !== 'weapon') W.setLook(playerLook()); U.feed(it.e, (it.weapon ? 'Armed with: ' : 'Wearing ') + it.n + (it.weapon ? ' (F to bonk)' : '')); if (it.happy) addHappy(it.happy); break;
       case 'vehicle': save.owned[id] = true; setRide(id); U.banner(it.e + ' ' + it.n + '!', 'Press V (or the ride button) to hop on and off.', 'done'); log('Bought a ' + it.n, it.e); break;
       case 'furniture': save.owned[id] = true; if (it.energy) save.maxE = (save.maxE || 0) + it.energy; U.feed(it.e, it.n + ' delivered home. +' + it.happy + ' 😊 every day'); log('Bought ' + it.n, it.e); break;
       case 'pet': save.pets.push({ kind: it.pet, name: it.pet === 'dog' ? 'Biscuit' : 'Mochi', since: save.day }); addHappy(10); refreshFollowers(); U.banner(it.e + ' New best friend!', 'Your ' + it.pet + ' follows you everywhere.', 'friend'); log('Adopted a ' + it.pet, it.e); break;
@@ -1272,10 +1272,23 @@ function mount(root, opts) {
 
   // ------------------------------------------------------------------ rides + look
   function playerLook() {
-    const base = Object.assign(W.randomLook(77), save.look || {});
-    const o = D.ITEMS[save.equip.outfit];
+    // you: a plain tee, jeans and the backpack you arrived with; shops change it (outfits, shoes, headphones...)
+    const base = Object.assign(W.randomLook(77), { dress: false, hat: null, glasses: false, beard: false, shorts: false, stripes: null, logo: null, phones: null,
+      scarf: null, collar: false, build: 1, h: 1, sleeve: 'short', bag: 0x6b4eff, shoe: 0xf2f2f2 }, save.look || {});
+    if (base.style == null) base.style = base.long ? 1 : 0;
+    if (base.pack === false) base.bag = null;
+    const eq = save.equip, o = D.ITEMS[eq.outfit];
     if (o && o.color) base.shirt = o.color;
-    if (save.equip.hat === 'helmet') base.hat = 0xf2b134;
+    if (eq.outfit === 'tee') base.logo = 0xffc21f;
+    if (eq.outfit === 'jacket') { base.sleeve = 'long'; base.collar = true; }
+    if (eq.outfit === 'outfit_date') { base.sleeve = 'long'; base.collar = true; base.scarf = 0xf4f1ea; }
+    if (eq.outfit === 'suit') { base.sleeve = 'long'; base.tie = 0xe8453c; base.pants = 0x1f2937; base.shoe = 0x222222; }
+    if (eq.outfit === 'designer') { base.sleeve = 'long'; base.stripes = 0xffc21f; base.pants = 0xf4f1ea; }
+    const SHOE_COL = { sneakers1: 0x3aa6b9, sneakers2: 0xff8a3d, sneakers3: 0xe8453c };
+    if (SHOE_COL[eq.shoes]) base.shoe = SHOE_COL[eq.shoes];
+    if (eq.acc === 'headphones') base.phones = 0xff5c8a;
+    if (eq.acc === 'fakenose') base.glasses = true;
+    if (eq.hat === 'helmet') base.hat = 0xf2b134;
     if (save.fun && save.fun.king) { base.crown = true; base.hat = null; }
     return base;
   }
