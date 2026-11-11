@@ -203,15 +203,15 @@ D.ITEMS = {
 
 // How rides move (W.setRide). walk = cruise speed, run = with Shift (m/s).
 D.VEHICLES = {
-  skateboard: { mode: 'ride', walk: 8, run: 12, jump: 7.5, radius: 0.4, color: 0xff5c8a },
-  kickscooter: { mode: 'ride', walk: 9, run: 12.5, jump: 0, radius: 0.4, color: 0x3aa6b9 },
-  bicycle: { mode: 'ride', kind: 'bike', walk: 11, run: 15.5, jump: 0, radius: 0.5, color: 0x2f9e6e },
-  moped: { mode: 'drive', walk: 15, run: 20, radius: 0.6, turn: 2.6, accel: 9, color: 0x7fd1c7 },
-  car: { mode: 'drive', walk: 19, run: 27, radius: 1.0, turn: 2.0, accel: 11, color: 0xf2b134 },
-  suv: { mode: 'drive', walk: 19, run: 26, radius: 1.1, turn: 1.8, accel: 10, color: 0x2b6cb0 },
-  sports: { mode: 'drive', walk: 25, run: 40, radius: 1.0, turn: 2.2, accel: 17, color: 0xe8453c },
+  skateboard: { mode: 'ride', walk: 9.5, run: 14.5, jump: 7.5, radius: 0.4, color: 0xff5c8a },
+  kickscooter: { mode: 'ride', walk: 10.5, run: 15, jump: 0, radius: 0.4, color: 0x3aa6b9 },
+  bicycle: { mode: 'ride', kind: 'bike', walk: 12.5, run: 18, jump: 0, radius: 0.5, color: 0x2f9e6e },
+  moped: { mode: 'drive', walk: 17, run: 23.5, radius: 0.6, turn: 2.6, accel: 9, color: 0x7fd1c7 },
+  car: { mode: 'drive', walk: 21, run: 30, radius: 1.0, turn: 2.0, accel: 11, color: 0xf2b134 },
+  suv: { mode: 'drive', walk: 21, run: 29, radius: 1.1, turn: 1.8, accel: 10, color: 0x2b6cb0 },
+  sports: { mode: 'drive', walk: 28, run: 44, radius: 1.0, turn: 2.2, accel: 17, color: 0xe8453c },
 };
-D.WALK = { walk: 5.0, run: 9.5 };
+D.WALK = { walk: 6.2, run: 12.5 };
 
 D.APARTMENTS = [
   { tier: 0, n: "Cousin Max's couch", e: '🛋️', cost: 0, rent: 0, happy: 0, kids: 0, pick: 'start', blurb: 'Lumpy, borrowed, and smells faintly of guitar strings.' },
@@ -329,7 +329,7 @@ D.CHAPTERS = [
 // M(id, chapter, title, giver, where the giver stands, requirements, intro lines, steps, outro lines, reward)
 // requirements: {m: [mission ids], lvl, apt, partner, married, kids, friends, turf, biz, own: item, stat: {}}
 // steps (do): go | talk | collect | deliver | buy | have | stat | level | own | pay | escort | chase | race | photo |
-//   visit | dance | quiz | sleep | walk | chat | tag | defend | rush
+//   visit | dance | quiz | sleep | walk | chat | tag | defend | rush | count (key, n, abs: a counter, see the wacky update below)
 D.MISSIONS = [];
 function M(id, ch, title, giver, at, req, intro, steps, outro, reward, extra) {
   D.MISSIONS.push(Object.assign({ id, ch, title, giver, at, req: req || {}, intro, steps, outro, reward }, extra || {}));
@@ -933,7 +933,226 @@ D.TIPS = [
   'Metro entrances 🚇 are fast travel: ride to any station you\'ve visited.',
   'Happiness boosts your income. Homes, friends, family and fun all add to it.',
   'Each game day is 24 minutes. Rent is due at midnight; business income never stops.',
+  'Press F to bonk. Monsters come out after dark and pop into coins. Bakeries sell baguettes. Just saying.',
+  'Space twice is a double jump. Land on a parked car for a big bounce.',
+  'Talk to strangers: say hi, tell a joke, or flirt. Sweethearts wait for you around town.',
+  'Street folk remember kindness. Enough street hearts and they crown you.',
+  'Made-up shops can be pranked. The owner will chase you. You are faster. Probably.',
+  'Banana peels are not a hazard. They are a free speed boost.',
 ];
+
+// ================================================================================================ the wacky update
+// Silly weapons, monsters, street life (flirting, street folk, pranks, grudges) and random street events.
+// cft-fun.js runs all of it; the data lives here.
+
+// Two kinds of shop that only exist as made-up shops (the map has no such places).
+D.KINDS.joke = { e: '🤡', n: 'Joke shop', fake: ['Ha Ha Hut', 'The Whoopee Emporium', 'Gag Reflex', 'Pranks a Lot', 'Rubber Chicken & Co.'], sells: ['w_chicken', 'w_noodle', 'w_plunger', 'fakenose', 'whoopee'] };
+D.KINDS.fortune = { e: '🔮', n: 'Fortune teller', fake: ['Madame Zaza', 'The Third Eye', 'Mystic Mo', 'Tomorrow, Today'], sells: ['fortune', 'luckycharm'] };
+
+// Weapons are gear for the "weapon" slot. dmg = hit points per bonk, reach in metres, knock = how far things fly,
+// stun = seconds a monster stays dizzy, ranged: 'cone' (a blast in front) or 'shot' (flies until it hits).
+Object.assign(D.ITEMS, {
+  w_baguette: { n: 'Stale baguette', e: '🥖', p: 12, type: 'gear', slot: 'weapon', weapon: { dmg: 1, reach: 2.7, knock: 3, mesh: 'baguette', word: 'BONK!' } },
+  w_chicken: { n: 'Rubber chicken', e: '🐔', p: 35, type: 'gear', slot: 'weapon', weapon: { dmg: 1, reach: 2.5, knock: 3, stun: 2.5, mesh: 'chicken', word: 'SQUEAK!' } },
+  w_pillow: { n: 'Feather pillow', e: '🪶', p: 30, type: 'gear', slot: 'weapon', weapon: { dmg: 1, reach: 2.6, knock: 8, mesh: 'pillow', word: 'FLOOF!', puff: '🪶' } },
+  w_noodle: { n: 'Pool noodle', e: '🏖️', p: 45, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 3.6, knock: 4, mesh: 'noodle', word: 'THWAP!' } },
+  w_fish: { n: 'Frozen fish', e: '🐟', p: 60, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 2.6, knock: 4, mesh: 'fish', word: 'SLAP!' } },
+  w_plunger: { n: 'Plunger of destiny', e: '🪠', p: 90, type: 'gear', slot: 'weapon', stats: { cred: 1 }, weapon: { dmg: 2, reach: 2.8, knock: 2, stun: 3, mesh: 'plunger', word: 'SHLOP!' } },
+  w_blower: { n: 'Leaf blower', e: '🍃', p: 380, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 9, knock: 11, ranged: 'cone', mesh: 'blower', word: 'WHOOSH!', puff: '🍃' } },
+  w_guitar: { n: 'Smashing guitar', e: '🎸', p: 650, type: 'gear', slot: 'weapon', stats: { cred: 1, style: 1 }, weapon: { dmg: 4, reach: 2.9, knock: 5, mesh: 'guitar', word: 'KERRANG!', puff: '🎵' } },
+  w_bubble: { n: 'Bubble blaster', e: '🫧', p: 900, type: 'gear', slot: 'weapon', req: { lvl: 6 }, weapon: { dmg: 3, reach: 18, knock: 4, ranged: 'shot', mesh: 'bubble', word: 'BLOOP!', puff: '🫧' } },
+  fakenose: { n: 'Fake nose and glasses', e: '🥸', p: 20, type: 'gear', slot: 'acc', stats: { charm: 1, cred: 1 } },
+  whoopee: { n: 'Whoopee cushion', e: '🎈', p: 8, type: 'gift', rel: 6 },
+  fortune: { n: 'Your fortune', e: '🔮', p: 10, type: 'service', fortune: true },
+  luckycharm: { n: 'Lucky rabbit sock', e: '🧦', p: 150, type: 'gear', slot: 'bag', stats: { charm: 1, cred: 1 }, happy: 3 },
+});
+D.KINDS.bakery.sells.push('w_baguette');
+D.KINDS.toys.sells.push('w_chicken', 'w_noodle');
+D.KINDS.furniture.sells.unshift('w_pillow');
+D.KINDS.grocery.sells.push('w_fish');
+D.KINDS.hardware.sells.push('w_plunger', 'w_blower');
+D.KINDS.music.sells.push('w_guitar');
+D.KINDS.tech.sells.push('w_bubble');
+D.SLAP = { dmg: 0.5, reach: 2.1, knock: 2, mesh: null, word: 'SLAP!' };   // bare hands
+
+// Monsters. hp, speed (m/s; your sprint beats all of them), steal = coins they grab when they touch you,
+// coins = what pops out, night: only after dark, boss: one at a time, announced.
+D.MONSTERS = {
+  slime: { n: 'Sidewalk slime', e: '🟢', hp: 2, speed: 3.2, steal: [1, 4], coins: [3, 5], xp: 12, w: 10 },
+  cone: { n: 'Cone gremlin', e: '🚧', hp: 2, speed: 5.2, steal: [1, 3], coins: [3, 5], xp: 14, w: 7 },
+  bin: { n: 'Trash goblin', e: '🗑️', hp: 3, speed: 4.2, steal: [2, 6], coins: [4, 7], xp: 18, w: 7 },
+  sock: { n: 'Lost-sock ghost', e: '🧦', hp: 3, speed: 3.7, steal: [2, 5], coins: [5, 7], xp: 20, w: 5, night: true },
+  pigeon: { n: 'Pigeonzilla', e: '🐦', hp: 7, speed: 4.6, steal: [5, 12], coins: [11, 15], xp: 60, w: 1.2, size: 1.5, cash: true },
+  blob: { n: 'King Blob', e: '👑', hp: 16, speed: 3.6, steal: [10, 25], coins: [22, 28], xp: 180, w: 0, boss: true, gem: true },
+  goose: { n: 'Furious goose', e: '🪿', hp: 4, speed: 6.6, steal: [1, 2], coins: [6, 8], xp: 30, w: 0 },
+};
+D.MONSTER_LINES = ['Blorp!', 'Grrr!', 'Mine! MINE!', 'Coins... coooins...', 'Boo!', 'Nom nom nom', 'Rawr (small)', 'Gimme!'];
+D.MONSTER_TITLES = [[1, 'Monster bonker'], [10, 'Night watch'], [30, 'Slime time'], [75, 'Monster hunter'], [150, 'Legend of the night shift']];
+
+// Shenanigans with strangers
+D.CRUSH_NAMES = ['Alex', 'Robin', 'Charlie', 'Jules', 'Sacha', 'Camille', 'Morgan', 'Remy', 'Noa', 'Elliot', 'Dominique', 'Frankie', 'Jordan', 'Ari', 'Sky', 'Rowan',
+  'Quinn', 'Maxime', 'Lou', 'Andrea', 'Riley', 'Casey', 'Jamie', 'Taylor', 'Avery', 'Devon', 'Kit', 'Sasha', 'Blake', 'Harper', 'Emery', 'Marlo'];
+D.FLIRT = {
+  lines: [
+    'Are you a parking ticket? Because you\'ve got "fine" written all over you.',
+    'Is your name Wi-Fi? Because I\'m feeling a connection.',
+    'Do you have a map? I keep getting lost in your eyes. (I do have a minimap, though.)',
+    'If you were a pickup, you\'d be a gem.',
+    'Are you from this neighbourhood? Because you just raised its property value.',
+    'I\'d cross a street on a red light for you. Looking both ways, obviously.',
+    'Are you a coin? Because I\'d run across town to pick you up.',
+    'Nonna Rosa told me to find someone nice. Hi.',
+  ],
+  yes: ['Ha! Okay, that was terrible. I love it. 💕', 'Smooth. Come find me later.', 'You\'re ridiculous. Here\'s my number.', 'Oh no. That worked on me.', 'Stop it. (Don\'t stop.)', '*blushes in pedestrian*'],
+  no: ['Wow. No.', 'I have a pigeon to feed. Bye.', 'Did that ever work on anyone?', 'I\'m calling my mother to tell her about this.', 'Ha. Ha. No.', 'Try that again when you\'ve showered.'],
+  taken: ['Your {pt} is RIGHT THERE.', 'Aren\'t you with someone? Shoo.'],
+  sweet: ['There\'s my favourite person!', 'I was hoping you\'d walk by.', 'Look who it is. 💕', 'I saved you a smile.', 'You again! Good.', 'My day just got better.'],
+  miss: ['Oh. You remember I exist?', 'It\'s been days...', 'I almost gave your nickname to my plant.'],
+  date: ['That was lovely.', 'Best. Walk. Ever.', 'Same time tomorrow?', 'You make this street look good.'],
+  drama: ['WHO IS THAT?!', 'So I\'m "the only one", huh?!', 'You said you were at the LIBRARY!', 'Hold my handbag. Actually, no: FEEL my handbag!'],
+  gone: '{n} moved on and gave your nickname to a houseplant.',
+};
+D.CRUSH_TITLES = [[1, 'Has a crush'], [3, 'Heartthrob'], [5, 'Casanova of the block'], [8, 'Legend of love']];
+D.JOKES = [
+  ['Why did the pigeon cross the road?', 'It was the chicken\'s day off.'], ['What do you call a fake noodle?', 'An impasta.'],
+  ['Why don\'t buildings ever get lost?', 'They always know their storey.'], ['What\'s a traffic light\'s favourite food?', 'Jam.'],
+  ['Why was the sidewalk so calm?', 'It was grounded.'], ['How does a taxi apologise?', 'It says "my bad" and charges you anyway.'],
+  ['What did the lamp post say to the dog?', 'Not again.'], ['Why did the banana go to the doctor?', 'It wasn\'t peeling well.'],
+  ['What do slimes study at school?', 'Goo-ography.'], ['Why did the bicycle fall over?', 'It was two-tired.'],
+];
+D.JOKE_REPLIES = { good: ['HAHA! Stop!', 'Okay that got me.', '*snort*', 'I\'m telling everyone that one.', 'Ha! Classic.'], bad: ['...', 'I don\'t get it.', 'My grandpa tells that one.', 'Boo.'] };
+D.BONKED = ['Hey! Rude!', 'OW! What was that for?!', 'Did you just... with a BAGUETTE?', 'My lawyer will hear about this!', 'Unbelievable.', 'I\'m telling my mom!', 'Not the hair!'];
+D.PILLOW_FIGHT = ['Pillow fight!!', 'Hahaha! Again!', 'Oh it\'s ON.', 'Feathers everywhere!'];
+
+// Street folk: neighbours without a roof. Help them (coins, food, time) and they remember. Never the butt of the joke.
+D.STREETFOLK = [
+  { id: 'marcel', n: 'Marcel', e: '🎷', hi: 'Spare a coin for a retired saxophone legend?', story: ['I played every club on this street. The clubs are condos now. The saxophone is a lamp.', 'One night a goose walked on stage. Best duet of my life.'], look: { beard: true, beanie: 0x24324a, coat: 0x5b4636 } },
+  { id: 'dolores', n: 'Dolores', e: '🐈', hi: 'Chairman Meow and I accept coins, tuna and compliments.', story: ['The cat is the brains of this operation. I\'m just the legs.', 'I used to run a bookshop. I still give recommendations. Free. Unstoppable.'], look: { long: true, hair: 0xd9d4cc, coat: 0x9b2c4f, scarf: 0xf2b134 } },
+  { id: 'ray', n: 'Captain Ray', e: '⚓', hi: 'Ahoy! Any change for an old sailor on dry land?', story: ['Thirty years at sea. Never once saw a sea monster. Moved here: slimes everywhere.', 'A lamp post is just a lighthouse that gave up.'], look: { beard: true, hat: 0x24324a, coat: 0x2b4c7e } },
+  { id: 'pete', n: 'Poet Pete', e: '📜', hi: 'A coin for a poem? Refunds in haiku only.', story: ['Roses are red, rent is absurd, I live outside, so does that bird.', 'I rhymed "orange" once. Nobody was there. I think about it every day.'], look: { glasses: true, beanie: 0x7b52c7, scarf: 0xef6aa5 } },
+  { id: 'tina', n: 'Big Tina', e: '♟️', hi: 'Got a dollar? I\'ll teach you a chess opening. Got two? I\'ll let you win.', story: ['Undefeated on this corner since the spring. A pigeon came close.', 'Life is like chess. I\'m currently in the endgame with a very good knight.'], look: { long: true, beanie: 0xe8453c, coat: 0x1f2937 } },
+  { id: 'gus', n: 'Old Gus', e: '🐦', hi: 'The pigeons and I would appreciate a small donation.', story: ['I know every pigeon by name. That one is Kevin. They are all Kevin.', 'People walk past. Pigeons never do. Loyal birds.'], look: { beard: true, hair: 0xd9d4cc, hat: 0x5b4636, coat: 0x6b7280 } },
+  { id: 'mags', n: 'Mags', e: '🧶', hi: 'A coin, dear? I\'ll knit you into my will.', story: ['I knit scarves for the lamp posts. They look cold.', 'Forty years a seamstress. Now I mend whatever walks by. Hold still.'], look: { long: true, hair: 0xd9d4cc, glasses: true, coat: 0xc084fc, scarf: 0x2f9e6e } },
+  { id: 'lint', n: 'Professor Lint', e: '🧦', hi: 'Any spare change, or better, spare socks? Singles only.', story: ['I study the migration of lost socks. They go north. Nobody believes me.', 'The ghosts at night? Socks. All socks. I\'ve published.'], look: { glasses: true, beard: true, beanie: 0xf2b134, coat: 0x3aa6b9 } },
+  { id: 'sunny', n: 'Sunny', e: '🌞', hi: 'Morning! Or evening! Either way: a coin would make it sunnier.', story: ['Best view in the city, this bench. And no rent. You should see my skylight.', 'I give out free compliments. You have excellent posture.'], look: { hat: 0xf2b134, coat: 0xff8a3d } },
+  { id: 'duchess', n: 'The Duchess', e: '🛒', hi: 'One may approach the cart. Tributes of coin are customary.', story: ['This cart has four wheels and a throne. Name another vehicle that does.', 'I was nearly royalty once. The paperwork was dreadful.'], look: { long: true, hair: 0x8a8a8a, coat: 0x7b52c7, scarf: 0xf4f1ea } },
+];
+D.FOLK_THANKS = ['Bless you, friend.', 'You\'re one of the good ones.', 'That\'s dinner sorted!', 'The street remembers.', 'Thank you. Truly.', 'May your coins be many and your slimes few.'];
+D.FOLK_SNUB = ['No worries. Have a good one.', 'Next time, maybe.', 'Mind the slimes.', 'Fair enough.'];
+D.FOLK_RUDE = ['Charming.', 'And a good day to you too, sunshine.', 'The pigeons heard that.'];
+D.FOLK_TITLES = [[0, 'Stranger'], [3, 'Friendly face'], [8, 'Friend of the street'], [16, 'Street saint'], [28, 'Royalty in waiting'], [40, 'Crowned']];
+D.CROWN_AT = 40;
+D.FOLK_KING = ['All hail!', 'Your Majesty!', 'Long live the crown!', '*bows with great ceremony*', 'Looking regal today!', 'The corner is yours, boss.'];
+
+// Pranks on made-up shops (never on real places from the map). The owner chases you; you are always a bit faster.
+D.PRANKS = [
+  { id: 'bell', t: '🔔 Ring the bell forty times and run', gain: { cred: 0.15 }, xp: 15 },
+  { id: 'samples', t: '🧀 Eat every single free sample', gain: { energy: 30 }, xp: 15 },
+  { id: 'sign', t: '🪧 Flip the sign to "CLOSED: GOOSE INSIDE"', gain: { cred: 0.25 }, xp: 20 },
+  { id: 'moonwalk', t: '🕺 Moonwalk through the shop, knocking nothing over (mostly)', gain: { charm: 0.15, happy: 3 }, xp: 20 },
+];
+D.KEEPER_LINES = {
+  bakery: ['COME BACK HERE, YOU CROUTON!', 'I\'ll knead you into next week!'], cafe: ['I will DECAF you!', 'No more loyalty stamps for you!'],
+  restaurant: ['You\'re off the menu!', 'Get back here and face the dessert!'], grocery: ['Clean-up on aisle YOU!', 'That\'s a paddlin\'!'],
+  flowers: ['I\'ll put you in a vase!', 'Petal pusher!'], books: ['Overdue! OVERDUE!', 'I will shush you so hard!'],
+  joke: ['Not funny! Okay, a little funny! COME BACK!', 'I INVENTED that prank!'], salon: ['Bad hair day incoming!', 'I\'ll give you bangs!'],
+  any: ['HEY! YOU!', 'Get back here!', 'I know your face!', 'My shop! My beautiful shop!', 'You\'ll pay for that! Literally!', 'STOP! In the name of retail!'],
+};
+D.KEEPER_GIVEUP = ['*wheeze* ...next time...', 'I\'m too old for this.', 'You\'re banned! BANNED!', 'I\'ll remember that face!'];
+D.RIVAL_LINES = ['YOU! You\'re stealing my customers!', 'There\'s the competition! Get \'em!', 'Your {biz} is ruining me!'];
+// which made-up shops see you as the competition, once you own a business
+D.RIVALS = { coffee: 'cafe', lemonade: 'icecream', foodtruck: 'fastfood', pizzeria: 'restaurant', sushi: 'restaurant', bistro: 'restaurant', laundromat: 'laundry',
+  salon: 'salon', phonefix: 'tech', gym: 'gym', karaoke: 'lounge', bikeshop: 'bike', hotel: 'hotel' };
+
+// Fortunes (the fortune teller): text + what happens (cft-fun.js reads `do`)
+D.FORTUNES = [
+  { t: 'I see... money. On the ground. Quite near.', do: 'coins' }, { t: 'A great bird approaches. It is furious.', do: 'goose' },
+  { t: 'Love is in the air. Or pollen. Your charm grows.', do: 'charm' }, { t: 'Beware the wobbling ones tonight.', do: 'slimes' },
+  { t: 'The stars say: you are lucky today. Also, hydrate.', do: 'sticker' }, { t: 'Visitors. From very far. Look up.', do: 'ufo' },
+  { t: 'You will walk very fast for a while. Don\'t ask why.', do: 'speed' }, { t: 'Your future is... sticky. I see a slide.', do: 'peels' },
+];
+
+// What the made-up shops along the streets are. W.makeShop picks by weight; names come from D.shopName.
+D.SHOP_MIX = [['cafe', 9], ['restaurant', 8], ['fastfood', 6], ['bakery', 6], ['grocery', 8], ['clothes', 6], ['flowers', 3], ['books', 3], ['tech', 3], ['pharmacy', 3],
+  ['salon', 4], ['gym', 2], ['toys', 3], ['gift', 3], ['music', 2], ['pet', 2], ['hardware', 2], ['laundry', 3], ['icecream', 3], ['lounge', 3], ['furniture', 2],
+  ['bike', 2], ['jewelry', 1], ['joke', 4], ['fortune', 2], ['bank', 1]];
+const NAME_A = ['Happy', 'Lucky', 'Golden', 'Little', 'Big', 'Funky', 'Cosmic', 'Sunny', 'Sleepy', 'Fancy', 'Wobbly', 'Royal', 'Turbo', 'Velvet', 'Crispy', 'Jolly', 'Mighty', 'Purple', 'Disco', 'Humble', 'Sneaky', 'Electric', 'Dizzy', 'Grand'];
+const NAME_B = {
+  cafe: ['Bean', 'Mug', 'Roast', 'Cup', 'Drip'], restaurant: ['Fork', 'Table', 'Plate', 'Spoon', 'Kitchen'], fastfood: ['Burger', 'Fry', 'Taco', 'Nugget', 'Hot Dog'],
+  bakery: ['Crumb', 'Bun', 'Loaf', 'Croissant', 'Oven'], grocery: ['Basket', 'Pantry', 'Market', 'Carrot', 'Corner'], clothes: ['Thread', 'Closet', 'Hanger', 'Sock', 'Button'],
+  flowers: ['Petal', 'Tulip', 'Bloom', 'Daisy', 'Stem'], books: ['Page', 'Chapter', 'Bookworm', 'Shelf', 'Comma'], tech: ['Pixel', 'Gizmo', 'Byte', 'Widget', 'Robot'],
+  pharmacy: ['Remedy', 'Tonic', 'Plaster', 'Pill'], salon: ['Scissors', 'Curl', 'Comb', 'Fringe'], gym: ['Dumbbell', 'Flex', 'Sweat', 'Burpee'], toys: ['Yo-Yo', 'Teddy', 'Kite', 'Marble'],
+  gift: ['Trinket', 'Ribbon', 'Souvenir', 'Knick-Knack'], music: ['Banjo', 'Vinyl', 'Kazoo', 'Chord'], pet: ['Paw', 'Whisker', 'Biscuit', 'Hamster'], hardware: ['Hammer', 'Bolt', 'Wrench', 'Nail'],
+  laundry: ['Bubble', 'Suds', 'Sock', 'Spin'], icecream: ['Scoop', 'Sprinkle', 'Cone', 'Sundae'], lounge: ['Owl', 'Groove', 'Neon', 'Flamingo'], furniture: ['Sofa', 'Nest', 'Cushion', 'Lamp'],
+  bike: ['Spoke', 'Pedal', 'Wheelie', 'Sprocket'], jewelry: ['Carat', 'Sparkle', 'Gem'], joke: ['Whoopee', 'Giggle', 'Chicken', 'Honk'], fortune: ['Eye', 'Tarot', 'Comet', 'Crystal'], bank: ['Piggy', 'Penny', 'Vault'],
+};
+D.shopName = function (kind, r) { // r: 0..1, steady for a building
+  const k = D.KINDS[kind], n = Math.floor(r * 1000);
+  if (n % 3 === 0 && k.fake.length) return k.fake[n % k.fake.length];
+  const b = NAME_B[kind] || [k.n];
+  return (n % 2 ? 'The ' : '') + NAME_A[n % NAME_A.length] + ' ' + b[Math.floor(n / 7) % b.length];
+};
+// Sign colours per kind of place (the 3D boards on the buildings)
+D.SIGN_COLS = { cafe: '#8a5a3c', restaurant: '#b3261e', fastfood: '#e8590c', bakery: '#c2772b', icecream: '#e64980', lounge: '#5f3dc4', grocery: '#2f9e44', clothes: '#1c7ed6',
+  flowers: '#d6336c', books: '#5c4033', library: '#364fc7', tech: '#1f2937', pharmacy: '#0ca678', school: '#e67700', park: '#2b8a3e', cinema: '#862e9c', museum: '#495057',
+  clinic: '#0b7285', bank: '#2b3a67', post: '#c92a2a', salon: '#c2255c', bike: '#087f5b', garage: '#5c5f66', community: '#7048e8', gym: '#d9480f', stadium: '#1864ab',
+  landmark: '#a67c00', music: '#9c36b5', jewelry: '#0c8599', toys: '#f08c00', pet: '#74b816', furniture: '#846358', gift: '#e03131', hotel: '#3b5bdb', laundry: '#1098ad',
+  hardware: '#e8590c', metro: '#1971c2', joke: '#f76707', fortune: '#6741d9' };
+
+// Random things that happen on the street. w = weight, night/day limits, min level.
+D.EVENTS = [
+  { id: 'moneyrain', n: '💸 A money truck hit a pothole!', sub: 'Coins all over the street. Grab them!', w: 6 },
+  { id: 'flashmob', n: '🕺 Flash mob!', sub: 'Everyone is dancing. Join in (E)!', w: 5, day: true },
+  { id: 'ufo', n: '🛸 What is THAT?', sub: 'Something is hovering nearby. Stand in the beam!', w: 3 },
+  { id: 'goose', n: '🪿 A goose has chosen you.', sub: 'Run, or bonk it. Good luck either way.', w: 4, day: true },
+  { id: 'slimes', n: '🟢 Slime alert!', sub: 'A wobble of slimes is loose on the street.', w: 4, day: true },
+  { id: 'crate', n: '🪂 Mystery crate incoming!', sub: 'It\'s floating down nearby. Be there when it lands.', w: 5 },
+  { id: 'dogs', n: '🐕 You smell like bacon.', sub: 'Every dog on the block wants to be your friend.', w: 3, day: true },
+  { id: 'pigeonzilla', n: '🐦 PIGEONZILLA!', sub: 'A very large pigeon is stomping around. It has your coins on its mind.', w: 2, lvl: 3 },
+];
+
+// Feats: stickers you can't find, only earn
+D.STICKER_SETS.push({ id: 'shenanigans', n: 'Shenanigans', feat: true, bonus: { stats: { cred: 2, charm: 2 } }, bonusText: '+2 Street cred, +2 Charm',
+  items: [['bonker', '👾', 'Monster bonker'], ['cardcrown', '🤴', 'Cardboard crown'], ['heartthrob', '💘', 'Heartthrob'], ['prankster', '🤡', 'Prankster'], ['abducted', '🛸', 'Close encounter'], ['goosed', '🪿', 'Goose survivor']] });
+
+D.CHATTER.push('Did you see that slime last night? Wobbly little menace.', 'Somebody put a scarf on a lamp post. Respect.', 'A goose chased me for three blocks. THREE.',
+  'The joke shop sells rubber chickens. Just so you know.', 'I saw a UFO over the bakery. Nobody believes me.', 'Never trust a traffic cone at night.',
+  'The street folk say there\'s a crown going around.', 'Those traffic lights take forever, eh?', 'Banana peels everywhere. Somebody loves chaos.');
+
+// More side stories (chapter 10). Step "count": a counter rises by n (or, with abs, reaches n): bonks, helped, flirts,
+// escapes, slides, bounces, ufos, boss, sweet (sweethearts right now), crowned, weapons (owned).
+S('s-armed', 'Armed and Ridiculous', 'dmitri', 'garage', { m: ['c1-couch'] }, ['Dmitri: The night streets? Full of wobbly things that steal coins. You need protection.',
+  'Dmitri: Not a real weapon! This is a nice neighbourhood. A baguette. A rubber chicken. Something with dignity.'],
+  [{ do: 'count', key: 'weapons', abs: true, n: 1, text: 'Buy something silly to bonk with (bakeries sell baguettes 🥖)' }, { do: 'count', key: 'bonks', n: 2, text: 'Bonk 2 monsters with it (press F). They come out after dark 🌙' }],
+  ['Dmitri: Ha! A warrior. A very silly warrior.'], { money: 60, xp: 160, stats: { cred: 0.5 }, rel: { dmitri: 8 } });
+S('s-night-shift', 'Night Shift', 'bouchard', 'community', { m: ['s-armed'] }, ['Bouchard: Officially, monsters do not exist. Unofficially, one ate my donut.',
+  'Bouchard: Clear five of them off my beat and I never saw you carrying that baguette.'],
+  [{ do: 'count', key: 'bonks', n: 5, text: 'Bonk 5 monsters 👾' }], ['Bouchard: The streets are safe. The donuts are safe. Good work, citizen.'], { money: 110, xp: 260, stats: { cred: 1 }, rel: { bouchard: 12 } });
+S('s-king-blob', 'Long Wobble the King', 'bouchard', 'community', { m: ['s-night-shift'], lvl: 4 }, ['Bouchard: There is a big one. Purple. Wears a crown. Calls itself King Blob.',
+  'Bouchard: It only comes out in the dead of night. Bring your best bonking stick.'],
+  [{ do: 'count', key: 'boss', n: 1, text: 'Find and bonk King Blob (after 22:00) 👑' }], ['Bouchard: You dethroned a jelly. I am putting that in the report.'], { money: 300, xp: 500, stats: { cred: 2 }, sticker: 'trophy' });
+S('s-soup', 'The Street Remembers', 'rosa', 'bakery', { m: ['c1-rosa'] }, ['Rosa: You see the people on the corners, yes? Marcel, Dolores, the Captain? They are neighbours too.',
+  'Rosa: A coin, a sandwich, five minutes of listening. Help three of them. This is how a street stays a street.'],
+  [{ do: 'count', key: 'helped', n: 3, text: 'Help 3 street folk: a coin, some food or a listening ear 🧡' }], ['Rosa: Good. You have a heart. I was almost sure.'], { xp: 200, happy: 8, stats: { charm: 1 }, rel: { rosa: 10 } });
+S('s-crown', 'A Crown of Cardboard', 'grandpa', 'park', { m: ['s-soup'] }, ['Walt: In my mail-carrying days the street folk had a king. Chosen by them. Crown made from a pizza box.',
+  'Walt: The throne has been empty for years. They are waiting for somebody kind. Could be you.'],
+  [{ do: 'count', key: 'crowned', abs: true, n: 1, text: 'Earn 40 street hearts and be crowned 👑' }], ['Walt: Your Majesty. I would bow, but my knees have retired.'], { money: 250, xp: 600, happy: 10, stats: { cred: 2, charm: 2 } });
+S('s-smooth', 'Smooth Operator', 'zoe', 'lounge', { lvl: 3 }, ['Zoe: You have rhythm in your feet but none in your mouth. Go flirt with three strangers.',
+  'Zoe: Worst case, they laugh. Best case, they laugh AND give you their number.'],
+  [{ do: 'count', key: 'flirts', n: 3, text: 'Charm 3 strangers (E on a person, then Flirt 😘)' }], ['Zoe: Look at you. A menace to hearts everywhere.'], { xp: 220, stats: { charm: 1.5 }, rel: { zoe: 8 } });
+S('s-heartthrob', 'Heartthrob', 'noor', 'museum', { m: ['s-smooth'] }, ['Noor: I am doing a photo series: "People Who Are Somehow Dating Half the Street". I need a model.',
+  'Noor: Three sweethearts at the same time. And {name}: do NOT let them meet.'],
+  [{ do: 'count', key: 'sweet', abs: true, n: 3, text: 'Have 3 sweethearts at the same time 💕' }], ['Noor: Got the shot. Also: I give this two weeks before the drama.'], { money: 120, xp: 300, stats: { charm: 1, style: 1 }, rel: { noor: 8 } });
+S('s-prank-war', 'Prank War', 'jay', 'tech', { lvl: 3 }, ['Jay: I have a theory: no shopkeeper in this town can outrun you. Science demands a test.',
+  'Jay: Made-up shops only. The real ones have lawyers.'],
+  [{ do: 'count', key: 'escapes', n: 2, text: 'Prank 2 made-up shops and outrun the owners 🤡' }], ['Jay: Two for two. The theory holds. You are a menace and I respect it.'], { money: 100, xp: 240, stats: { cred: 1 }, rel: { jay: 8 } });
+S('s-banana', 'Slip and Slide', 'kai', 'park', { m: ['c1-couch'] }, ['Kai: Dude. Somebody left banana peels all over town. You know what that means? FREE SPEED.',
+  'Kai: Hit three peels at a run. Then find something bouncy: a trampoline, a parked car roof, whatever.'],
+  [{ do: 'count', key: 'slides', n: 3, text: 'Slide on 3 banana peels 🍌' }, { do: 'count', key: 'bounces', n: 2, text: 'Bounce twice: trampolines or parked car roofs (jump on them) 🤸' }],
+  ['Kai: Gnarly. You\'re basically a cartoon now.'], { xp: 180, stats: { fit: 0.5, cred: 0.5 }, rel: { kai: 8 } });
+S('s-ufo', 'Close Encounter', 'okafor', 'library', { lvl: 4 }, ['Okafor: I have catalogued forty-one sightings of a hovering object over this neighbourhood. Forty-one!',
+  'Okafor: Stand in its light beam and tell me what happens. For science. I will hold your library card.'],
+  [{ do: 'count', key: 'ufos', n: 1, text: 'Find the UFO and stand in its beam 🛸 (it shows up while you wander)' }], ['Okafor: It gave you a GEM? Fascinating. Forty-two.'], { money: 150, xp: 350, stats: { smarts: 1 }, rel: { okafor: 10 } });
 
 window.CFT_DATA = D;
 })();

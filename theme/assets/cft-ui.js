@@ -43,6 +43,7 @@ function create(G, root) {
       <div class="cft-br">
         <button class="cft-act" data-act type="button" hidden><kbd>E</kbd><span data-acttext></span></button>
         <div class="cft-btns">
+          <button type="button" data-bonk title="Bonk (F)" aria-label="Bonk">🖐️</button>
           <button type="button" data-ride title="Ride (V)">🛹</button>
           <button type="button" data-phone title="Phone (P)">📱</button>
           <button type="button" data-jump class="cft-touch" title="Jump">⤒</button>
@@ -394,8 +395,8 @@ function create(G, root) {
     const t = shell.classList.contains('touch');
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
-      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>📱</kbd> your phone</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
+      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>📱</kbd> your phone</div>'
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
       '</div><p class="muted">The <b>gold arrow</b> over your head always points to your current goal. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
@@ -514,6 +515,7 @@ function create(G, root) {
         else { setText('qt', '[data-qtitle]', 'Free roam'); setText('qs', '[data-qstep]', 'Open your phone (P) for quests and odd jobs'); q.classList.add('idle'); }
         setText('qd', '[data-qdist]', goal && goal.d != null ? fmtDist(goal.d) : '');
         $('[data-ride]').textContent = s.equip.ride ? D.ITEMS[s.equip.ride].e : '🚶';
+        setText('bonk', '[data-bonk]', s.equip.weapon && D.ITEMS[s.equip.weapon] ? D.ITEMS[s.equip.weapon].e : '🖐️');
       }
       const goal = G.rt.goal;
       if (goal) {
@@ -542,6 +544,7 @@ function create(G, root) {
     if (G.rt.race) G.rt.race.cps.forEach((c, i) => { if (i >= G.rt.race.i) markers.push({ x: c.x, z: c.z, color: i === G.rt.race.i ? '#ffc21f' : '#6b4eff', r: 6, emoji: '🏁', ring: '#fff', edge: i === G.rt.race.i }); });
     const h = G.homeSpot();
     markers.push({ x: h.x, z: h.z, color: '#ff5c8a', r: 8, emoji: '🏠', ring: '#fff', edge: true });
+    if (G.fun) G.fun.markers(markers);
     const goal = G.rt.goal;
     if (goal) markers.push({ x: goal.x, z: goal.z, color: '#6b4eff', r: 9, emoji: goal.e || '⭐', ring: '#ffc21f', edge: true });
     return { markers, rects };
@@ -569,6 +572,7 @@ function create(G, root) {
     if (e.code === 'KeyE' || e.code === 'Enter') { e.preventDefault(); G.interact(); }
     else if (e.code === 'KeyP' || e.code === 'Tab' || e.code === 'Escape') { e.preventDefault(); U.phone(); }
     else if (e.code === 'KeyV') G.toggleRide();
+    else if (e.code === 'KeyF') { if (!e.repeat) G.attack(); }
     else if (e.code === 'KeyM') toggleZoom();
     else if (e.code === 'KeyH') U.help();
   }
@@ -576,6 +580,9 @@ function create(G, root) {
   $('[data-act]').addEventListener('click', () => G.interact());
   $('[data-phone]').addEventListener('click', () => U.phone());
   $('[data-ride]').addEventListener('click', () => G.toggleRide());
+  $('[data-bonk]').addEventListener('click', () => G.attack());
+  // with the mouse captured, a left click bonks
+  U.canvas.addEventListener('mousedown', e => { if (e.button === 0 && G.W && G.W.isLocked() && G.state() === 'play' && !stack.length) G.attack(); });
   $('[data-mmwrap]').addEventListener('click', () => U.phone('map'));
   $('[data-quest]').addEventListener('click', () => U.phone('quests'));
   $('[data-jump]').addEventListener('touchstart', e => { if (G.W) G.W.input.jump = true; e.preventDefault(); }, { passive: false });
@@ -584,7 +591,7 @@ function create(G, root) {
   // ------------------------------------------------------------------ the phone
   const APPS = [
     ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
-    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
+    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
   ];
   let phoneOv = null, phoneApp = null;
   U.phone = function (app) {
@@ -612,7 +619,8 @@ function create(G, root) {
   U.refreshPhone = () => { if (phoneOv) { const b = phoneOv.el.querySelector('[data-pbody]'), st = b.scrollTop; render(phoneApp); b.scrollTop = st; } };
   function homeScreen() {
     const s = save(), act = G.activeMissions().length, open = G.openMissions().length;
-    const badge = { quests: act + open, people: Object.keys(s.friends).length, business: Object.values(s.biz).filter(b => !b.mgr && b.till > 5).length };
+    const badge = { quests: act + open, people: Object.keys(s.friends).length, business: Object.values(s.biz).filter(b => !b.mgr && b.till > 5).length,
+      street: s.fun && s.fun.crushes ? s.fun.crushes.length : 0 };
     return '<div class="cft-apps">' + APPS.map(a => '<button type="button" class="cft-app" data-app="' + a[0] + '"><span>' + a[1] + '</span><b>' + a[2] + '</b>' +
       (badge[a[0]] ? '<i>' + badge[a[0]] + '</i>' : '') + '</button>').join('') + '</div>' +
       '<div class="cft-pcard"><b>☀️ Day ' + s.day + ' · ' + fmtClock(s.clock) + '</b><span>' + esc(s.apt.label || '') + ' · ' + esc(D.APARTMENTS[s.apt.tier].n) + '</span></div>' +
@@ -643,7 +651,7 @@ function create(G, root) {
   };
   VIEWS.map = function () {
     return '<div class="cft-mapwrap"><canvas class="cft-bigmap" data-bigmap></canvas><div class="cft-mapbtns"><button type="button" class="cft-pbtn" data-act="zin">＋</button><button type="button" class="cft-pbtn" data-act="zout">－</button></div></div>' +
-      '<div class="cft-legend"><span>🏠 home</span><span>❗ missions</span><span>💼 your businesses</span><span>🟪 your blocks</span><span>⭐ goal</span></div>';
+      '<div class="cft-legend"><span>🏠 home</span><span>❗ missions</span><span>💼 your businesses</span><span>🟪 your blocks</span><span>🧡 street folk</span><span>💕 sweethearts</span><span>💢 banned</span><span>⭐ goal</span></div>';
   };
   let mapScale = 0.5;
   function drawBigMap() {
@@ -687,6 +695,8 @@ function create(G, root) {
     if (it.rel) p.push('+' + it.rel + ' ❤️ as a gift');
     if (it.stats) for (const k in it.stats) p.push('+' + it.stats[k] + ' ' + D.STATS.find(s => s.id === k).e);
     if (it.speed) p.push('+' + Math.round(it.speed * 100) + '% speed');
+    if (it.weapon) p.push('Bonk ' + it.weapon.dmg + ' · reach ' + it.weapon.reach + ' m' + (it.weapon.ranged ? ' · ranged' : '') + (it.weapon.stun ? ' · stuns' : ''));
+    if (it.fortune) p.push('Something will happen. Probably');
     if (it.radar) p.push(it.radar > 1 ? 'Map shows blocks + shops' : 'Map shows shops');
     if (it.maxEnergy) p.push('+' + it.maxEnergy + ' max ⚡');
     if (it.sticker) p.push('A random sticker');
@@ -748,6 +758,24 @@ function create(G, root) {
         return '<div class="cft-li"><span>' + (t.own ? '🏳️‍🌈' : c.e) + '</span><div><b>' + esc(t.name) + '</b><small>' + (t.own ? 'Yours · +' + G.fmt$(15 + 10 * G.turfRing(id)) + '/h' + (t.rival != null ? ' · 🚨 rival tag!' : '') : esc(c.n) + ' · ' + n + '/4 tagged · needs 🔥' + G.turfNeed(id) + ' · ' + { race: 'race', dance: 'dance-off', quiz: 'quiz', chase: 'chase', cred: 'cred check' }[c.ch]) + '</small></div></div>'; }).join('') +
       (ids.length ? '' : '<p class="muted">Walk around to discover blocks.</p>');
   };
+  VIEWS.street = function () {
+    if (!G.fun) return '<div class="cft-empty">👑<p>The street is still waking up.</p></div>';
+    const s = save(), v = G.fun.summary(), w = v.weapon;
+    const weapons = Object.keys(s.owned).filter(k => D.ITEMS[k] && D.ITEMS[k].weapon);
+    const hearts = n => '❤️'.repeat(Math.max(1, Math.round(n / 20)));
+    return '<div class="cft-pcard"><b>' + (v.king ? '👑 ' : '🧡 ') + esc(v.folkTitle) + '</b><span>' + v.hearts + ' street hearts' + (v.king ? ' · a tribute arrives every morning' : ' · crowned at ' + v.crownAt) + '</span>' +
+      (v.king ? '' : bar(v.hearts, v.crownAt)) + '<small>Street folk sit on corners all over town (🧡 on the map). A coin, some food or a listening ear earns hearts.</small></div>' +
+      '<div class="cft-sec"><h4>💕 Sweethearts (' + v.crushes.length + ')' + (v.crushTitle ? ' · ' + esc(v.crushTitle) : '') + '</h4>' +
+      (v.crushes.length ? v.crushes.map(c => '<div class="cft-li"><span>💕</span><div><b>' + esc(c.name) + ' ' + hearts(c.love) + '</b><small>' + c.dist + ' m away · ' + (c.seen > 1 ? 'misses you (' + c.seen + ' days)' : 'saw you ' + (c.seen ? 'yesterday' : 'today')) + '</small>' + bar(c.love, 100, 'rel') + '</div>' +
+        '<button type="button" class="cft-btn sm" data-act="findcrush" data-id="' + c.id + '">🎯</button></div>').join('')
+        : '<p class="muted">Nobody yet. Walk up to a stranger, press E and try a pick-up line. Charm and style help.</p>') + '</div>' +
+      '<div class="cft-sec"><h4>👾 Monsters · ' + esc(v.monsterTitle || 'Not a bonker yet') + '</h4><div class="cft-li"><span>' + w.e + '</span><div><b>' + esc(w.n) + '</b><small>Bonk ' + w.dmg + ' · reach ' + w.reach + ' m' + (w.ranged ? ' · ranged' : '') + ' · press F</small></div></div>' +
+      (weapons.length > 1 || (weapons.length === 1 && s.equip.weapon !== weapons[0]) ? '<div class="cft-chips">' + weapons.map(k => '<button type="button" class="cft-chipb ' + (s.equip.weapon === k ? 'on' : '') + '" data-act="weapon" data-id="' + k + '">' + D.ITEMS[k].e + ' ' + esc(D.ITEMS[k].n) + '</button>').join('') + '</div>' : '') +
+      '<p class="muted small">' + (v.night ? '🌙 It\'s night: ' + v.monstersOut + ' out there right now.' : '☀️ They come out after 21:30. Bakeries, toy shops and joke shops sell things to bonk with.') + '</p></div>' +
+      (v.grudges.length ? '<div class="cft-sec"><h4>💢 Shops that banned you</h4>' + v.grudges.map(g => '<div class="cft-li"><span>💢</span><div><b>' + esc(g.name) + '</b><small>' + g.days + ' more day' + (g.days > 1 ? 's' : '') + ', or go and say sorry</small></div></div>').join('') + '</div>' : '') +
+      '<div class="cft-sec"><h4>Shenanigans so far</h4><div class="cft-grid2">' + [['👾 Monsters bonked', v.bonks], ['🤡 Pranks', v.pranks], ['🏃 Escapes', v.escapes], ['😘 Hearts won', v.flirts], ['💕 Dates', v.dates], ['🧡 Kind acts', v.helped],
+        ['🍌 Banana slides', v.slides], ['🤸 Bounces', v.bounces], ['😂 Jokes told', v.jokes], ['🎪 Street events', v.events]].map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
+  };
   VIEWS.album = function () {
     const s = save();
     const dupes = Object.keys(s.stickers).reduce((a, k) => a + Math.max(0, s.stickers[k] - 1), 0);
@@ -803,6 +831,8 @@ function create(G, root) {
       case 'upgrade': G.upgradeBiz(id); U.refreshPhone(); break;
       case 'mgr': G.hireManager(id); U.refreshPhone(); break;
       case 'findbiz': { const q = s.biz[id]; G.rt.pinGoal = { lat: q.lat, lon: q.lon, name: q.name }; s.track = null; phoneOv.close(); break; }
+      case 'findcrush': { const q = s.fun.crushes.find(c => c.id === id); if (q) { G.rt.pinGoal = { lat: q.lat, lon: q.lon, name: q.name }; s.track = null; phoneOv.close(); U.toast('💕 ' + q.name + ' is waiting. Follow the arrow!'); } break; }
+      case 'weapon': if (s.equip.weapon === id) delete s.equip.weapon; else s.equip.weapon = id; U.refreshPhone(); G.dirty(); break;
       case 'swap': await swapStickers(); U.refreshPhone(); break;
       case 'rename': { const n = await U.ask('Your name', s.name); if (n && n.trim()) { s.name = n.trim().slice(0, 20); G.dirty(); } U.refreshPhone(); break; }
       case 'pref': s.pref = s.pref === 'bf' ? 'gf' : 'bf'; G.refreshFollowers(); G.dirty(); U.refreshPhone(); break;
@@ -815,7 +845,7 @@ function create(G, root) {
   }
   async function swapStickers() {
     const s = save();
-    const missing = G.STICKERS.filter(x => !(s.stickers[x.id] > 0));
+    const missing = G.STICKERS.filter(x => !x.feat && !(s.stickers[x.id] > 0));
     if (!missing.length) { U.toast('You have every sticker!'); return; }
     const v = await U.choose({ title: '🔄 Pick a sticker', text: 'Trade 5 duplicates for:', opts: missing.slice(0, 9).map(x => ({ t: x.e + ' ' + x.n, v: x.id })).concat([{ t: 'Cancel', v: '' }]) });
     if (!v) return;
@@ -839,10 +869,14 @@ function create(G, root) {
       }).join('');
       ov.el.querySelector('[data-cash]').textContent = G.fmt$(s.money);
     };
-    const ov = overlay('<div class="cft-card cft-shop"><div class="cft-shop-h"><span>' + k.e + '</span><div><b>' + esc(pl.name || k.n) + '</b><small>' + esc(k.n) + (pl.virtual ? '' : ' · a real place on the map') + '</small></div><b class="cft-pmoney" data-cash></b><button type="button" class="cft-pbtn" data-x>✕</button></div>' +
-      (G.discount() > 0.01 ? '<p class="cft-disc">🕶️ Style discount: ' + Math.round(G.discount() * 100) + '% off</p>' : '') + '<div data-items class="cft-shop-items"></div></div>', 'cft-center', { dismiss: true });
+    const ov = overlay('<div class="cft-card cft-shop"><div class="cft-shop-h"><span>' + k.e + '</span><div><b>' + esc(pl.name || k.n) + '</b><small>' + esc(k.n) + (pl.virtual ? ' · a made-up shop' : ' · a real place on the map') + '</small></div><b class="cft-pmoney" data-cash></b><button type="button" class="cft-pbtn" data-x>✕</button></div>' +
+      (G.discount() > 0.01 ? '<p class="cft-disc">🕶️ Style discount: ' + Math.round(G.discount() * 100) + '% off</p>' : '') + '<div data-items class="cft-shop-items"></div>' +
+      (G.fun && G.fun.canPrank(pl) ? '<div class="cft-row"><button type="button" class="cft-btn sm ghost" data-prank>🤡 Pull a prank (the owner will chase you)</button></div>' : '') + '</div>', 'cft-center', { dismiss: true });
     ov.el.querySelector('[data-x]').onclick = () => ov.close();
-    ov.el.addEventListener('click', e => { const b = e.target.closest('[data-buy]'); if (b) { G.buy(b.dataset.buy, pl); draw(ov); } });
+    ov.el.addEventListener('click', e => {
+      if (e.target.closest('[data-prank]')) { ov.close(); G.fun.prank(pl); return; }
+      const b = e.target.closest('[data-buy]'); if (b) { G.buy(b.dataset.buy, pl); draw(ov); }
+    });
     draw(ov);
   };
   U.bizPanel = function (id) {

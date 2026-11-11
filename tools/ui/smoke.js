@@ -1,7 +1,7 @@
 /* Smoke test (tools/ui_test.py runs it at desktop and phone width): opens every page address signed out, then as a
    new member, then as the admin (the ADMIN_EMAILS address becomes admin on the local App Server). Fails on an empty
    page, sideways scrolling or a missing piece; ui_test.py also fails on any JS/Python exception in the log.
-   The game page (#play) only has to mount the engine (the container has no internet, so no map tiles). */
+   The game page (#play) only has to mount the engine with every file (the 3D game itself is played by tools/live/game_test.py). */
 (async function () {
   const log = [], bad = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -46,6 +46,8 @@
     await sleep(2500);
     log.push(($('.cft') ? 'ok   ' : 'note ') + '#play engine: ' + ($('.cft') ? 'game UI drawn' : $('.cft-fail') ? 'load failed: ' + text('.cft-fail') : 'still loading'));
     if ($('.cft-fail')) bad.push('#play: ' + text('.cft-fail'));
+    if ($('.cft') && !($('[data-bonk]') && window.CFTFun && window.CFT_DATA.MONSTERS)) bad.push('#play: the street-life module (cft-fun.js) or its bonk button is missing');
+    else if ($('.cft')) log.push('ok   #play street life loaded (cft-fun.js, the bonk button)');
     await check('#landing', () => main(), 'back from the game');
 
     // ---- a new member

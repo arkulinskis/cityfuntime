@@ -5,7 +5,7 @@ from ... import cft
 
 
 class Album(AlbumTemplate):
-    """#album: the sticker album (13 sets of 6, each full set gives a bonus forever) and the photos taken on photo
+    """#album: the sticker album (14 sets of 6, each full set gives a bonus forever) and the photos taken on photo
     missions (kept in this browser only). Anyone can look."""
 
     def __init__(self, args=(), **properties):

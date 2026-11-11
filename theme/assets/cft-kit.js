@@ -35,7 +35,7 @@
   }
   function chain(list) { return list.reduce(function (p, n) { return p.then(function () { return script(n); }); }, Promise.resolve()); }
   var DATA = ['cft-content.js', 'cft-game.js'];
-  var ALL = ['three.min.js', 'cft-content.js', 'cft-tiles.js', 'cft-world.js', 'cft-ui.js', 'cft-game.js'];
+  var ALL = ['three.min.js', 'cft-content.js', 'cft-tiles.js', 'cft-world.js', 'cft-ui.js', 'cft-fun.js', 'cft-game.js'];
 
   function get(k, dflt) { try { var v = localStorage.getItem(STORE + k); return v == null ? dflt : JSON.parse(v); } catch (e) { return dflt; } }
   function set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch (e) { /* storage full or blocked */ } }
@@ -209,6 +209,12 @@
       } else love = { title: '', sub: 'Single, for now. Nonna Rosa has opinions about that.' };
       love.kids = (s.kids || []).map(function (k) { return { text: (s.day - k.born > 12 ? '🧒' : '👶') + ' ' + esc(k.name), tone: '' }; });
       love.pets = (s.pets || []).map(function (p) { return { text: (p.kind === 'dog' ? '🐕' : '🐈') + ' ' + esc(p.name), tone: '' }; });
+      // street life (cft-fun.js): sweethearts around town, the cardboard crown, monsters bonked
+      var fun = s.fun || {}, bonks = (s.counters || {}).bonks || 0;
+      (fun.crushes || []).forEach(function (c) { love.pets.push({ text: '💕 ' + esc(c.name), tone: 'pink' }); });
+      if (fun.king) love.pets.push({ text: '👑 ' + esc(fun.king) + ' of the Streets', tone: 'gold' });
+      else if (fun.hearts) love.pets.push({ text: '🧡 ' + fun.hearts + ' street hearts', tone: '' });
+      if (bonks) love.pets.push({ text: '👾 ' + bonks + ' monsters bonked', tone: 'grape' });
       return {
         welcome: false, name: s.name, initials: initials(s.name), sub: '⭐ Level ' + lv + ' · Day ' + s.day + ' · ' + (S.home || ''),
         xp: pct(s.xp - x0, x1 - x0), money: money(s.money), worth: 'Net worth ' + money(S.worth),

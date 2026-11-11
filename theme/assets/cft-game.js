@@ -1,5 +1,6 @@
 /* City Fun Time: the game. Rules, saves, missions, pickups, people, homes, businesses, turf, time.
-   Uses CFT_DATA (cft-content.js), CFTWorld (cft-world.js, the 3D city) and CFTUI (cft-ui.js, HUD + menus).
+   Uses CFT_DATA (cft-content.js), CFTWorld (cft-world.js, the 3D city), CFTUI (cft-ui.js, HUD + menus) and CFTFun
+   (cft-fun.js: monsters, weapons, strangers, street folk, pranks, street events; G.fun once the world is loaded).
 
    CFTGame.mount(root, {save, me, onSave(save), onPhoto(url, meta), onExit(), quality}) -> {destroy, G}
    CFTGame.summary(save) / missionBoard(save) / newSave / levelOf / xpAt: also used by the pages (no three.js needed). */
@@ -17,7 +18,7 @@ function levelOf(xp) { let l = 1; while (l < 99 && xpAt(l + 1) <= xp) l++; retur
 const MISSION = {}; D.MISSIONS.forEach(m => { MISSION[m.id] = m; });
 const BIZ = {}; D.BUSINESSES.forEach(b => { BIZ[b.id] = b; });
 const CREW = {}; D.CREWS.forEach(c => { CREW[c.id] = c; });
-const STICKERS = []; D.STICKER_SETS.forEach(s => s.items.forEach(([id, e, n]) => STICKERS.push({ id, e, n, set: s.id, rare: !!s.rare })));
+const STICKERS = []; D.STICKER_SETS.forEach(s => s.items.forEach(([id, e, n]) => STICKERS.push({ id, e, n, set: s.id, rare: !!s.rare, feat: !!s.feat })));
 const RIDE_KIND = { skateboard: 'skateboard', kickscooter: 'kickscooter', bicycle: 'bike', moped: 'moped', car: 'car', suv: 'suv', sports: 'sports' };
 const FOOD_BIZ = new Set(['coffee', 'foodtruck', 'pizzeria', 'sushi', 'bistro', 'lemonade']);
 
@@ -33,6 +34,7 @@ function newSave(o) {
     day: 1, clock: 8, gameMin: 0, bag: {}, owned: {}, equip: {}, m: {}, track: null, spots: {}, castAt: {}, vplaces: [],
     jobs: { day: 0, list: [] }, dyn: {}, stickers: {}, turf: {}, biz: {}, rel: {}, friends: {}, partner: null, engaged: false, married: false,
     kids: [], pets: [], counters: {}, metro: [], log: [], hourPaid: 0,
+    fun: { hearts: 0, king: null, folk: {}, folkAt: {}, crushes: [], grudges: {}, feats: {} },  // street life (cft-fun.js)
     settings: { follow: { partner: true, kids: true, pets: true, friend: null }, quality: 'auto', sound: true },
   };
 }
@@ -143,6 +145,11 @@ function mount(root, opts) {
     tick: () => tone([[880, 0, 0.08]], 'square', 0.05),
     snap: () => tone([[2000, 0, 0.05], [1200, 0.04, 0.08]], 'square', 0.05),
     level: () => tone([[523, 0], [784, 0.12], [1046, 0.24], [1318, 0.36, 0.7]], 'triangle', 0.2),
+    swing: () => tone([[520, 0, 0.07], [300, 0.04, 0.09]], 'sine', 0.05),
+    bonk: () => tone([[196, 0, 0.12], [131, 0.05, 0.2]], 'square', 0.09),
+    boing: () => tone([[262, 0, 0.1], [392, 0.07, 0.1], [587, 0.14, 0.25]], 'sine', 0.14),
+    slide: () => tone([[880, 0, 0.12], [660, 0.08, 0.12], [440, 0.16, 0.25]], 'sine', 0.1),
+    alarm: () => tone([[880, 0, 0.14], [660, 0.16, 0.14], [880, 0.32, 0.14], [660, 0.48, 0.14]], 'square', 0.05),
   };
 
   // ------------------------------------------------------------------ derived stats
@@ -180,6 +187,7 @@ function mount(root, opts) {
     if (!ride) { const sh = D.ITEMS[save.equip.shoes]; if (sh && sh.speed) m += sh.speed; }
     else if (isFriend('kai')) m += 0.05;
     if (save.energy <= 0 && !ride) m *= 0.8;
+    if (G.fun) m *= G.fun.speedMul();
     return m;
   }
   G.happyTarget = function () {
@@ -187,7 +195,7 @@ function mount(root, opts) {
     let furn = 0;
     for (const id of Object.keys(save.owned)) { const it = D.ITEMS[id]; if (it && (it.type === 'furniture') && it.happy) furn += it.happy; }
     const t = 35 + apt.happy + Math.min(25, furn) + (save.partner ? 8 : 0) + (save.married ? 6 : 0) + save.kids.length * 6 +
-      Math.min(10, Object.keys(save.friends).length * 2) + save.pets.length * (isFriend('ollie') ? 6 : 4) + setBonus('happy');
+      Math.min(10, Object.keys(save.friends).length * 2) + save.pets.length * (isFriend('ollie') ? 6 : 4) + setBonus('happy') + (G.fun ? G.fun.happyBonus() : 0);
     return clamp(t, 0, 100);
   };
 
@@ -238,7 +246,7 @@ function mount(root, opts) {
   }
   function giveItem(id, n) { save.bag[id] = (save.bag[id] || 0) + n; if (save.bag[id] <= 0) delete save.bag[id]; }
   function addSticker(rare) {
-    const pool = STICKERS.filter(s => rare ? true : (!s.rare || Math.random() < 0.15 + setBonus('luck')));
+    const pool = STICKERS.filter(s => !s.feat && (rare ? true : (!s.rare || Math.random() < 0.15 + setBonus('luck'))));
     const s = pick(pool);
     const isNew = !(save.stickers[s.id] > 0);
     save.stickers[s.id] = (save.stickers[s.id] || 0) + 1;
@@ -326,6 +334,7 @@ function mount(root, opts) {
     for (const id of Object.keys(save.biz)) out.push(xz(save.biz[id]));
     if (save.apt.tier > 0) out.push(xz(save.apt));
     for (const v of save.vplaces) out.push(xz(v));
+    for (const q of W.places) if (q.made) out.push(q);
     return out;
   }
   // A building near (x, z) facing a street, not used by anything else: {b, wall, street}
@@ -358,6 +367,8 @@ function mount(root, opts) {
     const c = placesOf(kind).map(p => [Math.hypot(p.pin.x - x, p.pin.z - z), p]).sort((a, b) => a[0] - b[0]);
     let good = c.filter(e => e[0] >= min && e[0] <= max);
     if (!good.length) good = c.filter(e => e[0] <= 1800);
+    const real = good.filter(e => !e[1].made);  // missions go to real places from the map whenever there is one; made-up shops fill the gaps
+    if (real.length) good = real;
     if (good.length) return (o.random ? good[Math.floor(Math.random() * Math.min(4, good.length))] : good[0])[1];
     return createVirtual(kind, x, z);
   }
@@ -525,6 +536,7 @@ function mount(root, opts) {
       case 'rush': ms.b = counter('rush'); break;
       case 'tag': ms.b = counter('tags'); break;
       case 'defend': ms.b = counter('defends'); ensureRival(); break;
+      case 'count': ms.b = step.abs ? 0 : counter(step.key); break;
       case 'race': { const a = ll(p.x, p.z); ms.tg = Object.assign(a, { name: 'the start line', kind: 'race' }); break; }
       case 'chase': ms.tg = resolveTarget(step.at === 'here' ? 'here' : step.at, m, step); break;
       case 'escort': ms.tg = resolveTarget(step.to, m, step); startEscort(id, step); break;
@@ -696,6 +708,7 @@ function mount(root, opts) {
         case 'rush': if (slow && counter('rush') - ms.b >= step.n) completeStep(id); break;
         case 'tag': if (slow && counter('tags') - ms.b >= step.n) completeStep(id); break;
         case 'defend': if (slow && counter('defends') - ms.b >= 1) completeStep(id); break;
+        case 'count': if (slow && counter(step.key) - (ms.b || 0) >= step.n) completeStep(id); break;
         case 'escort': {
           const e = rt.escorts[id];
           if (!e) { if (slow) startEscort(id, step); break; }
@@ -783,6 +796,7 @@ function mount(root, opts) {
     if (step.do === 'walk') t += ' · ' + Math.min(step.m, Math.round(W.player.footMoved - ms.b)) + '/' + step.m + ' m';
     if (step.do === 'chat') t += ' · ' + Math.min(step.n, counter('chats') - ms.b) + '/' + step.n;
     if (step.do === 'rush') t += ' · ' + Math.min(step.n, counter('rush') - ms.b) + '/' + step.n;
+    if (step.do === 'count' && step.n > 1) t += ' · ' + Math.max(0, Math.min(step.n, counter(step.key) - (ms.b || 0))) + '/' + step.n;
     if (step.do === 'have') t += ' · ' + fmt$(Math.min(save.money, step.money)) + '/' + fmt$(step.money);
     if (step.do === 'stat') t += ' · ' + Math.floor(stat(step.stat)) + '/' + step.n;
     if (step.do === 'level') t += ' · ' + G.level() + '/' + step.n;
@@ -1233,7 +1247,7 @@ function mount(root, opts) {
     switch (it.type) {
       case 'food': addEnergy((it.energy || 0) * G.foodMul()); if (it.happy) addHappy(it.happy); if (it.stats) for (const k in it.stats) addStat(k, it.stats[k], true); U.feed(it.e, 'Yum! +' + Math.round((it.energy || 0) * G.foodMul()) + ' ⚡'); break;
       case 'snack': case 'gift': case 'quest': giveItem(it.give || id, 1); U.feed(it.e, it.n + ' added to your bag'); break;
-      case 'gear': save.owned[id] = true; save.equip[it.slot] = id; if (it.slot === 'outfit') W.setLook(playerLook()); U.feed(it.e, 'Wearing ' + it.n); if (it.happy) addHappy(it.happy); break;
+      case 'gear': save.owned[id] = true; save.equip[it.slot] = id; if (it.slot === 'outfit') W.setLook(playerLook()); U.feed(it.e, (it.weapon ? 'Armed with: ' : 'Wearing ') + it.n + (it.weapon ? ' (F to bonk)' : '')); if (it.happy) addHappy(it.happy); break;
       case 'vehicle': save.owned[id] = true; setRide(id); U.banner(it.e + ' ' + it.n + '!', 'Press V (or the ride button) to hop on and off.', 'done'); log('Bought a ' + it.n, it.e); break;
       case 'furniture': save.owned[id] = true; if (it.energy) save.maxE = (save.maxE || 0) + it.energy; U.feed(it.e, it.n + ' delivered home. +' + it.happy + ' 😊 every day'); log('Bought ' + it.n, it.e); break;
       case 'pet': save.pets.push({ kind: it.pet, name: it.pet === 'dog' ? 'Biscuit' : 'Mochi', since: save.day }); addHappy(10); refreshFollowers(); U.banner(it.e + ' New best friend!', 'Your ' + it.pet + ' follows you everywhere.', 'friend'); log('Adopted a ' + it.pet, it.e); break;
@@ -1246,7 +1260,8 @@ function mount(root, opts) {
         if (it.sticker) addSticker();
         if (it.hours) advanceClock(it.hours);
         if (it.once) save.owned[id] = true;
-        if (!it.stats && !it.sticker) U.feed(it.e, it.n + '!');
+        if (it.fortune && G.fun) G.fun.fortune();
+        else if (!it.stats && !it.sticker) U.feed(it.e, it.n + '!');
         break;
       default: break;
     }
@@ -1261,6 +1276,7 @@ function mount(root, opts) {
     const o = D.ITEMS[save.equip.outfit];
     if (o && o.color) base.shirt = o.color;
     if (save.equip.hat === 'helmet') base.hat = 0xf2b134;
+    if (save.fun && save.fun.king) { base.crown = true; base.hat = null; }
     return base;
   }
   G.playerLook = playerLook;
@@ -1271,6 +1287,7 @@ function mount(root, opts) {
     const v = id ? D.VEHICLES[id] : null;
     W.setRide(v ? Object.assign({}, v, { kind: RIDE_KIND[id] }) : { mode: 'foot', walk: D.WALK.walk, run: D.WALK.run, jump: 8.5, radius: 0.4 });
     refreshFollowers();
+    if (G.fun) G.fun.rideChanged();
     dirty();
   }
   G.setRide = setRide;
@@ -1773,6 +1790,7 @@ function mount(root, opts) {
       }
       const earned = Math.round((save.counters.earned || 0) - (save.counters.earnedAtDay || 0));
       save.counters.earnedAtDay = save.counters.earned || 0;
+      if (G.fun) G.fun.newDay(parts);
       if (earned > 0) parts.unshift('earned ' + fmt$(earned));
       U.banner('☀️ Day ' + save.day, parts.join(' · ') || 'A brand new day in the neighbourhood.', 'day');
       save.jobs = { day: 0, list: [] };
@@ -1836,6 +1854,9 @@ function mount(root, opts) {
     let best = null, bd = 3.6;
     for (const a of rt.actors.values()) { const d = Math.hypot(a.x - p.x, a.z - p.z); if (d < bd) { bd = d; best = a; } }
     if (best) return { t: '💬 Talk to ' + (best.who === 'boss' ? CREW[turfCrew(best.turf)].boss : D.CAST[best.who].n), fn: () => talkTo(best) };
+    // street folk, sweethearts, a flash mob (cft-fun.js)
+    const fi = G.fun && G.fun.interaction(p);
+    if (fi) return fi;
     // posters
     for (const id of Object.keys(save.turf)) {
       const t = save.turf[id];
@@ -1857,6 +1878,8 @@ function mount(root, opts) {
     for (const q of G.allPlaces()) { const d = Math.hypot(q.pin.x - p.x, q.pin.z - p.z); if (d < pd) { pd = d; pl = q; } }
     if (pl) {
       if (pl.kind === 'metro') visitMetro(pl);
+      const gate = G.fun && G.fun.shopGate(pl); // a made-up shop that banned you after a prank
+      if (gate) return gate;
       const k = D.KINDS[pl.kind];
       if (pl.kind === 'metro') return { t: '🚇 Ride the metro', fn: () => U.metroPanel(pl) };
       if (pl.kind === 'bank') return { t: '🏦 ' + (pl.name || 'Bank'), fn: () => U.bankPanel(pl) };
@@ -1866,7 +1889,11 @@ function mount(root, opts) {
     for (const f of rt.followers) { if (D.CAST[f.who] && !D.CAST[f.who].animal && Math.hypot(f.obj.position.x - p.x, f.obj.position.z - p.z) < 2.6) { const fw = f.who; return { t: '💬 Talk to ' + D.CAST[fw].n, fn: () => talkTo({ who: fw, open: G.openMissions().filter(id => getM(id).giver === fw), active: G.activeMissions().filter(id => { const s = curStep(id); return s && s.who === fw && s.do === 'talk'; }) }) }; } }
     // people on the street
     const ped = W.nearestPed(p.x, p.z, 2.6);
-    if (ped && rt.chatCooldown <= 0) return { t: '💬 Say hi', fn: () => chatPed(ped) };
+    if (ped && rt.chatCooldown <= 0) {
+      const survey = G.activeMissions().some(id => { const s = curStep(id); return s && s.do === 'chat'; });
+      if (!G.fun || survey) return { t: '💬 Say hi', fn: () => chatPed(ped) };
+      return { t: '💬 Talk to a stranger', fn: () => G.fun.pedMenu(ped) };
+    }
     return null;
   }
   function chatPed(ped) {
@@ -1885,6 +1912,8 @@ function mount(root, opts) {
     dirty();
   }
   G.peek = () => findInteraction();
+  G.attack = () => (G.fun && state === 'play' ? G.fun.attack() : false);
+  G.chatPed = chatPed;
   G.interact = function () { if (rt.busy || U.isOpen() || state !== 'play') return; const it = findInteraction(); rt.interact = it; if (it) it.fn(); };
 
   // ------------------------------------------------------------------ the beam over the tracked goal
@@ -1963,7 +1992,7 @@ function mount(root, opts) {
       accrue(dt);
       if (save.clock >= 24) newDay();
       const running = W.player.running && !save.equip.ride;
-      save.energy = clamp(save.energy - (running ? 1.3 : 0.035) * dt, 0, G.maxEnergy());
+      save.energy = clamp(save.energy - (running ? 0.85 : 0.035) * dt, 0, G.maxEnergy());
       W.noRun = save.energy <= 0 && !save.equip.ride;
       if (save.energy <= 0 && !rt.tiredNote) { rt.tiredNote = 1; U.toast('😮‍💨 Out of energy! Grab a coffee ☕ or something to eat.'); }
       if (save.energy > 10) rt.tiredNote = 0;
@@ -1981,6 +2010,7 @@ function mount(root, opts) {
     updateChase(dt);
     updateTurf(dt);
     updateSigns();
+    if (G.fun) G.fun.tick(dt, paused || rt.busy);
     rt.promptTimer -= dt;
     if (rt.promptTimer <= 0) { rt.promptTimer = 0.15; rt.interact = (paused || rt.busy) ? null : findInteraction(); U.prompt(rt.interact ? rt.interact.t : null); }
     // goal beam + arrow
@@ -2014,6 +2044,20 @@ function mount(root, opts) {
     const q = save.settings.quality === 'auto' ? (opts.quality || (matchMedia('(pointer: coarse)').matches ? 'low' : 'high')) : save.settings.quality;
     W = G.W = window.CFTWorld.create({ canvas: U.canvas, quality: q });
     W.touchUI.joy = U.joy; W.touchUI.knob = U.knob;
+    // made-up shops in real buildings (the same building always gets the same shop) and the signs on every place
+    const mixTotal = D.SHOP_MIX.reduce((a, m) => a + m[1], 0);
+    W.makeShop = seed => {
+      let r = hash(seed + 11) * mixTotal, kind = D.SHOP_MIX[0][0];
+      for (const m of D.SHOP_MIX) { if (r < m[1]) { kind = m[0]; break; } r -= m[1]; }
+      return { kind, name: D.shopName(kind, hash(seed + 23)) };
+    };
+    W.signList = () => G.allPlaces();
+    W.signInfo = pl => {
+      const k = D.KINDS[pl.kind];
+      if (!k) return null;
+      for (const id of Object.keys(save.biz)) if (dist(xz(save.biz[id]), pl.pin) < 16) return null; // your own sign hangs there
+      return { e: k.e, name: pl.name || k.n, col: D.SIGN_COLS[pl.kind] || '#6b4eff' };
+    };
     W.setOrigin(save.home.lat, save.home.lon);
     W.setLook(playerLook());
     setRide(save.equip.ride || null);
@@ -2039,6 +2083,8 @@ function mount(root, opts) {
     W.player.footMoved = save.walked || 0;
     placeHomeFlag();
     for (const id of Object.keys(save.biz)) buildBizSign(id);
+    if (window.CFTFun) G.fun = window.CFTFun.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, chatPed, setBusy: v => { rt.busy = !!v; } });
+    W.setLook(playerLook());
     refreshAvailability();
     refreshFollowers();
     for (const id of G.activeMissions()) if (save.m[id].p === undefined) beginStep(id);
@@ -2079,6 +2125,7 @@ function mount(root, opts) {
       if (save && state === 'play') doSave('exit');
       alive = false;
       if (window.ArkMusic) window.ArkMusic.stop();
+      if (G.fun) G.fun.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();
       U.destroy();
