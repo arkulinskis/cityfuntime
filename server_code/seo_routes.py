@@ -34,13 +34,15 @@ SEO = {
  "audience": "Players who want a life-sim adventure set in their own neighbourhood",
  "about": [
   "City Fun Time is a life-simulation game on your real streets. Type your address and the neighbourhood around it is rebuilt in 3D from OpenStreetMap: real buildings, streets, parks, hills, house numbers and shop names, filled with people walking dogs, traffic and pigeons.",
-  "You arrive with $20 and a backpack, crash on Cousin Max's couch and work your way up: errands, odd jobs, a lemonade stand, friends, love, a wedding, kids, fifteen businesses, a penthouse and every block won back from the crews. 155 missions, played at real places near you."
+  "You arrive with $20 and a backpack, crash on Cousin Max's couch and work your way up: errands, odd jobs, a lemonade stand, friends, love, a wedding, kids, fifteen businesses, a penthouse and every block won back from the crews. 165 missions, played at real places near you. After dark, cartoon monsters come out and you bonk them with a baguette."
  ],
  "features": [
   "Any address rebuilt in 3D from OpenStreetMap, with real hills from Mapterhorn elevation data",
-  "155 missions: 85 story missions in 9 chapters, plus side jobs",
+  "Traffic lights, shop signs on every place, street lamps, parked cars, busy pavements",
+  "165 missions: 85 story missions in 9 chapters, plus side stories and odd jobs",
   "Friends, love, a family and fifteen businesses",
-  "An album of 78 stickers and photo missions",
+  "Street life: cartoon monsters at night, silly weapons, flirting, street folk to help, pranks on made-up shops, random street events",
+  "An album of 84 stickers and photo missions",
   "Leaderboards for net worth, level, blocks and missions",
   "Play as a guest; saves stay in the browser"
  ],
@@ -55,11 +57,11 @@ SEO = {
   ],
   [
    "How long is the game?",
-   "There are 155 missions: 85 story missions in nine chapters plus side missions."
+   "There are 165 missions: 85 story missions in nine chapters plus side missions."
   ]
  ],
  "site": "https://city-fun-time.anvil.app",
- "updated": "2026-11-09",
+ "updated": "2026-11-11",
  "icon": "icon-512.png",
  "colors": {
   "bg": "#6b4eff",
@@ -133,6 +135,8 @@ def llms_txt(o):
             out += ["### %s" % q, "", a, ""]
     out += ["## Links", "", "- [Open %s](%s/)" % (s["name"], o), "- [About %s](%s/about)" % (s["name"], o),
             "- Made by [Arkvital](https://arkvital.com), Montreal, Canada (arkvital@outlook.com)", ""]
+    if s.get("pages"):  # more pages worth reading: [title, path]
+        out += ["## Pages", ""] + ["- [%s](%s%s)" % (n, o, p) for n, p in s["pages"]] + [""]
     if s.get("keywords"):
         out += ["Keywords: %s" % ", ".join(s["keywords"]), ""]
     return "\n".join(out)
@@ -152,10 +156,15 @@ def _ld(o):
         app["availableChannel"] = {"@type": "ServiceChannel", "serviceUrl": o + "/", "name": "Web browser",
                                    "availableLanguage": s.get("lang", "en")}
         del app["inLanguage"], app["publisher"], app["keywords"]
+    site_id = o + "/#site"
     if app["@type"] == "ProfessionalService":
-        # an Organization: knowsLanguage, not inLanguage (a CreativeWork field)
-        app["knowsLanguage"] = app.pop("inLanguage")
-        del app["publisher"]
+        # an Organization: knowsLanguage, not inLanguage (a CreativeWork field). The business itself, so it uses
+        # the same @ids as the hand-made home-page JSON-LD (#org, #website): one entity across the site.
+        app["knowsLanguage"] = s.get("languages", app.pop("inLanguage"))
+        app.pop("inLanguage", None)
+        app["@id"] = o + "/#org"
+        del app["publisher"], app["keywords"]
+        site_id = o + "/#website"
     if app["@type"] in ("WebApplication", "VideoGame"):
         app["applicationCategory"] = s.get("category", "WebApplication")
         app["operatingSystem"] = "Any (web browser)"
@@ -169,9 +178,10 @@ def _ld(o):
     if s.get("audience") and app["@type"] != "ProfessionalService":
         app["audience"] = {"@type": "Audience", "audienceType": s["audience"]}
     page = {"@type": "AboutPage", "@id": o + "/about#page", "url": o + "/about", "name": "About " + s["name"],
-            "about": {"@id": o + "/#app"}, "isPartOf": {"@id": o + "/#site"}}
-    graph = [app, page, {"@type": "WebSite", "@id": o + "/#site", "url": o + "/", "name": s["name"],
-                         "publisher": {"@id": "https://arkvital.com/#org"}},
+            "about": {"@id": app["@id"]}, "isPartOf": {"@id": site_id}}
+    graph = [app, page, {"@type": "WebSite", "@id": site_id, "url": o + "/", "name": s["name"],
+                         "publisher": {"@id": app["@id"] if app["@type"] == "ProfessionalService"
+                                       else "https://arkvital.com/#org"}},
              {"@type": "Organization", "@id": "https://arkvital.com/#org", "name": "Arkvital", "url": "https://arkvital.com",
               "email": "arkvital@outlook.com", "address": {"@type": "PostalAddress", "addressLocality": "Montreal",
                                                            "addressRegion": "QC", "addressCountry": "CA"}}]
