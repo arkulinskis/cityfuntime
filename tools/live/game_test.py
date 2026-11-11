@@ -1,8 +1,10 @@
 """Plays the 3D game in headless Chrome (software WebGL) and prints PASS/FAIL lines. Needs internet (real map tiles).
 
-    python -I tools/live/game_test.py [OUTDIR]            the whole game: gametest.js (missions, shops, turf...) then funtest.js
+    python -I tools/live/game_test.py [OUTDIR]            the whole game: gametest.js (missions, shops, turf...), funtest.js, rpgtest.js
     python -I tools/live/game_test.py --fun [OUTDIR]      only funtest.js (monsters, weapons, strangers, street folk, pranks, events)
+    python -I tools/live/game_test.py --rpg [OUTDIR]      only rpgtest.js (loot, talents, rested XP, discovery, reputation, achievements, rares)
     python -I tools/live/game_test.py --shots [OUTDIR]    no tests: screenshots of the city by day, at dusk and at night
+    python -I tools/live/game_test.py --long [OUTDIR]     no tests: the Character / Reputation / Achievements apps, a Legendary drop, a rare monster, a level-up
     python -I tools/live/game_test.py --people [OUTDIR]   no tests: close-ups of the characters (you, passers-by in poses, the look editor)
     python -I tools/live/game_test.py --eval FILE.js [OUTDIR]   start a game, run FILE.js in the page, print what it returns
 
@@ -93,17 +95,40 @@ PEOPLE = (
     + scene("p6-run", "G.ui.closeAll(); W.showOff = false; W.controls.enabled = true; W.cam.dist = W.cam.cur = 5; W.cam.pitch = 0.18; W.cam.yaw += 2.4; W.input.f = 1; W.input.sprint = true; s.energy = 100;", 40)
 )
 
+# The long game: the Character, Reputation and Achievements apps, a Legendary drop with its beam, a rare monster.
+LONG_SETUP = ("s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11; s.money = 900; s.xp = G.xpAt(14) + 40; const R = G.rpg;"
+              "['pinch', 'pinch', 'haggle', 'side', 'side', 'side', 'study', 'feet', 'feet', 'hands', 'smooth', 'smooth', 'dress'].forEach(id => R.learn(id));"
+              "for (let q of [3, 2, 4, 0, 1, 2, 0, 3]) R.add(R.make(q, 14), 'test'); s.counters.bonks = 140; s.counters.helped = 30; s.counters.flirts = 20; s.counters.spent = 1500;"
+              "s.rpg.rested = 260; R.questDone(G.D.MISSIONS.find(x => x.ch === 4)); G.stepSim(130);"
+              "const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 11) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.2;")
+LONG = (
+    scene("l1-character", LONG_SETUP + " G.ui.phone('hero');", 40, 2500)
+    + scene("l2-talents", "G.ui.phone('hero'); const b = document.querySelector('[data-pbody]'); const t = b.querySelector('.cft-branch'); if (t) b.scrollTop = t.offsetTop - 20;", 3, 1500)
+    + scene("l3-reputation", "G.ui.phone('rep');", 3, 1500)
+    + scene("l4-achievements", "G.ui.phone('ach');", 3, 1500)
+    + scene("l5-legendary", "G.ui.closeAll(); W.cam.dist = W.cam.cur = 7; G.rpg.add(G.rpg.make(5, 15), 'test');", 8, 700)
+    + scene("l6-rare", "G.ui.closeAll(); window.CFT_TEST.calm = false; const m = G.rpg.spawnRare(G.D.RPG.RARES[1]); window.CFT_TEST.calm = true; if (m) look(m.x, m.z, 6, 0.15);", 6, 900)
+    + scene("l7-levelup", "G.ui.closeAll(); for (const m of G.fun.monsters) m.t = 9999; G.addXp(G.xpAt(G.level() + 1) - s.xp + 5, 'quest'); W.cam.dist = W.cam.cur = 8; W.cam.pitch = 0.25;", 6, 600)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
 elif "--shots" in flags:
     steps = START + SCENES
 elif "--people" in flags:
     steps = START + PEOPLE
+elif "--long" in flags:
+    steps = START + LONG
 else:
     steps = START + [{"shot": "start"}]
-    if "--fun" not in flags:
-        steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
-    steps += script("funtest.js", "__funDone", "__funOut", 500000)
+    if "--rpg" in flags:
+        steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
+    else:
+        if "--fun" not in flags:
+            steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
+        steps += script("funtest.js", "__funDone", "__funOut", 500000)
+        if "--fun" not in flags:
+            steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"
@@ -120,13 +145,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--people" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--people" in flags or "--long" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--people" in flags or evalfile:
+if "--shots" in flags or "--people" in flags or "--long" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

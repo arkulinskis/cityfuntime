@@ -56,6 +56,23 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
   jeans with the backpack you arrived with; outfits, shoes, headphones and the helmet from the shops show on you. Change skin,
   hair colour, hair style, glasses, beard and backpack any time: phone → Settings (or Me) → **Change your look**, with your
   character turning to face you.
+- **The long game** (after what kept people in World of Warcraft; the phone's Character, Reputation and Achievements apps):
+  - **Loot in rarity colours:** charms in Junk grey, Common, Uncommon green, Rare blue, Epic purple and Legendary orange, with
+    random stats (and a perk on Epic and Legendary), from monsters (about one in five), treasure chests, mystery crates and
+    missions. Three charm slots, a 30-slot bag, "Sell junk", a green ▲ on anything better than what you wear, and a pity timer
+    (a Rare at least every 25 drops). Rare+ drops get a coloured banner; Epic and Legendary a beam of light.
+  - **Talents:** a point every level (tap the ⭐ level chip), three branches of eight (Hustler, Charmer, Brawler), tiers that
+    open after three points, a big fifth-tier talent each; reset free once, then $10 × level.
+  - **Reputation** with five neighbourhood factions (Shopkeepers' Guild, Night Watch, Street Folk, Hearts Club, Street Crews),
+    earned from what you already do; Neutral → Friendly → Honored → Revered → Exalted, a reward at each tier, a title and a
+    Legendary charm at Exalted. Pranks cost standing with the shopkeepers.
+  - **50 achievements** with points, a golden banner, and **titles** to wear ("Robin, the Monster Hunter").
+  - **Rested XP:** time away (4% of a level per hour, up to 1.5 levels) and sleeping at home double the XP from monsters,
+    pickups and jobs (not missions); the blue part ahead of the XP bar.
+  - **Discovery:** XP for every new street and block; each new block hides a treasure chest 🧰.
+  - **Rare monsters:** eight named ones with silver name tags (Gutterbeard the Bin King, Countess Slimeula...), four times the
+    hit points, guaranteed Rare loot. **Mission rewards:** chapter 2 onwards, choose one of three charms (✨ by your level).
+    A golden beam and the list of what opened when you level up.
 - **Made-up shops and signs:** besides the real places from the map, about one building in four along the streets holds a
   made-up shop (26 kinds, generated names, always the same shop in the same building). Every place, real or made-up, has a
   sign on its wall in its kind's colour, a striped awning and a round blade sign.
@@ -153,6 +170,7 @@ node tools/live/content_check.mjs                # missions, items, weapons, mon
 python -I tools/live/game_test.py                # plays the 3D game for real (needs internet): missions, then street life
 python -I tools/live/game_test.py --shots DIR    # pictures of the city by day, at dusk and at night
 python -I tools/live/game_test.py --people DIR   # close-ups of the characters: you, passers-by in poses, the look editor
+python -I tools/live/game_test.py --long DIR     # the Character / Reputation / Achievements apps, a Legendary drop, a rare monster
 git push origin master                           # the deploy: Anvil pulls master
 ```
 
@@ -162,6 +180,7 @@ git push origin master                           # the deploy: Anvil pulls maste
 theme/assets/cft-content.js   ALL the game content: stats, pickups, place kinds, items, weapons, rides, homes, businesses, crews, stickers,
                               cast, missions, monsters, street folk, flirting lines, pranks, street events, shop names and sign colours
 theme/assets/cft-game.js      the rules: saves, missions engine, pickups, people, shops, homes, businesses, turf, time, interaction
+theme/assets/cft-rpg.js       the long game: loot, talents, reputation, achievements, titles, rested XP, discovery, rare monsters
 theme/assets/cft-fun.js       street life: monsters + weapons, strangers and sweethearts, street folk and the crown, pranks and chasers,
                               banana peels, trampolines, street events
 theme/assets/cft-ui.js        HUD, dialogue, choices, phone apps, shop/business/home/bank/metro panels, dance-off, quiz, start screen

@@ -176,6 +176,31 @@ the mouse captured), `newDay(parts)`, `markers(list)` (minimap), `summary()` (th
 - **Tests:** `window.CFT_TEST.calm = true` stops everything that starts by itself (night spawns, events, folk walking over,
   rival chases); gametest.js runs calm, funtest.js switches it off where it needs to.
 
+## The long game (cft-rpg.js, 2026-11-11: "what made World of Warcraft addictive? apply it")
+
+`G.rpg = CFTRpg.attach(G, {spawnPickup})` (after G.fun). Data `D.RPG` (end of cft-content.js); state `save.rpg` {rested, loot[],
+eq {c1, c2, c3}, tal {}, rep {}, seen {}, ach {}, title, titles[], streets[], blocks[], pending[], pity, n, rares {}, grants {}}.
+- **The principles applied** (and the ones left out on purpose): goals at every timescale (next pickup, step, level, tier,
+  title); unpredictable rewards with a floor (rarity rolls + a pity timer); visible numbers going up (stats on charms, XP bar,
+  rep bars); choice and identity (talents, titles, reward picks); discovery rewarded (streets, blocks, chests); rare surprises
+  (named rares, events); being seen (titles, leaderboard); **rested XP as a reward for breaks**. Left out: anything that
+  punishes absence (no streaks, no decaying rewards except sweethearts' slow fade), timed fear-of-missing-out, raids that need a
+  schedule, pay-to-skip. Keep it that way.
+- **One bonus aggregator:** `R.bonus(key)` = talents + equipped charms (`stat_<id>` and perks) + faction tier rewards, cached 2 s
+  (`R.mark()` after changes). Keys: stat_fit/charm/smarts/style/cred, coin, discount, income, turf, xp, monsterXp, loot, interest,
+  sell, rep, flirt, happy, fade, forgive, tips, dmg, crit, speed, steal, drain, rare. The game reads them at marked places
+  (stat(), G.discount, G.incomeMul, G.turfIncome, speedMul, happyTarget, savings interest, energy drain, coin pickups) and
+  street life reads dmg/crit (`R.modWeapon` in attack), steal, flirt, fade, forgive.
+- **XP sources:** `addXp(n, src)`: 'quest' (mission rewards: never doubled by rest), 'monster', 'explore', or none.
+- **Reputation reads counters**: `repTick` compares `save.counters` with `rep.seen` every second, so any new counter can feed a
+  faction by adding it to that faction's `gain`. The first run counts earlier play quietly.
+- **Achievements** are data: `{k, c}` = a counter or a special from `val(k)` reaches c. Titles come from achievements and Exalted.
+- **Loot:** `R.drop(source)` (SOURCES: monster, pigeon, rare, boss, chest, crate, quest), `R.make(q, itemLevel, opts)`, `R.add`.
+  Stat budget `(0.5 + il × 0.11) × quality multiplier`. Bag 30: full = the worst unworn item is sold.
+- **Rares:** `R.spawnRare(entry)` through `G.fun.spawnMonster` with an overriding `def` (`def.rare`); `R.onKill(m)` from
+  hitMonster. 5% chance every 15 s when none is out (doubled by Legend of the Night).
+- Tests: `tools/live/rpgtest.js` (`game_test.py --rpg`; also runs last in the full test). Pictures: `--long DIR`.
+
 ## Recipes
 
 - **New page:** copy a similar `client_code/Pages/<Name>/`, register it in `client_code/router.py`; new field on Life / Quests /
@@ -192,6 +217,8 @@ the mouse captured), `newDay(parts)`, `markers(list)` (minimap), `summary()` (th
   its name in content_check.mjs `MESHES`. **New monster:** `D.MONSTERS` + a branch in `W.monster` / `W.animateMonster`.
 - **New place kind:** `D.KINDS` (+ `D.SIGN_COLS`, + the mapping in cft-tiles.js for real places, or `D.SHOP_MIX` + `NAME_B` for made-up ones).
 - **New street event:** `D.EVENTS` + a branch in `startEvent` and `updateEvent` (+ its id in content_check.mjs).
+- **New achievement / faction / talent / rare:** an entry in `D.RPG.ACH` / `FACTIONS` / `TALENTS` / `RARES`; a new bonus key
+  also needs reading where it applies. **New loot source:** `D.RPG.SOURCES` + a `G.rpg.drop('name')` call.
 - **New street person:** `D.STREETFOLK` ({id, n, e, hi, story[2], look}); props per persona in `spawnFolk`.
 - **Balance:** prices in ITEMS, BUSINESSES income/cost, mission rewards, `D.MONSTERS` (speed below `D.WALK.run`: the content
   check insists), chaser speed in `updateChasers`, event pace `eventT`, spawn counts in cft-world.js `life`.

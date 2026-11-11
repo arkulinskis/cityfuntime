@@ -1,6 +1,7 @@
 /* City Fun Time: the game. Rules, saves, missions, pickups, people, homes, businesses, turf, time.
    Uses CFT_DATA (cft-content.js), CFTWorld (cft-world.js, the 3D city), CFTUI (cft-ui.js, HUD + menus) and CFTFun
-   (cft-fun.js: monsters, weapons, strangers, street folk, pranks, street events; G.fun once the world is loaded).
+   (cft-fun.js: monsters, weapons, strangers, street folk, pranks, street events; G.fun once the world is loaded) and CFTRpg
+   (cft-rpg.js: loot, talents, reputation, achievements, titles, rested XP, discovery, rare monsters; G.rpg).
 
    CFTGame.mount(root, {save, me, onSave(save), onPhoto(url, meta), onExit(), quality}) -> {destroy, G}
    CFTGame.summary(save) / missionBoard(save) / newSave / levelOf / xpAt: also used by the pages (no three.js needed). */
@@ -163,16 +164,17 @@ function mount(root, opts) {
     let v = save.stats[id] || 0;
     for (const slot of Object.keys(save.equip)) { const it = D.ITEMS[save.equip[slot]]; if (it && it.stats && it.stats[id] && slot !== 'ride') v += it.stats[id]; }
     for (const s of D.STICKER_SETS) if (s.bonus.stats && s.bonus.stats[id] && setDone(s.id)) v += s.bonus.stats[id];
+    if (G.rpg) v += G.rpg.bonus('stat_' + id);  // charms, talents, faction rewards
     for (const id2 of Object.keys(save.owned)) { const it = D.ITEMS[id2]; if (it && it.type === 'furniture' && it.stats && it.stats[id]) v += it.stats[id]; }
     return v;
   }
   G.stat = stat;
   G.level = () => levelOf(save.xp);
   G.maxEnergy = () => 100 + Math.floor(stat('fit')) * 2 + (save.maxE || 0) + setBonus('energy') + (isFriend('kim') ? 10 : 0);
-  G.discount = () => Math.min(0.25, stat('style') * 0.006);
+  G.discount = () => Math.min(0.4, Math.min(0.25, stat('style') * 0.006) + (G.rpg ? G.rpg.bonus('discount') : 0));
   G.relMul = () => 1 + stat('charm') * 0.03;
   G.happyMul = () => 0.8 + save.happy / 250;
-  G.incomeMul = id => (1 + stat('smarts') * 0.02) * G.happyMul() * (1 + setBonus('income') + (isFriend('priya') ? 0.1 : 0) + (isFriend('tomas') && FOOD_BIZ.has(id) ? 0.15 : 0));
+  G.incomeMul = id => (1 + stat('smarts') * 0.02) * G.happyMul() * (1 + setBonus('income') + (isFriend('priya') ? 0.1 : 0) + (isFriend('tomas') && FOOD_BIZ.has(id) ? 0.15 : 0) + (G.rpg ? G.rpg.bonus('income') : 0));
   G.xpMul = () => 1 + stat('smarts') * 0.01 + setBonus('xp') + (isFriend('okafor') ? 0.1 : 0);
   G.foodMul = () => 1 + setBonus('food') + (isFriend('benny') ? 0.2 : 0);
   G.priceOf = id => {
@@ -188,6 +190,7 @@ function mount(root, opts) {
     else if (isFriend('kai')) m += 0.05;
     if (save.energy <= 0 && !ride) m *= 0.8;
     if (G.fun) m *= G.fun.speedMul();
+    if (G.rpg) m *= 1 + G.rpg.bonus('speed');
     return m;
   }
   G.happyTarget = function () {
@@ -195,7 +198,7 @@ function mount(root, opts) {
     let furn = 0;
     for (const id of Object.keys(save.owned)) { const it = D.ITEMS[id]; if (it && (it.type === 'furniture') && it.happy) furn += it.happy; }
     const t = 35 + apt.happy + Math.min(25, furn) + (save.partner ? 8 : 0) + (save.married ? 6 : 0) + save.kids.length * 6 +
-      Math.min(10, Object.keys(save.friends).length * 2) + save.pets.length * (isFriend('ollie') ? 6 : 4) + setBonus('happy') + (G.fun ? G.fun.happyBonus() : 0);
+      Math.min(10, Object.keys(save.friends).length * 2) + save.pets.length * (isFriend('ollie') ? 6 : 4) + setBonus('happy') + (G.fun ? G.fun.happyBonus() : 0) + (G.rpg ? G.rpg.bonus('happy') : 0);
     return clamp(t, 0, 100);
   };
 
@@ -209,13 +212,17 @@ function mount(root, opts) {
     U.hud.bump('money');
     dirty();
   }
-  function addXp(n) {
+  // src: 'quest' (mission rewards: never doubled by rest, as in WoW), 'monster', 'explore', or nothing (pickups, jobs...)
+  function addXp(n, src) {
     const before = levelOf(save.xp);
-    save.xp += Math.round(n * G.xpMul());
+    let gain = Math.round(n * G.xpMul() * (G.rpg ? G.rpg.xpMul(src) : 1));
+    if (G.rpg && src !== 'quest') gain += G.rpg.rested(gain);
+    save.xp += gain;
     const after = levelOf(save.xp);
     if (after > before) {
       G.sfx.level();
-      U.banner('Level ' + after + '!', 'You\'re getting better at city life.', 'level');
+      U.banner('Level ' + after + '!', G.rpg ? G.rpg.levelText(after) : 'You\'re getting better at city life.', 'level');
+      if (G.rpg) G.rpg.onLevel(after);
       log('Reached level ' + after, '⭐');
       save.energy = G.maxEnergy();
     }
@@ -269,7 +276,7 @@ function mount(root, opts) {
   function applyReward(r, title) {
     const parts = [];
     if (r.money) { addMoney(r.money); parts.push('💵 ' + fmt$(r.money)); }
-    if (r.xp) { addXp(r.xp); parts.push('⭐ ' + Math.round(r.xp * G.xpMul()) + ' XP'); }
+    if (r.xp) { addXp(r.xp, 'quest'); parts.push('⭐ ' + Math.round(r.xp * G.xpMul()) + ' XP'); }
     for (const k of Object.keys(r.stats || {})) { addStat(k, r.stats[k], true); const st = D.STATS.find(s => s.id === k); parts.push(st.e + ' +' + r.stats[k] + ' ' + st.name); }
     for (const k of Object.keys(r.items || {})) { giveItem(k, r.items[k]); if (r.items[k] > 0) parts.push(D.ITEMS[k].e + ' ' + D.ITEMS[k].n); }
     for (const k of Object.keys(r.rel || {})) { addRel(k, r.rel[k]); parts.push('❤️ ' + D.CAST[k].n); }
@@ -588,6 +595,7 @@ function mount(root, opts) {
     ms.s = 'done'; ms.done = save.day;
     G.sfx.done();
     const parts = applyReward(m.reward || {}, m.title);
+    if (G.rpg && MISSION[id]) G.rpg.questDone(m);  // a reward to choose from three
     if (MISSION[id]) bump('missions'); else bump('jobs');
     if (m.rush && !m.steps.some(x => x.do === 'deliver')) bump('rush');
     log('Completed: ' + m.title, '🏆');
@@ -971,7 +979,7 @@ function mount(root, opts) {
     mesh.position.set(x, gy + 1.15, z);
     W.scene.add(mesh);
     let beam = null;
-    if (mission || type === 'gem' || type === 'pack' || type === 'cash') {
+    if (mission || type === 'gem' || type === 'pack' || type === 'cash' || D.PICKUPS[type].beam) {
       beam = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, mission ? 70 : 30, 8, 1, true).translate(0, mission ? 35 : 15, 0),
         new THREE.MeshBasicMaterial({ color: mission ? 0xff5c8a : 0xffd84a, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending }));
       beam.position.set(x, gy, z);
@@ -1042,7 +1050,8 @@ function mount(root, opts) {
       return;
     }
     for (const id of G.activeMissions()) { const s = curStep(id); if (s && s.do === 'collect' && s.what === k.type && !save.m[id].items) save.m[id].p++; }
-    if (pk.money) { const amt = Math.round(rnd(pk.money[0], pk.money[1]) * (1 + G.level() * 0.06)); save.money += amt; bump('coins', k.type === 'coin' ? 1 : 0); U.feed(pk.e, '+' + fmt$(amt)); U.hud.bump('money'); G.sfx.coin(); }
+    if (pk.loot) { bump('chests'); if (G.rpg) G.rpg.drop('chest'); }
+    if (pk.money) { const amt = Math.round(rnd(pk.money[0], pk.money[1]) * (1 + G.level() * 0.06) * (1 + (G.rpg ? G.rpg.bonus('coin') : 0))); save.money += amt; bump('coins', k.type === 'coin' ? 1 : 0); U.feed(pk.e, '+' + fmt$(amt)); U.hud.bump('money'); G.sfx.coin(); }
     if (pk.energy) { addEnergy(pk.energy * G.foodMul()); U.feed(pk.e, '+' + Math.round(pk.energy * G.foodMul()) + ' ⚡'); G.sfx.pick(); }
     if (pk.stat) { addStat(pk.stat, 0.25); G.sfx.pick(); }
     if (pk.item) giveItem(pk.item, 1);
@@ -1513,7 +1522,7 @@ function mount(root, opts) {
   G.turfRing = turfRing;
   function turfCrew(id) { if (id === '0_0') return 'grannies'; const { i, j } = turfIJ(id); return D.CREWS[Math.floor(hash(i * 7349 + j * 9157 + 11) * D.CREWS.length)].id; }
   G.turfCrew = turfCrew;
-  G.turfIncome = () => Object.keys(save.turf).filter(t => save.turf[t].own).reduce((a, t) => a + (15 + 10 * turfRing(t)) * (1 + stat('cred') * 0.02), 0);
+  G.turfIncome = () => Object.keys(save.turf).filter(t => save.turf[t].own).reduce((a, t) => a + (15 + 10 * turfRing(t)) * (1 + stat('cred') * 0.02), 0) * (1 + (G.rpg ? G.rpg.bonus('turf') : 0));
   G.turfNeed = id => 1 + turfRing(id) * 3;
   // A poster can be tagged only if the player can stand within reach (3.5 m) of it: free ground just outside the wall,
   // a clear straight walk from the street, and still close enough after the walls push the player out.
@@ -1788,7 +1797,7 @@ function mount(root, opts) {
         if (save.money >= rent) { save.money -= rent; parts.push('rent ' + fmt$(-rent)); }
         else { save.money = 0; addHappy(-10); parts.push('rent was late 😟'); log('Couldn\'t pay the rent', '😟'); }
       }
-      if (save.savings > 0) { const i = Math.round(save.savings * 0.01); save.savings += i; parts.push('interest +' + fmt$(i)); }
+      if (save.savings > 0) { const i = Math.round(save.savings * (0.01 + (G.rpg ? G.rpg.bonus('interest') : 0))); save.savings += i; parts.push('interest +' + fmt$(i)); }
       // rival tags expire into lost blocks
       for (const id of Object.keys(save.turf)) {
         const t = save.turf[id];
@@ -1814,6 +1823,7 @@ function mount(root, opts) {
     const h = save.clock;
     const until = 7, add = h < until ? until - h : 24 - h + until;
     await U.fade(() => { advanceClock(add); save.energy = G.maxEnergy(); addHappy(2); }, '😴 Zzz...');
+    if (G.rpg) G.rpg.onSleep();
     for (const id of G.activeMissions()) { const s = curStep(id); if (s && s.do === 'sleep') await completeStep(id); }
   }
   G.sleep = sleep;
@@ -2005,7 +2015,7 @@ function mount(root, opts) {
       accrue(dt);
       if (save.clock >= 24) newDay();
       const running = W.player.running && !save.equip.ride;
-      save.energy = clamp(save.energy - (running ? 0.85 : 0.035) * dt, 0, G.maxEnergy());
+      save.energy = clamp(save.energy - (running ? 0.85 * (1 - (G.rpg ? G.rpg.bonus('drain') : 0)) : 0.035) * dt, 0, G.maxEnergy());
       W.noRun = save.energy <= 0 && !save.equip.ride;
       if (save.energy <= 0 && !rt.tiredNote) { rt.tiredNote = 1; U.toast('😮‍💨 Out of energy! Grab a coffee ☕ or something to eat.'); }
       if (save.energy > 10) rt.tiredNote = 0;
@@ -2024,6 +2034,7 @@ function mount(root, opts) {
     updateTurf(dt);
     updateSigns();
     if (G.fun) G.fun.tick(dt, paused || rt.busy);
+    if (G.rpg) G.rpg.tick(dt, paused || rt.busy);
     rt.promptTimer -= dt;
     if (rt.promptTimer <= 0) { rt.promptTimer = 0.15; rt.interact = (paused || rt.busy) ? null : findInteraction(); U.prompt(rt.interact ? rt.interact.t : null); }
     // goal beam + arrow
@@ -2097,6 +2108,7 @@ function mount(root, opts) {
     placeHomeFlag();
     for (const id of Object.keys(save.biz)) buildBizSign(id);
     if (window.CFTFun) G.fun = window.CFTFun.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, chatPed, setBusy: v => { rt.busy = !!v; } });
+    if (window.CFTRpg) G.rpg = window.CFTRpg.attach(G, { spawnPickup });
     W.setLook(playerLook());
     refreshAvailability();
     refreshFollowers();
@@ -2104,6 +2116,7 @@ function mount(root, opts) {
     for (const id of G.activeMissions()) { const s = curStep(id); if (s && s.do === 'collect' && save.m[id].items) spawnMissionPickups(id); if (s && s.deadline) save.m[id].deadline = null; if (s && s.do === 'deliver' && s.time) save.m[id].deadline = rt.t + s.time; }
     updateBeam();
     // offline earnings from managed businesses
+    if (G.rpg) G.rpg.offline((Date.now() - (save.updated || Date.now())) / 60000);  // time away = rested XP
     const away = Math.min(480, (Date.now() - (save.updated || Date.now())) / 60000);
     let off = 0;
     if (away > 2) for (const id of Object.keys(save.biz)) if (save.biz[id].mgr) off += G.bizIncome(id) * away / 60;
@@ -2139,6 +2152,7 @@ function mount(root, opts) {
       alive = false;
       if (window.ArkMusic) window.ArkMusic.stop();
       if (G.fun) G.fun.destroy();
+      if (G.rpg) G.rpg.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();
       U.destroy();

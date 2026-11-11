@@ -97,7 +97,7 @@ function attach(G, api) {
   F.attack = function () {
     if (!alive || quiet() || cool > 0) return false;
     if (!onFoot()) { U.toast('Hop off your ride to bonk things (V).'); cool = 0.6; return false; }
-    const w = weapon(), p = P(), f = facing();
+    const w = G.rpg ? G.rpg.modWeapon(weapon()) : weapon(), p = P(), f = facing();
     cool = w.ranged === 'shot' ? 0.32 : 0.42;
     W.swing();
     G.sfx.swing();
@@ -171,6 +171,7 @@ function attach(G, api) {
     return m;
   }
   F.spawnMonster = spawnMonster;
+  F.streetSpot = (x, z, a, b) => streetSpot(x, z, a, b);
   function removeMonster(m, poof) {
     const i = F.monsters.indexOf(m);
     if (i >= 0) F.monsters.splice(i, 1);
@@ -195,7 +196,7 @@ function attach(G, api) {
     const n = Math.round(rnd(def.coins[0], def.coins[1]) / 2);
     for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r = 1.2 + Math.random() * 2.4; let cx = m.x + Math.cos(a) * r, cz = m.z + Math.sin(a) * r; if (W.heightAt(cx, cz)) { cx = m.x; cz = m.z; } api.spawnPickup(def.cash && i === 0 ? 'cash' : 'coin', cx, cz); }
     if (m.carry > 0) { save().money += m.carry; U.feed('💰', 'Got your ' + fmt$(m.carry) + ' back'); U.hud.bump('money'); }
-    G.addXp(def.xp);
+    G.addXp(def.xp, 'monster');
     G.addStat('cred', def.boss ? 0.5 : 0.05, true);
     U.feed(def.e, 'Bonked: ' + def.n + ' · +' + Math.round(def.xp * G.xpMul()) + ' XP');
     W.burst(m.x, y, m.z, '⭐', def.boss ? 16 : 7, { spread: 4, up: 5 });
@@ -208,6 +209,7 @@ function attach(G, api) {
     if (m.kind === 'goose') feat('goosed');
     const total = save().counters.bonks || 0, title = D.MONSTER_TITLES.find(t => t[0] === total);
     if (title && total > 1) U.banner('👾 ' + title[1], total + ' monsters bonked.', 'level');
+    if (G.rpg) G.rpg.onKill(m);  // loot
     removeMonster(m, true);
     G.dirty();
   }
@@ -270,7 +272,7 @@ function attach(G, api) {
   function touch(m) {
     const s = save(), p = P();
     m.grab = 1.6;
-    const amt = Math.min(Math.floor(s.money), Math.round(rnd(m.def.steal[0], m.def.steal[1])));
+    const amt = Math.min(Math.floor(s.money), Math.round(rnd(m.def.steal[0], m.def.steal[1]) * Math.max(0, 1 - (G.rpg ? G.rpg.bonus('steal') : 0))));
     if (amt > 0) { s.money -= amt; m.carry += amt; U.feed(m.def.e, m.def.n + ' grabbed ' + fmt$(amt) + '! Bonk it to get it back (F)'); U.hud.bump('money'); }
     else sayAt(m.obj, 'Pfffbt!', 1.5);
     W.pop(p.x, p.y + 2.4, p.z, m.kind === 'goose' ? 'HONK!' : 'YOINK!', '#ff5c8a');
@@ -315,7 +317,7 @@ function attach(G, api) {
     W.holdPed(ped, 6, null);
     sayAt(W.avatar, pick(D.FLIRT.lines), 3);
     const withPartner = s.partner && G.rt.followers.some(x => x.who === s.partner);
-    const chance = clamp(0.3 + G.stat('charm') * 0.035 + G.stat('style') * 0.015 + (s.happy - 50) / 400, 0.15, 0.92);
+    const chance = clamp(0.3 + G.stat('charm') * 0.035 + G.stat('style') * 0.015 + (s.happy - 50) / 400 + (G.rpg ? G.rpg.bonus('flirt') : 0), 0.15, 0.95);
     const yes = !withPartner && f.crushes.length < 12 && Math.random() < chance;
     later(2800, () => {
       if (!ped.obj.parent) return;
@@ -676,8 +678,8 @@ function attach(G, api) {
     const dd = Math.hypot(dx, dz) || 1;
     dx /= dd; dz /= dd;
     let kx = pl.pin.x + (pl.x - pl.pin.x) * 0.3, kz = pl.pin.z + (pl.z - pl.pin.z) * 0.3;
-    if (Math.hypot(kx - p.x, kz - p.z) < 5) { kx = p.x + dx * 5; kz = p.z + dz * 5; }
-    startKeeper(pl, { x: kx, z: kz, secs: 22, xp: pr.xp, ban: true, wait: 1.3 });
+    if (Math.hypot(kx - p.x, kz - p.z) < 8) { const q = streetSpot(p.x, p.z, 9, 13); if (q && Math.hypot(q.x - p.x, q.z - p.z) >= 7) { kx = q.x; kz = q.z; } else { kx = p.x + dx * 9; kz = p.z + dz * 9; } }  // never right on top of you
+    startKeeper(pl, { x: kx, z: kz, secs: 22, xp: pr.xp, ban: true, wait: 2 });
     feat('prankster');
   };
   function startKeeper(pl, o) {
@@ -688,7 +690,7 @@ function attach(G, api) {
         if (won) {
           api.bump('escapes'); G.addXp(o.xp || 15); G.addStat('cred', 0.1, true); G.sfx.done();
           U.feed('🏃', 'Lost them! ' + (o.ban ? pl.name + ' has banned you for 2 days.' : 'Too slow, shopkeeper.'));
-          if (o.ban) f.grudges[pl.id] = save().day + 2;
+          if (o.ban) f.grudges[pl.id] = save().day + (G.rpg && G.rpg.bonus('forgive') >= 1 ? 1 : 2);
         } else delete f.grudges[pl.id];
         G.dirty();
       } });
@@ -880,6 +882,7 @@ function attach(G, api) {
         const lv = G.level(), r = Math.random();
         const cash = Math.round(rnd(25, 60) * (1 + lv * 0.12));
         G.addMoney(cash, 'from the mystery crate');
+        if (G.rpg) G.rpg.drop('crate');
         if (r < 0.35 && !save().owned.w_chicken) { save().owned.w_chicken = true; save().equip.weapon = save().equip.weapon || 'w_chicken'; U.banner('🐔 A rubber chicken!', 'It was in the crate. It squeaks. Press F to bonk with it.', 'done'); }
         else if (r < 0.7) G.addSticker();
         else { G.giveItem('energybar', 2); U.feed('🍫', '2 energy bars'); }
@@ -939,7 +942,7 @@ function attach(G, api) {
     const f = fun(), p = P();
     for (const a of F.folk) out.push({ x: a.x, z: a.z, color: '#ff8a3d', r: 5, emoji: '🧡', ring: '#fff' });
     for (const c of f.crushes) { const q = G.xz(c); out.push({ x: q.x, z: q.z, color: '#ff5c8a', r: 5.5, emoji: '💕', ring: '#fff' }); }
-    for (const m of F.monsters) out.push({ x: m.x, z: m.z, color: m.def.boss ? '#9b5cf6' : '#35e06a', r: m.def.boss ? 8 : 4, emoji: m.def.boss ? '👑' : '', ring: '#1f1a3d', edge: !!m.def.boss });
+    for (const m of F.monsters) out.push({ x: m.x, z: m.z, color: m.def.boss ? '#9b5cf6' : m.def.rare ? '#d6dbe3' : '#35e06a', r: m.def.boss || m.def.rare ? 8 : 4, emoji: m.def.boss ? '👑' : m.def.rare ? '💀' : '', ring: '#1f1a3d', edge: !!(m.def.boss || m.def.rare) });
     for (const c of F.chasers) out.push({ x: c.x, z: c.z, color: '#ff3b30', r: 6, emoji: '💢', ring: '#fff', edge: true });
     for (const q of F.pads) out.push({ x: q.x, z: q.z, color: '#ff5c8a', r: 3.5, ring: '#1f1a3d' });
     for (const id of Object.keys(f.grudges)) { const pl = gplace[id] || (gplace[id] = W.places.find(x => x.id === id)); if (pl && f.grudges[id] > save().day && Math.hypot(pl.pin.x - p.x, pl.pin.z - p.z) < 500) out.push({ x: pl.pin.x, z: pl.pin.z, color: '#ffffff', r: 5.5, emoji: '💢', ring: '#ff3b30' }); }
@@ -953,7 +956,7 @@ function attach(G, api) {
     let gifts = 0;
     for (let i = f.crushes.length - 1; i >= 0; i--) {
       const c = f.crushes[i];
-      if (s.day - c.seen > 1) c.love -= 6;
+      if (s.day - c.seen > 1) c.love -= G.rpg && G.rpg.bonus('fade') >= 1 ? 3 : 6;
       if (c.love <= 0) { f.crushes.splice(i, 1); G.log(D.FLIRT.gone.replace('{n}', c.name), '💔'); parts.push('💔 ' + c.name + ' moved on'); continue; }
       if (c.love >= 55 && Math.random() < 0.4) gifts += Math.round(rnd(5, 14) * (1 + lv * 0.1));
     }

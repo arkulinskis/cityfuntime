@@ -195,6 +195,7 @@ window.__funOut = []; window.__funDone = false;
       // stay a few steps ahead for a while: the owner must be slower than your plain walking pace, every single second
       const walkSp = W.ride().walk * W.speedMul;
       let top = 0;
+      ok(Math.hypot(ch.x - pp.x, ch.z - pp.z) >= 6, 'the owner bursts out a few steps away (' + Math.hypot(ch.x - pp.x, ch.z - pp.z).toFixed(1) + ' m), not on top of you');
       sim(45);                                    // the head start while they shake a fist in the doorway
       for (let i = 0; i < 12 && F.chasers.length; i++) {
         const ahead = W.randomWalkSpot(ch.x, ch.z, 14, 24) || { x: ch.x + 16, z: ch.z };
@@ -202,6 +203,7 @@ window.__funOut = []; window.__funDone = false;
         const kx = ch.x, kz = ch.z; sim(30);
         top = Math.max(top, Math.hypot(ch.x - kx, ch.z - kz));
       }
+      info('chase state: chasers ' + F.chasers.length + (F.chasers[0] ? ' t ' + F.chasers[0].t.toFixed(1) + ' wait ' + F.chasers[0].wait.toFixed(2) + ' stun ' + F.chasers[0].stun.toFixed(2) : '') + ' busy ' + G.rt.busy + ' open ' + U.isOpen() + ' (' + [...document.querySelectorAll('.cft-ov')].map(o => o.className).join('|') + ') escapes ' + c('escapes') + ' caught ' + c('caught') + ' king ' + s.fun.king);
       ok(top > 1 && top < walkSp * 0.92, 'the owner runs at ' + top.toFixed(1) + ' m/s at most; you walk at ' + walkSp.toFixed(1) + ' m/s: always faster');
       for (let i = 0; i < 80 && F.chasers.length; i++) { W.teleport(ch.x + 70, ch.z); sim(10); }
       ok(!F.chasers.length && c('escapes') === 1 && c('caught') === 0, 'you got away (they are slower than your walk)');

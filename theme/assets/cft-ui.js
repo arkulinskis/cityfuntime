@@ -29,7 +29,7 @@ function create(G, root) {
     <div class="cft-hud" hidden>
       <div class="cft-tl">
         <div class="cft-chip cft-money" data-money-chip><span>💵</span><b data-money>$0</b></div>
-        <div class="cft-chip cft-lvl" title="Level"><span class="cft-star">⭐</span><b data-lvl>1</b><div class="cft-bar"><i data-xpbar></i></div></div>
+        <button type="button" class="cft-chip cft-lvl" title="Level: open your Character (talents, charms)"><span class="cft-star">⭐</span><b data-lvl>1</b><div class="cft-bar xp"><s data-restbar></s><i data-xpbar></i></div><i class="cft-pts" data-pts hidden></i></button>
         <div class="cft-chip cft-meter" title="Energy"><span>⚡</span><div class="cft-bar e"><i data-ebar></i></div></div>
         <div class="cft-chip cft-meter" title="Happiness"><span data-hface>😊</span><div class="cft-bar h"><i data-hbar></i></div></div>
       </div>
@@ -112,7 +112,8 @@ function create(G, root) {
     el.className = 'cft-banner ' + (b.kind || '');
     el.innerHTML = '<b>' + esc(b.title) + '</b>' + (b.sub ? '<span>' + esc(b.sub) + '</span>' : '');
     $('[data-banners]').appendChild(el);
-    setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); nextBanner(); }, 350); }, b.kind === 'done' || b.kind === 'level' ? 3600 : 3000);
+    const long = b.kind === 'done' || b.kind === 'level' || /^(loot|ach)/.test(b.kind || '');
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); nextBanner(); }, 350); }, bannerQ.length > 2 ? 1700 : long ? 3600 : 3000);  // a queue moves faster
   }
   U.prompt = function (text) {
     const b = $('[data-act]');
@@ -398,7 +399,7 @@ function create(G, root) {
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
       '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>📱</kbd> your phone</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
       '</div><p class="muted">The <b>gold arrow</b> over your head always points to your current goal. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
@@ -522,6 +523,7 @@ function create(G, root) {
       const lv = G.level(), a = G.xpAt(lv), b = G.xpAt(lv + 1);
       setText('lvl', '[data-lvl]', String(lv));
       $('[data-xpbar]').style.width = Math.round((s.xp - a) / (b - a) * 100) + '%';
+      if (s.rpg) $('[data-restbar]').style.width = Math.min(100, Math.round((s.xp - a + (s.rpg.rested || 0)) / (b - a) * 100)) + '%';  // rested XP: the blue part ahead of your bar
       $('[data-ebar]').style.width = Math.round(s.energy / G.maxEnergy() * 100) + '%';
       $('[data-hbar]').style.width = Math.round(s.happy) + '%';
       setText('hface', '[data-hface]', s.happy > 75 ? '😄' : s.happy > 50 ? '😊' : s.happy > 30 ? '😐' : '😟');
@@ -543,6 +545,7 @@ function create(G, root) {
         else { setText('qt', '[data-qtitle]', 'Free roam'); setText('qs', '[data-qstep]', 'Open your phone (P) for quests and odd jobs'); q.classList.add('idle'); }
         setText('qd', '[data-qdist]', goal && goal.d != null ? fmtDist(goal.d) : '');
         $('[data-ride]').textContent = s.equip.ride ? D.ITEMS[s.equip.ride].e : '🚶';
+        if (G.rpg) { const bd = G.rpg.badge(); setText('pts', '[data-pts]', bd ? '✨' + bd : ''); $('[data-pts]').hidden = !bd; }
         setText('bonk', '[data-bonk]', s.equip.weapon && D.ITEMS[s.equip.weapon] ? D.ITEMS[s.equip.weapon].e : '🖐️');
       }
       const goal = G.rt.goal;
@@ -609,6 +612,7 @@ function create(G, root) {
   $('[data-phone]').addEventListener('click', () => U.phone());
   $('[data-ride]').addEventListener('click', () => G.toggleRide());
   $('[data-bonk]').addEventListener('click', () => G.attack());
+  $('.cft-lvl').addEventListener('click', () => U.phone('hero'));
   // with the mouse captured, a left click bonks
   U.canvas.addEventListener('mousedown', e => { if (e.button === 0 && G.W && G.W.isLocked() && G.state() === 'play' && !stack.length) G.attack(); });
   $('[data-mmwrap]').addEventListener('click', () => U.phone('map'));
@@ -618,7 +622,7 @@ function create(G, root) {
 
   // ------------------------------------------------------------------ the phone
   const APPS = [
-    ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
+    ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['hero', '🧙', 'Character'], ['rep', '🤝', 'Reputation'], ['ach', '🏆', 'Achievements'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
     ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
   ];
   let phoneOv = null, phoneApp = null;
@@ -648,7 +652,7 @@ function create(G, root) {
   function homeScreen() {
     const s = save(), act = G.activeMissions().length, open = G.openMissions().length;
     const badge = { quests: act + open, people: Object.keys(s.friends).length, business: Object.values(s.biz).filter(b => !b.mgr && b.till > 5).length,
-      street: s.fun && s.fun.crushes ? s.fun.crushes.length : 0 };
+      street: s.fun && s.fun.crushes ? s.fun.crushes.length : 0, hero: G.rpg ? G.rpg.badge() : 0 };
     return '<div class="cft-apps">' + APPS.map(a => '<button type="button" class="cft-app" data-app="' + a[0] + '"><span>' + a[1] + '</span><b>' + a[2] + '</b>' +
       (badge[a[0]] ? '<i>' + badge[a[0]] + '</i>' : '') + '</button>').join('') + '</div>' +
       '<div class="cft-pcard"><b>☀️ Day ' + s.day + ' · ' + fmtClock(s.clock) + '</b><span>' + esc(s.apt.label || '') + ' · ' + esc(D.APARTMENTS[s.apt.tier].n) + '</span></div>' +
@@ -696,7 +700,7 @@ function create(G, root) {
   VIEWS.me = function () {
     const s = save(), lv = G.level(), a = G.xpAt(lv), b = G.xpAt(lv + 1), sum = window.CFTGame.summary(s);
     const eq = ['outfit', 'shoes', 'hat', 'acc', 'phone', 'bag'].map(k => { const it = D.ITEMS[s.equip[k]]; return '<div class="cft-slot"><span>' + (it ? it.e : '·') + '</span><small>' + (it ? esc(it.n) : k) + '</small></div>'; }).join('');
-    return '<div class="cft-me"><div class="cft-me-h"><button type="button" class="cft-face big" data-act="look" title="Change your look" aria-label="Change your look">🪞</button><div><b>' + esc(s.name) + '</b><span>Level ' + lv + ' · ' + (s.xp - a) + ' / ' + (b - a) + ' XP</span>' + bar(s.xp - a, b - a, 'xp') + '</div></div>' +
+    return '<div class="cft-me"><div class="cft-me-h"><button type="button" class="cft-face big" data-act="look" title="Change your look" aria-label="Change your look">🪞</button><div><b>' + esc(s.name) + (s.rpg && s.rpg.title ? ' <small class="cft-title">' + esc(s.rpg.title) + '</small>' : '') + '</b><span>Level ' + lv + ' · ' + (s.xp - a) + ' / ' + (b - a) + ' XP</span>' + bar(s.xp - a, b - a, 'xp') + '</div></div>' +
       '<div class="cft-grid2"><div class="cft-mini"><small>Cash</small><b>' + G.fmt$(s.money) + '</b></div><div class="cft-mini"><small>Net worth</small><b>' + G.fmt$(sum.worth) + '</b></div>' +
       '<div class="cft-mini"><small>⚡ Energy</small><b>' + Math.round(s.energy) + ' / ' + G.maxEnergy() + '</b></div><div class="cft-mini"><small>😊 Happiness</small><b>' + Math.round(s.happy) + '% → ' + Math.round(G.happyTarget()) + '%</b></div></div>' +
       '<div class="cft-sec"><h4>Stats</h4>' + D.STATS.map(st => { const v = G.stat(st.id); return '<div class="cft-stat"><span>' + st.e + '</span><div><b>' + st.name + ' ' + Math.floor(v) + '</b><small>' + esc(st.blurb) + '</small>' + bar(v % 1 || (v >= 1 ? 0 : 0), 1, 'st') + '</div></div>'; }).join('') + '</div>' +
@@ -804,6 +808,48 @@ function create(G, root) {
       '<div class="cft-sec"><h4>Shenanigans so far</h4><div class="cft-grid2">' + [['👾 Monsters bonked', v.bonks], ['🤡 Pranks', v.pranks], ['🏃 Escapes', v.escapes], ['😘 Hearts won', v.flirts], ['💕 Dates', v.dates], ['🧡 Kind acts', v.helped],
         ['🍌 Banana slides', v.slides], ['🤸 Bounces', v.bounces], ['😂 Jokes told', v.jokes], ['🎪 Street events', v.events]].map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
   };
+  // ---- the long game (cft-rpg.js): Character, Reputation, Achievements
+  const lootRow = (v, it, btns) => '<div class="cft-li cft-loot q' + it.q + '"><span>' + it.e + '</span><div><b>' + esc(it.n) + (it.fresh ? ' <i class="cft-new">new</i>' : '') + '</b><small>' +
+    v.quality[it.q].n + ' · item level ' + it.il + ' · ' + esc(v.statLine(it)) + '</small></div>' + (btns || '') + '</div>';
+  VIEWS.hero = function () {
+    if (!G.rpg) return '<div class="cft-empty">🧙<p>Still loading.</p></div>';
+    const v = G.rpg.view(), s = save();
+    let h = '<div class="cft-pcard"><b>🧙 ' + esc(s.name) + (v.title ? ', ' + esc(v.title) : '') + '</b><span>Level ' + v.level + ' · 🏆 ' + v.achPoints + ' achievement points' +
+      (v.rested ? ' · 💤 rested for ' + v.rested + ' XP' : '') + '</span>' +
+      (v.titles.length ? '<div class="cft-chips"><button type="button" class="cft-chipb ' + (v.title ? '' : 'on') + '" data-act="title" data-id="">No title</button>' +
+        v.titles.map(t => '<button type="button" class="cft-chipb ' + (v.title === t ? 'on' : '') + '" data-act="title" data-id="' + esc(t) + '">' + esc(t) + '</button>').join('') + '</div>'
+        : '<small>Titles come from achievements and Exalted factions.</small>') + '</div>';
+    if (v.pending) h += '<div class="cft-sec"><div class="cft-li"><span>🎁</span><div><b>' + v.pending + ' mission reward' + (v.pending > 1 ? 's' : '') + ' to choose</b><small>Pick one of three charms for each</small></div><button type="button" class="cft-btn sm primary" data-act="claim">Choose</button></div></div>';
+    h += '<div class="cft-sec"><h4>🧿 Charms you wear</h4>' + v.worn.map(w => w.it ? lootRow(v, w.it, '<button type="button" class="cft-btn sm ghost" data-act="unequipc" data-id="' + w.slot + '">Take off</button>')
+      : '<div class="cft-li cft-loot empty"><span>⬚</span><div><b>Empty charm slot</b><small>Monsters, treasure chests, crates and missions drop charms</small></div></div>').join('') + '</div>';
+    const junk = v.bag.filter(x => x.q === 0).length;
+    h += '<div class="cft-sec"><h4>🎒 Bag (' + v.bag.length + ' of 30)</h4>' + (junk ? '<div class="cft-row"><button type="button" class="cft-btn sm" data-act="selljunk">🧾 Sell ' + junk + ' junk</button></div>' : '') +
+      (v.bag.length ? v.bag.map(it => lootRow(v, it, (it.q ? '<button type="button" class="cft-btn sm ' + (v.upgrade(it) ? 'primary' : '') + '" data-act="equipc" data-id="' + it.id + '">' + (v.upgrade(it) ? '▲ Wear' : 'Wear') + '</button>' : '') +
+        '<button type="button" class="cft-btn sm ghost" data-act="sellc" data-id="' + it.id + '">' + G.fmt$(v.sellPrice(it)) + '</button>')).join('') : '<p class="muted">Empty. Bonk monsters, open treasure chests 🧰 and finish missions.</p>') + '</div>';
+    h += '<div class="cft-sec"><h4>🌳 Talents · ' + v.points + ' point' + (v.points === 1 ? '' : 's') + ' to spend</h4><p class="muted small">A point every level. Three points in a branch open its next tier; the fifth tier is that branch\'s big one.</p>';
+    for (const br of v.branches) {
+      h += '<div class="cft-branch"><b class="cft-branch-h">' + br.b.e + ' ' + br.b.n + ' <small>' + br.spent + ' · ' + esc(br.b.blurb) + '</small></b>' + br.talents.map(x =>
+        '<button type="button" class="cft-tal' + (x.rank ? ' got' : '') + (x.can ? ' can' : '') + (x.open ? '' : ' locked') + '" data-act="talent" data-id="' + x.t.id + '"><span>' + (x.open ? x.t.e : '🔒') + '</span><b>' + esc(x.t.n) +
+        '</b><em>' + x.rank + '/' + x.t.max + '</em><small>' + (x.open ? esc(x.text) : 'Tier ' + x.t.tier + ': spend ' + ((x.t.tier - 1) * 3) + ' points in ' + br.b.n + ' first') + '</small></button>').join('') + '</div>';
+    }
+    h += '<div class="cft-row"><span class="muted small">' + v.spent + ' points spent</span>' + (v.spent ? '<button type="button" class="cft-btn sm ghost" data-act="respec">Reset talents ' + (v.respecCost ? G.fmt$(v.respecCost) : '(free the first time)') + '</button>' : '') + '</div></div>';
+    for (const it of s.rpg.loot) it.fresh = 0;
+    return h;
+  };
+  VIEWS.rep = function () {
+    if (!G.rpg) return '';
+    const v = G.rpg.view();
+    return '<p class="muted small">Five groups in the neighbourhood notice what you do. Every tier brings a reward; Exalted brings a title and a Legendary charm.</p>' +
+      v.factions.map(x => '<div class="cft-li cft-rep t' + x.t + '"><span>' + x.f.e + '</span><div><b>' + esc(x.f.n) + ' · <em>' + x.tier + '</em></b><small>' + esc(x.f.d) + '</small>' +
+        bar(x.v - x.from, Math.max(1, x.to - x.from), 'rel') + '<small>' + (x.next ? (x.v - x.from) + ' / ' + (x.to - x.from) + ' to ' + x.next + ': ' + esc(x.reward.d) : 'Exalted. You are their favourite person.') + '</small></div></div>').join('');
+  };
+  VIEWS.ach = function () {
+    if (!G.rpg) return '';
+    const v = G.rpg.view(), cats = [...new Set(v.ach.map(x => x.a.cat))], got = v.ach.filter(x => x.done).length;
+    return '<div class="cft-pcard"><b>🏆 ' + v.achPoints + ' points</b><span>' + got + ' of ' + v.ach.length + ' achievements · ' + v.streets + ' streets and ' + v.blocks + ' blocks discovered</span></div>' +
+      cats.map(c => '<div class="cft-sec"><h4>' + esc(c) + '</h4>' + v.ach.filter(x => x.a.cat === c).map(x => '<div class="cft-li cft-ach' + (x.done ? ' got' : '') + '"><span>' + (x.done ? x.a.e : '🔒') + '</span><div><b>' + esc(x.a.n) +
+        ' <em>' + x.a.pts + '</em></b><small>' + esc(x.a.d) + (x.a.title ? ' · title: ' + esc(x.a.title) : '') + (x.done ? ' · day ' + x.done : '') + '</small>' + (x.done ? '' : bar(x.v, x.a.c, 'st')) + '</div></div>').join('') + '</div>').join('');
+  };
   VIEWS.album = function () {
     const s = save();
     const dupes = Object.keys(s.stickers).reduce((a, k) => a + Math.max(0, s.stickers[k] - 1), 0);
@@ -861,6 +907,14 @@ function create(G, root) {
       case 'mgr': G.hireManager(id); U.refreshPhone(); break;
       case 'findbiz': { const q = s.biz[id]; G.rt.pinGoal = { lat: q.lat, lon: q.lon, name: q.name }; s.track = null; phoneOv.close(); break; }
       case 'findcrush': { const q = s.fun.crushes.find(c => c.id === id); if (q) { G.rt.pinGoal = { lat: q.lat, lon: q.lon, name: q.name }; s.track = null; phoneOv.close(); U.toast('💕 ' + q.name + ' is waiting. Follow the arrow!'); } break; }
+      case 'talent': if (G.rpg.learn(id)) U.refreshPhone(); else U.toast(G.rpg.points() ? 'That tier is still locked: spend points lower in the branch.' : 'No points left. You get one every level.'); break;
+      case 'respec': if (await U.confirm('Reset all your talents and get the points back?', 'Reset')) { G.rpg.respec(); U.refreshPhone(); } break;
+      case 'equipc': G.rpg.equip(id); U.refreshPhone(); break;
+      case 'unequipc': G.rpg.unequip(id); U.refreshPhone(); break;
+      case 'sellc': G.rpg.sell(id); U.refreshPhone(); break;
+      case 'selljunk': G.rpg.sellJunk(); U.refreshPhone(); break;
+      case 'title': G.rpg.setTitle(id || null); U.refreshPhone(); break;
+      case 'claim': await G.rpg.claim(); U.refreshPhone(); break;
       case 'weapon': if (s.equip.weapon === id) delete s.equip.weapon; else s.equip.weapon = id; U.refreshPhone(); G.dirty(); break;
       case 'swap': await swapStickers(); U.refreshPhone(); break;
       case 'rename': { const n = await U.ask('Your name', s.name); if (n && n.trim()) { s.name = n.trim().slice(0, 20); G.dirty(); } U.refreshPhone(); break; }
