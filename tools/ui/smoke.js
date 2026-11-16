@@ -76,13 +76,13 @@
     await check('#auth', () => $$('.au-card input').length >= 2, 'sign-in form');
     const vis = () => $$('.au-card input[type=text], .au-card input[type=email], .au-card input[type=password]').filter((i) => i.offsetParent);
     const pw = 'Hb-local-admin-Kq7-2026';
-    type(vis()[0], 'arkulinskis@gmail.com'); type(vis()[1], pw);
+    type(vis()[0], 'admin@example.com'); type(vis()[1], pw);
     $$('.anvil-role-btn-block button').find((b) => /Sign in/.test(b.textContent)).click();
     await sleep(3500);
     if (location.hash !== '#life') {  // no admin account in this local database yet: create it
       $$('.ui-seg button').find((b) => /Create account/.test(b.textContent)).click();
       await sleep(500);
-      const i = vis(); type(i[0], 'Local Admin'); type(i[1], 'arkulinskis@gmail.com'); type(i[2], pw);
+      const i = vis(); type(i[0], 'Local Admin'); type(i[1], 'admin@example.com'); type(i[2], pw);
       const t2 = $('.au-card input[type=checkbox]'); if (t2 && !t2.checked) t2.click();
       $$('.anvil-role-btn-block button').find((b) => /Create account/.test(b.textContent)).click();
     }

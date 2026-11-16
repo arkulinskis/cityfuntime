@@ -117,7 +117,7 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
 level, money, net worth, stats, home, love & family, friends, businesses, blocks, stickers, the current mission and the diary.
 A game played as a guest is kept when you sign up.
 
-**For admins** (`#admin`; arkulinskis@gmail.com becomes an admin on first sign-in):
+**For admins** (`#admin`; your admin email (App Secret `admin_emails`) becomes an admin on first sign-in):
 - **Players:** every save with progress; hide a player from the leaderboard or reset a game name.
 - **Map backup:** how many map tiles the server keeps, a size limit, and a button that copies 20 starter cities in advance.
 - **Feedback inbox**, **Users**, **Demo data** (six demo players for the leaderboard).
@@ -146,7 +146,7 @@ doesn't answer, so every neighbourhood someone has played keeps working; places 
 1. In the Anvil editor: **Create app → Clone from GitHub**, and paste `https://github.com/arkulinskis/cityfuntime`.
 2. **Users** service: email + password and "Continue with Google", sign-up allowed (already set in `anvil.yaml`; check it).
 3. Open the app in the editor. If it shows a **Schema Mismatch** alert, choose **"The schema of the source code is correct"** so Anvil creates the tables.
-4. **Run** it and sign up with **arkulinskis@gmail.com** straight away (that account becomes the admin).
+4. **Run** it and sign up with **your admin email** (App Secret `admin_emails`) straight away (that account becomes the admin).
 5. **Publish** (Publish → public URL, or your own domain).
 
 <!-- libraries:start -->
