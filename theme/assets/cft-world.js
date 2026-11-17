@@ -1072,7 +1072,7 @@ function create(opts) {
   W.carAt = carAt;
 
   // ---------------------------------------------------------------- smashing things (session only) + borrowed cars
-  const PROP_HP = { bin: 1, box: 1, hydrant: 2, bench: 2, lamp: 3, tree: 3, car: 4, van: 5 };
+  const PROP_HP = (opts.tune && opts.tune.smash && opts.tune.smash.hp) || { bin: 1, box: 1, hydrant: 2, bench: 2, lamp: 3, tree: 3, car: 4, van: 5 };  // D.TUNE.smash.hp
   const DEBRIS_COL = { bin: [0x2f8f5b, 0x226b44, 0xf4f1ea], box: [0x2b6cb0, 0xf4f1ea], hydrant: [0xe23b2e, 0xf2b134], bench: [0x9a6a3c, 0xa8774a, 0x33373f],
     lamp: [0x3a3f4a, 0x2a2e37, 0xfff0b8], tree: [0x6b4f37, 0x4f8a3a, 0x6c9a4e], car: [0x2b2a2e, 0x9fc3dd, 0x3a3d44], van: [0x2b2a2e, 0x9fc3dd, 0x3a3d44] };
   const SMASH_FX = { bin: ['🗑️', '📰', '🍌'], box: ['✉️', '📨'], hydrant: ['💦', '💧'], bench: ['🪵'], lamp: ['⚡', '✨'], tree: ['🍃', '🍂'], car: ['💥', '🔥'], van: ['💥', '🔥'] };
@@ -2591,7 +2591,8 @@ function create(opts) {
   };
 
   // ---------------------------------------------------------------- ambient life: pedestrians, traffic, pigeons
-  const life = { peds: [], cars: [], birds: [], max: LOW ? 22 : 44, maxCars: LOW ? 9 : 20, flocks: LOW ? 1 : 3, t: 0 };
+  const TW = (opts.tune && opts.tune.world) || { peds: 44, pedsLow: 22, cars: 20, carsLow: 9 };  // D.TUNE.world
+  const life = { peds: [], cars: [], birds: [], max: LOW ? TW.pedsLow : TW.peds, maxCars: LOW ? TW.carsLow : TW.cars, flocks: LOW ? 1 : 3, t: 0 };
   W.life = life;
   const laneOff = sg => Math.max(1.3, Math.min(3.2, sg.w * 0.25 - 0.6)); // moving cars keep clear of the parked ones
   function nextSegs(x, z, not, carOnly) {

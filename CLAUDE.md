@@ -7,3 +7,6 @@ Workflow, design rules and product knowledge: `.claude/skills/cityfuntime/SKILL.
 After a change, refresh the map: `python -I C:/Users/arkvi/Documents/CLAUDE/APP_MAKER/standard/app_map.py cityfuntime`.
 The app standard every app follows: C:/Users/arkvi/Documents/CLAUDE/APP_MAKER/standard/README.md.
 <!-- /app-standard -->
+**Small fixes and play-test notes:** use the `/cft-fix` skill. Read `FIX_INDEX.md` (where everything lives) and use
+`python -I tools/where.py <words>` for exact line ranges; skip the guide, the map and ANVIL_NOTES. Notes inbox:
+`PLAYTEST.md`. Balance numbers: `D.TUNE` at the end of `theme/assets/cft-content.js`. Play-test panel: `?debug=1`.

@@ -844,6 +844,18 @@ button.cft-face { cursor: pointer; padding: 0; } button.cft-face:active { transf
 }
 @keyframes cft-fade { 0% { opacity: 0; } 10% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
 
+/* ===== the play-test panel (cft-debug.js, only with ?debug=1) ===== */
+.cft-dbg-btn { position: absolute; left: 12px; bottom: 228px; z-index: 6; width: 40px; height: 40px; border-radius: 12px; border: 2px solid #1f1a3d; background: #fff; box-shadow: 2px 2px 0 #1f1a3d; font-size: 1.2rem; cursor: pointer; }
+.cft-dbg { position: absolute; left: 12px; top: 12px; bottom: 12px; z-index: 30; width: min(360px, calc(100% - 24px)); overflow-y: auto; background: #fff; color: #1f1a3d; border: 2.5px solid #1f1a3d; border-radius: 16px; box-shadow: 4px 4px 0 #1f1a3d; padding: 12px; font: 600 .85rem/1.3 var(--font-body); }
+.cft-dbg-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; } .cft-dbg-h b { font: 700 1rem var(--font-display); }
+.cft-dbg-h button { border: 0; background: none; font-size: 1.1rem; cursor: pointer; color: inherit; }
+.cft-dbg-g { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 8px 0; } .cft-dbg-g > span { width: 100%; font-weight: 800; color: #6b4eff; }
+.cft-dbg-g button { border: 1.5px solid #1f1a3d; background: #fff6e9; border-radius: 999px; padding: 4px 9px; font: inherit; cursor: pointer; color: inherit; }
+.cft-dbg-g button:active { transform: translate(1px, 1px); } .cft-dbg-g button.wide { width: 100%; background: #ffc21f; padding: 7px; }
+.cft-dbg textarea { width: 100%; font: 500 .72rem/1.35 ui-monospace, monospace; border: 1.5px solid #1f1a3d; border-radius: 8px; padding: 6px; resize: vertical; }
+.cft-dbg p { margin: 6px 0 0; color: #5f5980; font-size: .75rem; }
+@media (max-width: 720px) { .cft-dbg-btn { left: 8px; bottom: 146px; } }
+
 /* ===== quests.html ===== */
 .qs-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
 .qs-filters button { font: 700 .9rem var(--font-display); padding: 8px 14px; border-radius: 999px; border: 2px solid var(--c-edge); background: var(--c-surface); color: var(--c-ink); cursor: pointer; box-shadow: 2px 2px 0 var(--c-edge); }

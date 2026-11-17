@@ -1409,8 +1409,6 @@ D.RPG.GEAR.hand = [{ id: 'lid', n: 'Trash-Can Lid', e: '🛡️' }, { id: 'pizza
 D.RPG.GEAR_AR.hand = 1;
 D.RPG.SLOT_NAMES.hand = 'Off-hand';
 
-// Combat feel (cft-fun.js): wind-up before a monster strikes, the parry window, block strength
-D.COMBAT = { wind: [0.55, 1.05], reach: 1.9, recover: 0.75, parry: 0.3, block: 0.6, counter: 2.5, opening: 1.35, comboT: 1.25 };
 
 // The hype: everything people say to you, and the big words across the screen (cft-hero.js)
 D.HYPE = {
@@ -1478,6 +1476,56 @@ S('s-liberator', 'The Liberator', 'bouchard', 'community', { m: ['s-morning-rush
   'Bouchard: Free five places in total. The city will never forget it.'],
   [{ do: 'count', key: 'liberated', n: 5, text: 'Liberate 5 outposts (🍩 or 🛒)' }],
   ['Bouchard: The mayor wants to give you a medal. I told her you\'d want a double-double instead.'], { money: 300, xp: 700, stats: { cred: 2, charm: 1 }, rel: { bouchard: 15 } });
+
+// ======================================================== D.TUNE: the knobs (2026-11-17)
+// Every balance number a play-test note is likely to touch lives here: change it here, not in the engine files.
+// (Speeds of you and your rides: D.WALK / D.VEHICLES above. Prices: D.ITEMS. Monster stats: D.MONSTERS.)
+D.TUNE = {
+  combat: {                       // cft-fun.js: wind-up, block, parry (also read as D.COMBAT)
+    wind: [0.55, 1.05],           // seconds a figment winds up before it strikes (random in this range)
+    reach: 1.9,                   // how far a strike reaches (metres beyond the figment's body)
+    recover: 0.75,                // seconds after a strike when your hits are OPENINGS
+    parry: 0.3,                   // seconds before the strike in which starting a block = PERFECT PARRY (+ shield bonus)
+    block: 0.6,                   // share of damage a block stops (+ shield bonus, max 0.92)
+    counter: 2.5,                 // damage multiplier of the hit after a parry
+    opening: 1.35,                // damage multiplier during a figment's recovery
+    comboT: 1.25,                 // seconds between hits that keep a combo going
+    comboStep: 0.06,              // extra damage per combo hit (up to 10 hits)
+    guardBreak: [0.22, 0.06],     // chance a block is crushed: [champions/guards/bosses/rares, others]
+    luckyDodge: 0.05,             // base chance to slip a hit (+ Fitness, + fast shoes)
+    runOver: 7,                   // m/s a car needs to knock a figment flat
+  },
+  monsters: {                     // cft-fun.js spawner
+    night: 6, nightLow: 4,        // figments out at once at night (high / low graphics)
+    day: 3, dayLow: 2,            // ... by day (never near home)
+    champChance: 0.07,            // chance a spawn is a champion pack of three
+    aggro: 17,                    // metres at which a figment notices you
+    hpPerLevel: 0.18, atkPerLevel: 0.1,   // growth per monster level
+    levelEvery: 400,              // metres from home per extra monster level
+    regenDelay: 5, regen: 0.025,  // you heal regen x max health per second, after regenDelay seconds out of a fight
+  },
+  hype: {                         // cft-hero.js
+    compliment: [6, 11], complimentSome: [14, 24],   // seconds between compliments (Max / Some)
+    fan: [80, 140], fanSome: [160, 260],             // seconds between selfie fans
+    gift: [170, 260], giftSome: [300, 420],          // seconds between admirers with gifts
+    flirtShare: 0.34,             // share of compliments that are flirts (none when married)
+    swag: { kill: 5, bigKill: 14, parry: 12, dodge: 3, block: 2, combo: 2, smash: 1.5, wreck: 6, mission: 25, level: 15, compliment: 2, fan: 6, gift: 8, outpost: 40 },
+    mainSecs: 25, mainSpeed: 1.25, mainDmg: 1.5,     // main character mode
+  },
+  outposts: {                     // cft-hero.js (bonus and cap per kind: D.OUTPOSTS)
+    range: 62,                    // metres at which a pack appears
+    maxPacks: 2,                  // fights at once
+    homeCalm: 90,                 // no outposts this close to home
+    packMin: 3, packMax: 6,       // figments besides the captain (more with your level)
+    captainHp: 7, captainAtk: 1.5, leash: 26,
+  },
+  smash: {                        // cft-world.js / cft-fun.js
+    hp: { bin: 1, box: 1, hydrant: 2, bench: 2, lamp: 3, tree: 3, car: 4, van: 5 },   // hits (x weapon) to break
+    weaponMul: 2.2,               // how hard a swing hits things (x weapon damage)
+  },
+  world: { peds: 44, pedsLow: 22, cars: 20, carsLow: 9 },   // people and traffic around you (cft-world.js)
+};
+D.COMBAT = D.TUNE.combat;
 
 window.CFT_DATA = D;
 })();

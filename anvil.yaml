@@ -393,20 +393,21 @@ native_deps:
     <!-- Prepsto feedback panel: every "Submit feedback" link and button opens it (it is the only feedback channel). No floating button, no cookies, nothing loads until it is opened. Codes: APP_MAKER/prepsto-links.json -->
     <script src="https://prepsto.com/_/theme/widget.js" data-prepsto="xz9nut9" data-button="false" data-label="Submit feedback" async></script>
     <link rel="stylesheet" href="_/theme/icons.css?v=8f508d76cd">
-    <link rel="stylesheet" href="_/theme/app.css?v=49a140d46a">
+    <link rel="stylesheet" href="_/theme/app.css?v=853a6406b1">
     <script src="_/theme/app-kit.js?v=9ddf8e5515"></script>
     <script src="_/theme/ark-music.js?v=4ee0f1e082"></script>
-    <script src="_/theme/cft-kit.js?v=8aa27f3923"></script>
+    <script src="_/theme/cft-kit.js?v=55ad0f74cc"></script>
     <!-- the game engine, loaded only when a page needs it (cft-kit.js reads these; tools/assets.py keeps ?v= current) -->
     <meta name="cft-asset" content="_/theme/three.min.js?v=a13f10ad8e">
-    <meta name="cft-asset" content="_/theme/cft-content.js?v=b5f703bad8">
+    <meta name="cft-asset" content="_/theme/cft-content.js?v=aa7e9d40a3">
     <meta name="cft-asset" content="_/theme/cft-tiles.js?v=a65067908e">
-    <meta name="cft-asset" content="_/theme/cft-world.js?v=c08ff2cd2e">
-    <meta name="cft-asset" content="_/theme/cft-fun.js?v=b2b406613e">
+    <meta name="cft-asset" content="_/theme/cft-world.js?v=7ee19119f4">
+    <meta name="cft-asset" content="_/theme/cft-fun.js?v=3ed3e6f49c">
     <meta name="cft-asset" content="_/theme/cft-rpg.js?v=39a3ced9b8">
-    <meta name="cft-asset" content="_/theme/cft-hero.js?v=f3e44eaec3">
+    <meta name="cft-asset" content="_/theme/cft-hero.js?v=471dd36876">
+    <meta name="cft-asset" content="_/theme/cft-debug.js?v=3137acfa95">
     <meta name="cft-asset" content="_/theme/cft-ui.js?v=d00742e2ad">
-    <meta name="cft-asset" content="_/theme/cft-game.js?v=90251b0d35">
+    <meta name="cft-asset" content="_/theme/cft-game.js?v=c28ee1e298">
 package_name: City_Fun_Time
 runtime_options:
   client_version: '3'

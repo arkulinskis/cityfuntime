@@ -32,7 +32,7 @@ function attach(G, api) {
   const fmt$ = G.fmt$;
   const LOW = !W.renderer.shadowMap.enabled;
   const F = { monsters: [], folk: [], sweet: new Map(), chasers: [], peels: [], pads: [], shots: [], event: null, boost: 0, boostMul: 1 };
-  const CB = D.COMBAT || { wind: [0.55, 1.05], reach: 1.9, recover: 0.75, parry: 0.3, block: 0.6, counter: 2.5, opening: 1.35, comboT: 1.25 };
+  const CB = D.TUNE.combat, TM = D.TUNE.monsters;  // the knobs: cft-content.js D.TUNE
   const hype = (ev, o) => { if (G.hero) G.hero.event(ev, o || {}); };
   F.blocking = false; F.blockStart = -99; F.combo = 0; F.counter = 0;
   let lastHitT = -99;
@@ -150,7 +150,7 @@ function attach(G, api) {
       const hw = Object.assign({}, w);
       if (countered) { hw.dmg *= CB.counter; hw.word = 'COUNTER!'; hw.stun = (hw.stun || 0) + 1; }
       else if (m.recover > 0) { hw.dmg *= CB.opening; hw.word = 'OPENING!'; }
-      hw.dmg *= 1 + 0.06 * Math.min(10, F.combo);
+      hw.dmg *= 1 + CB.comboStep * Math.min(10, F.combo);
       hitMonster(m, hw, f); hits++;
       if (!cone && hits >= 3) break;
     }
@@ -175,7 +175,7 @@ function attach(G, api) {
     }
     // nothing monstrous in reach: street furniture to smash, a passer-by, or a parked car (alarm, then a wreck)
     const thing = W.propNear && W.propNear(p.x + f.x * 1.3, p.z + f.z * 1.3, w.reach * 0.7 + 0.4);
-    if (thing) { smashProp(thing, w.dmg * 2.2, f, false); return true; }
+    if (thing) { smashProp(thing, w.dmg * D.TUNE.smash.weaponMul, f, false); return true; }
     const ped = W.nearestPed(p.x + f.x * 1.2, p.z + f.z * 1.2, 1.9);
     if (ped && !cone) { bonkPed(ped, w); return true; }
     const car = W.carAt(p.x + f.x * 1.4, p.z + f.z * 1.4, 0.3);
@@ -244,7 +244,7 @@ function attach(G, api) {
   };
   F.cityName = () => { const c = cityOf(), h = save().home || {}; return c ? c.n : (h.short || h.label || 'the city').split(',').pop().trim(); };
   // A monster's level: yours near home, higher the further you roam (up to yours + 4). Diablo's areas, on your real streets.
-  function monsterLevel(x, z) { const home = G.homeSpot(), L = G.level(); return Math.max(1, Math.min(L + 4, L - 1 + Math.floor(Math.hypot(x - home.x, z - home.z) / 400))); }
+  function monsterLevel(x, z) { const home = G.homeSpot(), L = G.level(); return Math.max(1, Math.min(L + 4, L - 1 + Math.floor(Math.hypot(x - home.x, z - home.z) / TM.levelEvery))); }
   F.monsterLevel = monsterLevel;
   function spawnMonster(kind, x, z, o) {
     const base = D.MONSTERS[kind];
@@ -255,8 +255,8 @@ function attach(G, api) {
     const size = (o.size || def.size || 1) * (o.champ ? 1.15 : 1);
     const obj = W.monster(kind);
     obj.userData.size = size; obj.scale.setScalar(size);
-    const hp = (o.hp || def.hp) * (1 + 0.18 * (lvl - 1)) * (o.champ ? 2.5 : 1);
-    const atk = (def.atk || 6) * (1 + 0.1 * (lvl - 1)) * (o.champ ? 1.4 : 1) * (o.atkMul || 1);
+    const hp = (o.hp || def.hp) * (1 + TM.hpPerLevel * (lvl - 1)) * (o.champ ? 2.5 : 1);
+    const atk = (def.atk || 6) * (1 + TM.atkPerLevel * (lvl - 1)) * (o.champ ? 1.4 : 1) * (o.atkMul || 1);
     const m = Object.assign({ kind, obj, x, z, carry: 0, state: 'idle', t: 0, stun: 0, kx: 0, kz: 0, grab: 0, wanderA: Math.random() * 6.28,
       r: (kind === 'blob' ? 1.6 : kind === 'brute' || kind === 'worm' ? 0.85 : 0.6) * size, born: G.rt.t, say: 2 + Math.random() * 6 }, o,
       { def, hp, mhp: hp, atk, lvl, xpv: def.xp * (1 + 0.12 * (lvl - 1)) * (o.champ ? 2.5 : 1) });
@@ -324,7 +324,7 @@ function attach(G, api) {
     if (slow <= 0 && onStory() && !calm()) {
       // who is out: more at night, a couple by day (never close to home), fewer when you're happy, more when you're not
       const wild = F.monsters.filter(m => !m.event && !m.def.boss && !m.guard).length, mood = s.happy >= 75 ? 0.6 : s.happy < 30 ? 1.4 : 1;
-      const want = Math.round((night ? (LOW ? 4 : 6) : (LOW ? 2 : 3)) * mood);  // 2026-11-17: a little more Diablo
+      const want = Math.round((night ? (LOW ? TM.nightLow : TM.night) : (LOW ? TM.dayLow : TM.day)) * mood);
       if (wild < want && !quiet()) {
         const sp = W.randomWalkSpot(p.x, p.z, 30, 85, (x, z) => Math.hypot(x - home.x, z - home.z) > (night ? 30 : 90));
         if (sp) {
@@ -332,7 +332,7 @@ function attach(G, api) {
           let tot = 0; for (const k of pool) tot += D.MONSTERS[k].w;
           let r = Math.random() * tot, kind = pool[0];
           for (const k of pool) { if (r < D.MONSTERS[k].w) { kind = k; break; } r -= D.MONSTERS[k].w; }
-          if (G.level() >= 2 && Math.random() < 0.07) { // a champion pack: three, tougher, blue name tags, better pay
+          if (G.level() >= 2 && Math.random() < TM.champChance) { // a champion pack: three, tougher, blue name tags, better pay
             for (let i = 0; i < 3; i++) spawnMonster(kind, sp.x + rnd(-2, 2), sp.z + rnd(-2, 2), { champ: true, nightBorn: night });
             U.banner('🔵 Champions nearby', 'Three ' + F.localName(kind) + 's, tougher than usual. Worth it.', 'fail');
           } else spawnMonster(kind, sp.x, sp.z, { nightBorn: night });
@@ -362,21 +362,21 @@ function attach(G, api) {
         m.kx *= Math.exp(-6 * dt); m.kz *= Math.exp(-6 * dt);
         m.obj.position.set(m.x, W.groundAt(m.x, m.z), m.z);
       }
-      if (!onFoot() && Math.abs(W.player.speed) > 7 && d < m.r + 1.6 && !(m.runT > G.rt.t)) { // driving into one
+      if (!onFoot() && Math.abs(W.player.speed) > CB.runOver && d < m.r + 1.6 && !(m.runT > G.rt.t)) { // driving into one
         m.runT = G.rt.t + 0.8;
         const hx = -Math.sin(W.player.heading), hz = -Math.cos(W.player.heading);
         hitMonster(m, { dmg: Math.abs(W.player.speed) * 0.28 * (1 + 0.15 * (G.level() - 1)), knock: 9, stun: 1.2, word: pick(['SPLAT!', 'BEEP BEEP!', 'VROOM!', 'BOINK!']) }, { x: hx, z: hz });
         api.bump('runover'); W.shake(0.35);
         if (m.dead || !F.monsters.includes(m)) continue;
       }
-      if ((m.stun > 0 || m.grab > 0 || d > (m.aggro || 17) + 3 || !onFoot() || F.dying) && m.wind > 0) { m.wind = 0; removeTele(m); }
+      if ((m.stun > 0 || m.grab > 0 || d > (m.aggro || TM.aggro) + 3 || !onFoot() || F.dying) && m.wind > 0) { m.wind = 0; removeTele(m); }
       if (m.stun > 0) { m.stun -= dt; m.obj.rotation.y += dt * 9; }
       else if (m.grab > 0) { // it got what it wanted: backs off for a moment
         m.grab -= dt; sp = def.speed * 0.8;
         walk(m, m.x + (m.x - p.x), m.z + (m.z - p.z), sp, dt, m.r);
       } else if (m.home && Math.hypot(m.x - m.home.x, m.z - m.home.z) > (m.leash || 30)) { // a guardian never strays far from its station
         sp = def.speed; walk(m, m.home.x, m.home.z, sp, dt, m.r); m.hp = Math.min(m.mhp, m.hp + m.mhp * 0.1 * dt);
-      } else if (d < (m.aggro || 17) && onFoot() && !quiet() && !F.dying && Math.hypot(p.x - home.x, p.z - home.z) > 14 && (!m.home || Math.hypot(p.x - m.home.x, p.z - m.home.z) < (m.leash || 30) + 4)) {
+      } else if (d < (m.aggro || TM.aggro) && onFoot() && !quiet() && !F.dying && Math.hypot(p.x - home.x, p.z - home.z) > 14 && (!m.home || Math.hypot(p.x - m.home.x, p.z - m.home.z) < (m.leash || 30) + 4)) {
         if (m.wind > 0) { // winding up: it plants its feet and telegraphs, then strikes
           m.wind -= dt; sp = 0;
           const want = Math.atan2(-(p.x - m.x), -(p.z - m.z)); m.obj.rotation.y += Math.atan2(Math.sin(want - m.obj.rotation.y), Math.cos(want - m.obj.rotation.y)) * Math.min(1, dt * 10);
@@ -451,7 +451,7 @@ function attach(G, api) {
         return 'parry';
       }
       const heavy = m.champ || m.guard || m.def.boss || m.def.rare;
-      if (Math.random() < (heavy ? 0.22 : 0.06) && !(window.CFT_TEST && window.CFT_TEST.noLuck)) { // the dice: a big hit can still crash through
+      if (Math.random() < (heavy ? CB.guardBreak[0] : CB.guardBreak[1]) && !(window.CFT_TEST && window.CFT_TEST.noLuck)) { // the dice: a big hit can still crash through
         W.pop(p.x, p.y + 2.4, p.z, 'GUARD BREAK!', '#ff8a3d', 0.9);
         F.hurt((m.atk || 5) * 0.7, m); F.blockStart = G.rt.t + 99;
         return 'break';
@@ -463,7 +463,7 @@ function attach(G, api) {
       return 'block';
     }
     // the dice again: sometimes you just slip out of it (Fitness and fast shoes help)
-    if (Math.random() < 0.05 + G.stat('fit') * 0.004 + (G.rpg ? G.rpg.bonus('speed') : 0) * 0.8 && !(window.CFT_TEST && window.CFT_TEST.noLuck)) {
+    if (Math.random() < CB.luckyDodge + G.stat('fit') * 0.004 + (G.rpg ? G.rpg.bonus('speed') : 0) * 0.8 && !(window.CFT_TEST && window.CFT_TEST.noLuck)) {
       api.bump('dodges');
       W.pop(p.x, p.y + 2.4, p.z, 'LUCKY DODGE!', '#20c997', 0.9);
       hype('dodge'); return 'lucky';
@@ -492,7 +492,7 @@ function attach(G, api) {
   F.hp = hp;
   F.armor = () => Math.round(G.rpg ? G.rpg.bonus('armor') : 0);
   F.hurt = function (n, src) {
-    if (F.dying || !alive) return 0;
+    if (F.dying || !alive || G.debugGod) return 0;  // G.debugGod: the play-test panel's god mode
     const f = fun(), dmg = Math.max(1, n * 100 / (100 + F.armor()));
     f.hp = Math.max(0, hp() - dmg); lastHurt = G.rt.t;
     const p = P();
@@ -1329,7 +1329,7 @@ function attach(G, api) {
     updateProps(dt);
     updateEvent(dt);
     foeTick(dt);
-    if (!F.dying && G.rt.t - lastHurt > 5) F.heal(F.maxHp() * 0.025 * dt);  // catching your breath
+    if (!F.dying && G.rt.t - lastHurt > TM.regenDelay) F.heal(F.maxHp() * TM.regen * dt);  // catching your breath
     if (hp() > F.maxHp()) fun().hp = F.maxHp();
     guardT -= dt;
     if (guardT <= 0) { guardT = 1; guardTick(); walletTick(); }

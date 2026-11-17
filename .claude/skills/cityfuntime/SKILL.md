@@ -39,6 +39,15 @@ baguette, a rubber chicken, a pillow. Street folk are named neighbours with stor
 at their expense, and being rude to them costs you. Flirting is PG. Pranks and angry owners only ever involve **made-up**
 shops (see Gotchas: real places).
 
+## Small fixes (play-test notes): the lean path
+
+Use the `/cft-fix` skill: `FIX_INDEX.md` (feature -> function -> knob -> test), `tools/where.py` (exact line ranges:
+`--def`, `--toc`, `--tune`), `PLAYTEST.md` (the notes inbox with Open / Done). Balance numbers live in **`D.TUNE`** (end of
+cft-content.js: combat, monsters, hype, outposts, smash, world; `D.COMBAT` is an alias of `D.TUNE.combat`; the world gets
+`opts.tune`). When you hard-code a new balance number, put it in D.TUNE and the index instead. **Play-test panel**
+`theme/assets/cft-debug.js`: only with `?debug=1` (localStorage `cityfuntime.debug`); time, money, level, god mode
+(`G.debugGod`, checked in `F.hurt`), spawns, hype, jumps to places; "Copy note info" (`info()`).
+
 ## Workflow for any change
 
 1. `git pull --ff-only` (Anvil commits "Edited ..." when the user changes something in the IDE; read those commits).
@@ -84,6 +93,7 @@ theme/assets/
   cft-fun.js          window.CFTFun.attach(G, api) -> G.fun: street life + combat (see below)
   cft-rpg.js          window.CFTRpg.attach(G, api) -> G.rpg: the long game (loot, talents, reputation...)
   cft-hero.js         window.CFTHero.attach(G, api) -> G.hero: the main character update (hype, swagger, outposts, mission blips, borrowed cars)
+  cft-debug.js        window.CFTDebug.attach(G) -> G.debug: the play-test panel (?debug=1 only)
   cft-ui.js           window.CFTUI.create(G, root) -> U: HUD, feed, banners, dialogue, U.choose, phone + 12 apps, panels, minigames, start screen
   app.css             all styles; the game's are the `/* ===== play.html =====` block (.cft-*)
 server_code/          Game.py (get_save, put_save, reset_save, leaderboard, admin_players...), Tiles.py (map backup), DemoData.py,

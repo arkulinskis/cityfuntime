@@ -101,15 +101,17 @@ window.__heroOut = []; window.__heroDone = false;
       H.borrow(pc);
       ok(W.ride().mode === 'drive' && !!H.borrowed && c('borrowed') === b0 + 1 && !W.carAt(pc.x, pc.z, 0.2), 'borrowed it: driving, and its parking spot is empty');
       // drive into something
-      const t = findNear((x, z) => W.propNear(x, z, 1.4));
-      if (t) {
-        const cs0 = c('carsmash'), d = 9;
-        const ang = Math.random() * 6.28, sx = t.x + Math.cos(ang) * d, sz = t.z + Math.sin(ang) * d;
+      // up to three tries: a wall or a parked car can stop the run-up
+      const cs0 = c('carsmash'); let t = null;
+      for (let tr = 0; tr < 3 && c('carsmash') === cs0; tr++) {
+        t = findNear((x, z) => W.propNear(x, z, 1.4));
+        if (!t) break;
+        const ang = tr * 2.1 + Math.random(), sx = t.x + Math.cos(ang) * 9, sz = t.z + Math.sin(ang) * 9;
         W.teleport(sx, sz); W.player.heading = W.player.face = Math.atan2(-(t.x - sx), -(t.z - sz)); W.player.speed = 18; W.controls.enabled = true; W.input.f = 1;
         for (let i = 0; i < 40 && c('carsmash') === cs0; i++) { W.player.heading = Math.atan2(-(t.x - pp.x), -(t.z - pp.z)); sim(1); }
         W.input.f = 0;
-        ok(c('carsmash') > cs0, 'drove into a ' + t.k + ' and smashed it');
       }
+      ok(c('carsmash') > cs0, 'drove into ' + (t ? 'a ' + t.k : 'something') + ' and smashed it');
       W.player.speed = 0;
       G.toggleRide();
       ok(W.ride().mode === 'foot' && !H.borrowed && !!W.borrowable(pp.x, pp.z, 4), 'V parks it: on foot, and the car waits at the kerb to be borrowed again');
@@ -195,6 +197,21 @@ window.__heroOut = []; window.__heroDone = false;
     const board = window.CFTGame.missionBoard(s), all = [].concat(...board.map(x => x.missions));
     ok(D.MISSIONS.some(x => x.id === 's-morning-rush') && D.MISSIONS.some(x => x.id === 's-hold-line'), 'new missions: Hold the Line, Morning Rush, Aisle Hero, Wrecking Ball, Keys in the Ignition, Main Character Energy, The Liberator');
     info(all.filter(x => x.status === 'locked').length + ' missions still locked');
+    // ---------- the play-test panel (?debug=1)
+    try { localStorage.setItem('cityfuntime.debug', '1'); } catch (err) { /* ignore */ }
+    const dbg = window.CFTDebug && window.CFTDebug.attach(G);
+    ok(!!dbg && !!document.querySelector('.cft-dbg-btn'), 'the 🐞 play-test panel appears with ?debug=1');
+    if (dbg) {
+      dbg.open();
+      const btns = [...document.querySelectorAll('.cft-dbg [data-a]')];
+      let errs = 0; const bad = []; const toast0 = U.toast; U.toast = t => { if (/Cannot|undefined|is not|Error/.test(t)) { errs++; bad.push(t); } };
+      for (const b of btns) { b.click(); sim(2); }
+      U.toast = toast0; G.debugGod = false;
+      const txt = dbg.info();
+      ok(btns.length >= 20 && errs === 0, 'every panel button runs (' + btns.length + ')' + (bad.length ? ': ' + bad.join(' / ') : ''));
+      ok(/CFT note info/.test(txt) && /where: /.test(txt) && /missions: /.test(txt), 'Copy note info: ' + txt.split(String.fromCharCode(10))[1]);
+      dbg.destroy(); try { localStorage.removeItem('cityfuntime.debug'); } catch (err) { /* ignore */ }
+    }
   } catch (err) {
     ok(false, 'hero test crashed: ' + (err && err.stack || err));
   }

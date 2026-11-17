@@ -25,7 +25,7 @@
 'use strict';
 
 function attach(G, api) {
-  const D = G.D, W = G.W, U = G.ui, THREE = W.THREE, HY = D.HYPE;
+  const D = G.D, W = G.W, U = G.ui, THREE = W.THREE, HY = D.HYPE, TH = D.TUNE.hype, TO = D.TUNE.outposts, SW = D.TUNE.hype.swag;  // knobs: D.TUNE
   const save = () => G.save;
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -101,8 +101,8 @@ function attach(G, api) {
 
   // ------------------------------------------------------------------ swagger and main character mode
   H.mainOn = () => mainT > 0;
-  H.speedMul = () => (mainT > 0 ? 1.25 : 1);
-  H.dmgMul = () => (mainT > 0 ? 1.5 : 1);
+  H.speedMul = () => (mainT > 0 ? TH.mainSpeed : 1);
+  H.dmgMul = () => (mainT > 0 ? TH.mainDmg : 1);
   function swag(n) {
     const h = st();
     if (mainT > 0 || !onStory()) return;
@@ -113,7 +113,7 @@ function attach(G, api) {
   function mainMode() {
     const h = st();
     h.swag = 0; h.mains = (h.mains || 0) + 1;
-    mainT = 25;
+    mainT = TH.mainSecs;
     bump('maincharacter');
     H.word(pick(HY.mainOn), 'violet', '25 seconds: faster, stronger, adored', true);
     U.confetti(); G.sfx.level();
@@ -136,24 +136,24 @@ function attach(G, api) {
         const w = HY.kills.filter(k => k[0] === killStreak).pop();
         if (w) H.word(w[1], killStreak >= 5 ? 'violet' : 'gold', killStreak + ' in a row');
         else if (big) H.word(pick(['HUGE!', 'BOSS MOVE!', 'INCREDIBLE!', 'WHAT A HIT!']), 'gold');
-        swag(big ? 14 : 5);
+        swag(big ? SW.bigKill : SW.kill);
         cheer(p, big ? 0.9 : 0.35);
         break;
       }
-      case 'parry': H.word(pick(HY.parry), 'gold', 'next hit counters ×' + D.COMBAT.counter); swag(12); cheer(p, 0.6); break;
-      case 'dodge': if (Math.random() < 0.5) H.word(pick(HY.dodge), 'mint'); swag(3); break;
-      case 'block': swag(2); break;
-      case 'combo': { const w = HY.combo.filter(k => k[0] === o.n).pop(); if (w) H.word(w[1], o.n >= 8 ? 'violet' : 'pink'); swag(2); break; }
+      case 'parry': H.word(pick(HY.parry), 'gold', 'next hit counters ×' + D.COMBAT.counter); swag(SW.parry); cheer(p, 0.6); break;
+      case 'dodge': if (Math.random() < 0.5) H.word(pick(HY.dodge), 'mint'); swag(SW.dodge); break;
+      case 'block': swag(SW.block); break;
+      case 'combo': { const w = HY.combo.filter(k => k[0] === o.n).pop(); if (w) H.word(w[1], o.n >= 8 ? 'violet' : 'pink'); swag(SW.combo); break; }
       case 'smash': {
         smashStreak = G.rt.t - smashT < 6 ? smashStreak + 1 : 1; smashT = G.rt.t;
         const w = HY.smashStreak.filter(k => k[0] === smashStreak).pop();
         if (w) H.word(w[1], 'pink', smashStreak + ' smashed');
         else if (o.wreck) H.word('KABOOM!', 'red');
-        swag(o.wreck ? 6 : 1.5);
+        swag(o.wreck ? SW.wreck : SW.smash);
         break;
       }
-      case 'mission': H.word(pick(HY.mission), 'gold', (o.m && o.m.title) || '', true); swag(25); later(1200, () => H.ticker(pick(HY.hero), someone(), '🌟')); cheer(p, 1); break;
-      case 'level': H.word(pick(HY.level), 'violet', 'Level ' + o.lv, true); swag(15); later(900, () => H.ticker('Level ' + o.lv + '?! You keep getting better, {name}!', someone(), '⭐')); break;
+      case 'mission': H.word(pick(HY.mission), 'gold', (o.m && o.m.title) || '', true); swag(SW.mission); later(1200, () => H.ticker(pick(HY.hero), someone(), '🌟')); cheer(p, 1); break;
+      case 'level': H.word(pick(HY.level), 'violet', 'Level ' + o.lv, true); swag(SW.level); later(900, () => H.ticker('Level ' + o.lv + '?! You keep getting better, {name}!', someone(), '⭐')); break;
       default: break;
     }
   };
@@ -181,14 +181,14 @@ function attach(G, api) {
   function compliment() {
     const ped = nearPed(17);
     if (!ped) return;
-    const s = save(), flirty = !s.married && Math.random() < 0.34, heroic = G.rt.t - killT < 20 && Math.random() < 0.5;
+    const s = save(), flirty = !s.married && Math.random() < TH.flirtShare, heroic = G.rt.t - killT < 20 && Math.random() < 0.5;
     const line = fill(pick(heroic ? HY.hero : flirty ? HY.flirts : HY.compliments));
     W.holdPed(ped, 2.6, Math.random() < 0.6 ? 'wave' : null);
     W.say(ped.obj, line, 3.2);
     if (flirty) { const o = ped.obj.position; W.burst(o.x, o.y + 2.2, o.z, '💕', 3, { spread: 1, up: 2, size: 0.45 }); }
     H.ticker(line, someone(), flirty ? '😘' : heroic ? '🌟' : '💬');
     bump('compliments');
-    swag(2);
+    swag(SW.compliment);
     if (Math.random() < 0.3) G.addHappy(1);
   }
   // a fan comes running for a selfie, or an admirer brings you a present (gear)
@@ -224,7 +224,7 @@ function attach(G, api) {
         W.burst(o.x, o.y + 2, o.z, '📸', 4, { spread: 1.5, up: 2.5 });
         W.say(ped.obj, pick(['EEEE! Thank you!!', 'Posting this RIGHT now!', 'Best day ever!', 'You\'re so nice in real life!']), 2.6);
         H.word('+1 FAN', 'pink', h.fans + ' fan' + (h.fans === 1 ? '' : 's') + ' and counting');
-        swag(6); G.addHappy(2);
+        swag(SW.fan); G.addHappy(2);
       }
     }
     if (f.phase === 'meet') {
@@ -250,7 +250,7 @@ function attach(G, api) {
     const slot = pick(['hand', 'hand', 'head', 'body', 'feet', 'weapon']);
     const it = R.add(R.make(q, Math.max(1, G.level() + (q >= 3 ? 1 : 0)), { slot }), 'gift');
     if (it) { H.word('🎁 A GIFT FOR YOU', 'pink', it.n); U.banner('🎁 ' + it.n, 'A present from an admirer. Phone → Character to wear it.', 'loot q' + Math.max(1, it.q)); }
-    swag(8); G.addHappy(3);
+    swag(SW.gift); G.addHappy(3);
   }
 
   // ------------------------------------------------------------------ outposts: Tom Hearton's and grocery stores
@@ -267,10 +267,10 @@ function attach(G, api) {
     const p = P(), home = G.homeSpot();
     for (const pl of W.places) {
       if (!isOutpost(pl) || st().out[pl.id] || packs.has(pl.id)) continue;
-      if (Math.hypot(pl.pin.x - home.x, pl.pin.z - home.z) < 90) continue;  // home is always calm
+      if (Math.hypot(pl.pin.x - home.x, pl.pin.z - home.z) < TO.homeCalm) continue;  // home is always calm
       const d = Math.hypot(pl.pin.x - p.x, pl.pin.z - p.z);
-      if (d > 62) continue;
-      if (packs.size >= 2 || [...packs.values()].some(k => Math.hypot(k.pl.pin.x - pl.pin.x, k.pl.pin.z - pl.pin.z) < 50)) continue;  // two fights at most, one per corner
+      if (d > TO.range) continue;
+      if (packs.size >= TO.maxPacks || [...packs.values()].some(k => Math.hypot(k.pl.pin.x - pl.pin.x, k.pl.pin.z - pl.pin.z) < 50)) continue;  // two fights at most, one per corner
       spawnPack(pl);
     }
     for (const [id, k] of packs) {
@@ -283,18 +283,18 @@ function attach(G, api) {
     if (!F) return;
     const h = save().clock, night = h >= 21.5 || h < 5;
     const kinds = Object.keys(D.MONSTERS).filter(k => D.MONSTERS[k].w > 0 && !D.MONSTERS[k].boss && (night || !D.MONSTERS[k].night));
-    const n = 3 + Math.min(3, Math.floor(G.level() / 3)), mons = [];
+    const n = TO.packMin + Math.min(TO.packMax - TO.packMin, Math.floor(G.level() / 3)), mons = [];
     const home = { x: pl.pin.x, z: pl.pin.z };
     for (let i = 0; i < n; i++) {
       const a = i / n * Math.PI * 2, r = 3 + Math.random() * 4;
       let x = home.x + Math.cos(a) * r, z = home.z + Math.sin(a) * r;
       if (W.heightAt(x, z)) { x = home.x; z = home.z; }
-      const m = F.spawnMonster(pick(kinds), x, z, { outpost: pl.id, home, leash: 26, aggro: 19, event: 1e9 });
+      const m = F.spawnMonster(pick(kinds), x, z, { outpost: pl.id, home, leash: TO.leash, aggro: 19, event: 1e9 });
       if (m) mons.push(m);
     }
     const ck = pick(kinds), base = D.MONSTERS[ck];
     const def = Object.assign({}, base, { n: (D.OUTPOST_CAPTAIN[pl.kind] || 'Captain') + ' (' + F.localName(ck) + ')', night: false, steal: [0, 0], xp: base.xp * 4 });
-    const cap = F.spawnMonster(ck, home.x, home.z, { def, hp: base.hp * 7, size: 1.6, atkMul: 1.5, outpost: pl.id, home, leash: 26, aggro: 21, event: 1e9, lvl: F.monsterLevel(home.x, home.z) + 1 });
+    const cap = F.spawnMonster(ck, home.x, home.z, { def, hp: base.hp * TO.captainHp, size: 1.6, atkMul: TO.captainAtk, outpost: pl.id, home, leash: TO.leash, aggro: 21, event: 1e9, lvl: F.monsterLevel(home.x, home.z) + 1 });
     if (cap) { cap.champ = true; cap.xpv *= 2; mons.push(cap); const tag = W.label('😈 ' + def.n, { size: 32, height: 0.46, bg: 'rgba(200,16,46,.94)', fg: '#ffffff', border: '#5a0714' }); tag.position.y = 2.5; cap.obj.add(tag); }
     packs.set(pl.id, { pl, mons, started: G.rt.t });
     W.refreshSign(pl.id);
@@ -325,7 +325,7 @@ function attach(G, api) {
     G.giveItem(o.freeItem, 2);
     if (G.rpg) G.rpg.drop('chest', { minQ: 2 });
     G.addXp(60 + G.level() * 10, 'quest');
-    swag(40);
+    swag(SW.outpost);
     for (const ped of W.life.peds) { const q = ped.obj.position; if (Math.hypot(q.x - pl.pin.x, q.z - pl.pin.z) < 35 && !ped.ctl) { W.holdPed(ped, 4, 'dance'); if (Math.random() < 0.4) W.say(ped.obj, fill(pick(HY.cheers)), 2.4); } }
     W.burst(pl.pin.x, W.groundAt(pl.pin.x, pl.pin.z) + 2, pl.pin.z, '🎉', 14, { spread: 5, up: 7 });
     later(1600, () => H.ticker('You freed ' + (pl.name || o.n) + '! You\'re amazing, {name}!', someone(), o.e));
@@ -497,10 +497,11 @@ function attach(G, api) {
     const lv = level();
     if (lv) {
       compT -= dt;
-      if (compT <= 0) { compT = (lv === 2 ? rnd(6, 11) : rnd(14, 24)); compliment(); }
+      const R2 = a => rnd(a[0], a[1]);
+      if (compT <= 0) { compT = R2(lv === 2 ? TH.compliment : TH.complimentSome); compliment(); }
       fanT -= dt; giftT -= dt;
-      if (fanT <= 0 && !fan) { fanT = lv === 2 ? rnd(80, 140) : rnd(160, 260); startFan(false); }
-      if (giftT <= 0 && !fan) { giftT = lv === 2 ? rnd(170, 260) : rnd(300, 420); if (!startFan(true)) giftT = 20; }
+      if (fanT <= 0 && !fan) { fanT = R2(lv === 2 ? TH.fan : TH.fanSome); startFan(false); }
+      if (giftT <= 0 && !fan) { giftT = R2(lv === 2 ? TH.gift : TH.giftSome); if (!startFan(true)) giftT = 20; }
     }
   };
   H.summary = function () {

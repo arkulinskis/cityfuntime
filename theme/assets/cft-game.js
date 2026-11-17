@@ -2085,7 +2085,7 @@ function mount(root, opts) {
   // ------------------------------------------------------------------ start
   async function startWorld() {
     const q = save.settings.quality === 'auto' ? (opts.quality || (matchMedia('(pointer: coarse)').matches ? 'low' : 'high')) : save.settings.quality;
-    W = G.W = window.CFTWorld.create({ canvas: U.canvas, quality: q });
+    W = G.W = window.CFTWorld.create({ canvas: U.canvas, quality: q, tune: D.TUNE });
     W.touchUI.joy = U.joy; W.touchUI.knob = U.knob;
     // made-up shops in real buildings (the same building always gets the same shop) and the signs on every place
     const mixTotal = D.SHOP_MIX.reduce((a, m) => a + m[1], 0);
@@ -2136,6 +2136,7 @@ function mount(root, opts) {
     if (window.CFTFun) G.fun = window.CFTFun.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, chatPed, setBusy: v => { rt.busy = !!v; } });
     if (window.CFTRpg) G.rpg = window.CFTRpg.attach(G, { spawnPickup });
     if (window.CFTHero) G.hero = window.CFTHero.attach(G, { bump, spawnPickup });
+    if (window.CFTDebug) G.debug = window.CFTDebug.attach(G);  // the play-test panel: only with ?debug=1
     // driving into things smashes them (borrowed cars and your own rides alike)
     W.onDriveHit = (e, speed, dir) => { if (G.fun) G.fun.smashProp(e, speed > 9 ? 99 : speed * 0.5, dir, true); };
     W.setLook(playerLook());
@@ -2183,6 +2184,7 @@ function mount(root, opts) {
       if (G.fun) G.fun.destroy();
       if (G.rpg) G.rpg.destroy();
       if (G.hero) G.hero.destroy();
+      if (G.debug) G.debug.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();
       U.destroy();
