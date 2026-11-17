@@ -791,7 +791,58 @@ button.cft-face { cursor: pointer; padding: 0; } button.cft-face:active { transf
   .cft-phone-wrap { padding: 0; } .cft-phone { width: 100%; height: 100%; border-radius: 0; border-width: 0; box-shadow: none; }
   .cft-dlg-wrap { padding: 8px; } .cft-dlg { padding: 14px; } .cft-face { width: 50px; height: 50px; font-size: 1.6rem; } .cft-dlg-text { font-size: .98rem; }
   .cft-keys { grid-template-columns: 1fr; }
+  .cft-btns { display: grid; grid-template-columns: repeat(3, 50px); gap: 6px; justify-content: end; }
 }
+
+/* ===== the main character update (cft-hero.js, 2026-11-17): hype words, compliments ticker, swagger, mission pointers ===== */
+.cft-hero { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+.cft-vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse 75% 70% at 50% 46%, rgba(0,0,0,0) 58%, rgba(20,12,48,.34) 100%); }
+.cft-canvas { filter: saturate(1.07) contrast(1.04); }
+.cft.touch .cft-canvas { filter: none; }
+.cft-hype { position: absolute; left: 50%; top: 31%; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px; width: min(760px, 96vw); }
+.cft-hw { text-align: center; transform: rotate(var(--tilt, 0deg)); animation: cft-hw 1.7s var(--ease-out) both; }
+.cft-hw.big { animation-duration: 2.3s; }
+.cft-hw b { display: block; font: 900 clamp(1.9rem, 6.2vw, 3.6rem)/1 var(--font-display); letter-spacing: .01em; color: #ffc21f;
+  -webkit-text-stroke: 2.5px #1f1a3d; paint-order: stroke fill; text-shadow: 4px 4px 0 #1f1a3d; }
+.cft-hw.big b { font-size: clamp(2.3rem, 8vw, 4.6rem); }
+.cft-hw span { display: inline-block; margin-top: 6px; font: 800 clamp(.8rem, 2.4vw, 1.05rem)/1.2 var(--font-body); color: #1f1a3d; background: #fff; border: 2px solid #1f1a3d; border-radius: 999px; padding: 3px 12px; box-shadow: 3px 3px 0 #1f1a3d; }
+.cft-hw.pink b { color: #ff5c8a; text-shadow: 4px 4px 0 #1f1a3d; }
+.cft-hw.mint b { color: #20c997; text-shadow: 4px 4px 0 #1f1a3d; }
+.cft-hw.red b { color: #ff6a3d; text-shadow: 4px 4px 0 #1f1a3d; }
+.cft-hw.violet b { color: #b79cff; text-shadow: 4px 4px 0 #1f1a3d; }
+@keyframes cft-hw { 0% { opacity: 0; transform: rotate(var(--tilt)) scale(.4); } 12% { opacity: 1; transform: rotate(var(--tilt)) scale(1.12); } 22% { transform: rotate(var(--tilt)) scale(1); }
+  78% { opacity: 1; transform: rotate(var(--tilt)) translateY(-8px); } 100% { opacity: 0; transform: rotate(var(--tilt)) translateY(-26px) scale(.96); } }
+.cft-ticker { position: absolute; left: 0; right: 0; top: 17%; height: 132px; }
+.cft-tk { position: absolute; left: 100%; display: flex; align-items: center; gap: 7px; white-space: nowrap; background: rgba(255,255,255,.96); color: #1f1a3d; border: 2.5px solid #1f1a3d;
+  border-radius: 999px; box-shadow: 4px 4px 0 #1f1a3d; padding: 6px 14px 6px 8px; font: 700 clamp(.82rem, 2.3vw, 1rem)/1.2 var(--font-body); animation: cft-tk 7.4s linear both; }
+.cft-tk.l0 { top: 0; } .cft-tk.l1 { top: 44px; } .cft-tk.l2 { top: 88px; }
+.cft-tk i { font-style: normal; font-size: 1.25em; font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif; } .cft-tk b { font-family: var(--font-display); color: #6b4eff; }
+@keyframes cft-tk { from { transform: translateX(0); } to { transform: translateX(calc(-100vw - 110%)); } }
+.cft-blips { position: absolute; inset: 0; }
+.cft-blip { position: absolute; left: 0; top: 0; display: grid; justify-items: center; margin: -22px 0 0 -20px; width: 40px; }
+.cft-blip b { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #ffc21f; color: #1f1a3d; border: 3px solid #1f1a3d; box-shadow: 3px 3px 0 #1f1a3d;
+  font: 900 1.3rem/1 var(--font-display); }
+.cft-blip.goal b { background: #6b4eff; color: #fff; border-color: #fff; box-shadow: 0 0 0 3px #1f1a3d, 3px 3px 0 3px #1f1a3d; font-family: "Segoe UI Emoji", "Apple Color Emoji", var(--font-display), sans-serif; }
+.cft-blip small { margin-top: 3px; font: 800 .72rem/1 var(--font-body); color: #fff; background: rgba(31,26,61,.82); border-radius: 999px; padding: 2px 7px; white-space: nowrap; }
+.cft-blip-arrow { display: none; position: absolute; left: 50%; top: 20px; width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 14px solid #1f1a3d;
+  transform: translate(-50%, -50%) rotate(calc(var(--a, 0rad) + 90deg)) translateY(-31px); }
+.cft-blip.off .cft-blip-arrow { display: block; }
+.cft-blip.off b { transform: scale(.86); }
+.cft-swag { cursor: pointer; font: inherit; color: inherit; }
+.cft-bar.sw > i { background: linear-gradient(90deg, #ffc21f, #ff5c8a); }
+.cft-swag b { font: 800 .78rem var(--font-body); }
+.cft-swag.on { background: #1f1a3d; color: #ffc21f; animation: cft-glow 1s var(--ease-in-out) infinite alternate; }
+@keyframes cft-glow { from { transform: scale(1); } to { transform: scale(1.07); } }
+.cft-btns [data-block] { touch-action: none; }
+@media (max-width: 720px) {
+  .cft-hype { top: 30%; } .cft-ticker { top: 22%; height: 110px; } .cft-tk.l1 { top: 38px; } .cft-tk.l2 { top: 76px; }
+  .cft-blip { width: 34px; margin: -18px 0 0 -17px; } .cft-blip b { width: 34px; height: 34px; font-size: 1.1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cft-hw { animation: cft-fade 1.6s ease both; } .cft-tk { animation: cft-fade 6s ease both; left: 50%; transform: translateX(-50%); }
+  .cft-swag.on { animation: none; }
+}
+@keyframes cft-fade { 0% { opacity: 0; } 10% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
 
 /* ===== quests.html ===== */
 .qs-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }

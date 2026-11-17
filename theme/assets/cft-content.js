@@ -211,7 +211,7 @@ D.VEHICLES = {
   suv: { mode: 'drive', walk: 21, run: 29, radius: 1.1, turn: 1.8, accel: 10, color: 0x2b6cb0 },
   sports: { mode: 'drive', walk: 28, run: 44, radius: 1.0, turn: 2.2, accel: 17, color: 0xe8453c },
 };
-D.WALK = { walk: 6.2, run: 12.5 };
+D.WALK = { walk: 8.4, run: 15.5 };  // 2026-11-17: "the character needs to move faster by default" (was 6.2 / 12.5)
 
 D.APARTMENTS = [
   { tier: 0, n: "Cousin Max's couch", e: '🛋️', cost: 0, rent: 0, happy: 0, kids: 0, pick: 'start', blurb: 'Lumpy, borrowed, and smells faintly of guitar strings.' },
@@ -1138,6 +1138,7 @@ const NAME_B = {
 };
 D.shopName = function (kind, r) { // r: 0..1, steady for a building
   const k = D.KINDS[kind], n = Math.floor(r * 1000);
+  if (kind === 'hearton') return 'Tom Hearton\'s';  // one chain, one name, everywhere
   if (n % 3 === 0 && k.fake.length) return k.fake[n % k.fake.length];
   const b = NAME_B[kind] || [k.n];
   return (n % 2 ? 'The ' : '') + NAME_A[n % NAME_A.length] + ' ' + b[Math.floor(n / 7) % b.length];
@@ -1377,6 +1378,106 @@ S('s-static', 'The Static', 'max', 'home', { m: ['c1-couch'] }, ['Max: Hey cuz..
   [{ do: 'count', key: 'bonks', n: 3, text: 'Face 3 figments (press F)' }, { do: 'buy', item: 'checkup', text: 'Get a free check-up at a clinic 🩺' }, { do: 'sleep', text: 'Get a good night\'s sleep at home 😴' }],
   ['Max: Better? Good. They might come back now and then, when the city gets loud. Friends, sleep and a good mood keep them quiet. And you can always talk to me.'],
   { money: 50, xp: 220, happy: 10, rel: { max: 10 } });
+
+// ======================================================== the main character update (2026-11-17)
+// "This is for people having a tough time after work": everyone adores you, outposts to liberate (Far Cry), blocks and
+// parries, things to smash, cars to borrow (GTA), mission letters on the map. Engine: cft-hero.js (G.hero) + cft-fun.js.
+
+// Tom Hearton's: the coffee-and-donut chain. Every Tim Hortons on the map is shown under this name (D.HEARTON_RE), and
+// made-up ones open in real buildings so every city has a few. Liberate one from the figments: +max energy, free refills.
+D.HEARTON_RE = /tim\s*horton/i;
+D.KINDS.hearton = { e: '🍩', n: 'Tom Hearton\'s', fake: ['Tom Hearton\'s'], sells: ['doubledouble', 'tombits', 'coffee', 'tea', 'donut'] };
+D.SIGN_COLS.hearton = '#c8102e';
+D.SHOP_MIX.push(['hearton', 4]);
+D.SHOP_MIX.find(x => x[0] === 'grocery')[1] = 5;  // real corner stores already count as groceries (outposts): fewer made-up ones
+Object.assign(D.ITEMS, {
+  doubledouble: { n: 'Double-double', e: '☕', p: 3, type: 'food', energy: 45, happy: 1 },
+  tombits: { n: 'Tom-Bits (box of 10)', e: '🍩', p: 4, type: 'snack', energy: 30, heal: 20, happy: 2 },
+});
+// Outposts: places figments occupy until you clear them (G.hero). bonus = what one liberation adds for good.
+D.OUTPOSTS = {
+  hearton: { e: '🍩', n: 'Tom Hearton\'s', what: 'energy', bonus: 5, cap: 100, free: '☕ Free double-double (once a day)', freeItem: 'doubledouble',
+    thanks: ['Staff: You saved the morning rush! Coffee is on us. Forever.', 'Staff: Our hero! Your double-double is always free here.', 'Staff: The figments ate ALL the Tom-Bits. You\'re a legend for this.'] },
+  grocery: { e: '🛒', n: 'Grocery', what: 'health', bonus: 5, cap: 150, free: '🍎 Free snack bag (once a day)', freeItem: 'juice',
+    thanks: ['Cashier: Clean-up on aisle you! Thank you, hero!', 'Cashier: They were hiding in the frozen aisle. You were amazing.', 'Manager: Free snacks for life. And a standing ovation.'] },
+};
+D.OUTPOST_CAPTAIN = { hearton: 'Night Manager of the Static', grocery: 'Aisle Tyrant' };
+
+// Shields for the new off-hand slot (loot, gifts, outposts): they make blocking stronger and parries easier
+D.RPG.GEAR.hand = [{ id: 'lid', n: 'Trash-Can Lid', e: '🛡️' }, { id: 'pizza', n: 'Pizza Box', e: '🍕' }, { id: 'pan', n: 'Frying Pan', e: '🍳' },
+  { id: 'umbrella', n: 'Umbrella', e: '☂️' }, { id: 'deck', n: 'Skateboard Deck', e: '🛹' }, { id: 'tray', n: 'Cafeteria Tray', e: '🍽️' }];
+D.RPG.GEAR_AR.hand = 1;
+D.RPG.SLOT_NAMES.hand = 'Off-hand';
+
+// Combat feel (cft-fun.js): wind-up before a monster strikes, the parry window, block strength
+D.COMBAT = { wind: [0.55, 1.05], reach: 1.9, recover: 0.75, parry: 0.3, block: 0.6, counter: 2.5, opening: 1.35, comboT: 1.25 };
+
+// The hype: everything people say to you, and the big words across the screen (cft-hero.js)
+D.HYPE = {
+  compliments: ['Wow, {name}! You look amazing today!', 'Is that {name}?! I\'m such a fan!', 'Your outfit is perfect. Who styles you?', 'You walk like you own the city. Because you do.',
+    'Hey {name}, the whole street is safer with you here!', 'I wish I had your energy!', 'You light up this block, seriously.', 'Great hair. Great vibe. Great everything.',
+    'My kid wants to be you when they grow up!', 'You\'re even cooler in person!', 'That confidence! Teach me!', 'Looking sharp, {name}!', 'Whoever you\'re meeting today is lucky.',
+    'You make this neighbourhood better just by walking through it.', 'Hero of the neighbourhood, right there!', 'I saw you on the news! Not really, but you deserve it.',
+    'You look like the main character. Because you are.', 'You deserve a parade, {name}.', 'Is it me, or did the sun come out when you showed up?', 'Hey! Thanks for everything you do around here!'],
+  flirts: ['Hey {name}... call me sometime? 😘', 'Is it hot out here or is it just you?', 'I\'d share my fries with you. And I NEVER share my fries.', 'Are you a parking ticket? Because you\'ve got "fine" written all over you.',
+    'I forgot what I was saying. You\'re very distracting.', 'Did it hurt? When you fell from the top of the leaderboard?', 'You have the best smile on this street. Fact.',
+    'If you were a coffee, you\'d be a double-double: sweet AND strong.', 'I was going to play it cool. Then you walked by.', 'Save me a dance sometime, {name}! 💃',
+    'You\'re basically a walking compliment.', 'I just tripped over my own feet. Because of you. Worth it.'],
+  hero: ['Did you SEE that?!', 'That was incredible!', 'Way to go, {name}!', 'You\'re unstoppable!', 'Best. Thing. I\'ve seen. All week.', 'My hero!', 'Bravo! Encore!', 'Teach me your moves!', 'Nothing can stop you!'],
+  cheers: ['WOOO!', 'YEAH!', 'GO {NAME}!', 'LEGEND!', 'BRAVO!', '👏👏👏', 'ICONIC!', 'YES!!'],
+  kills: [[2, 'DOUBLE BONK!'], [3, 'TRIPLE BONK!'], [4, 'RAMPAGE!'], [5, 'UNSTOPPABLE!'], [7, 'LEGENDARY!'], [10, 'GODLIKE!'], [15, 'ABSOLUTE ICON!']],
+  combo: [[3, 'COMBO ×3!'], [5, 'COMBO ×5!'], [8, 'SUPER COMBO!'], [12, 'MEGA COMBO!'], [20, 'COMBO OF THE CENTURY!']],
+  parry: ['PERFECT PARRY!', 'FLAWLESS!', 'TOO SMOOTH!', 'SAW IT COMING!', 'READ LIKE A BOOK!', 'SILKY!'],
+  dodge: ['DODGED!', 'TOO FAST!', 'NOT TODAY!', 'MISSED ME!'],
+  smash: ['SMASH!', 'KA-BLAM!', 'CRUNCH!', 'WHAMMO!', 'DEMOLISHED!', 'KABOOM!'],
+  smashStreak: [[5, 'WRECKING BALL!'], [10, 'DEMOLITION EXPERT!'], [20, 'CHAOS MASTER!'], [35, 'CITY REMODELLER!']],
+  mission: ['MISSION COMPLETE!', 'NAILED IT!', 'FLAWLESS VICTORY!', 'THE CITY LOVES YOU!', 'TOO EASY!'],
+  level: ['LEVEL UP!', 'STRONGER THAN EVER!', 'GLOW UP!', 'NEXT LEVEL YOU!'],
+  welcome: ['Welcome back, {name}. The city missed you.', 'The legend returns! Hi, {name}!', 'Everyone was asking where you were, {name}.', 'Good to see you, {name}. Today\'s going to be a great day.',
+    'You made it! After a long day, this city is all yours, {name}.', 'Hey superstar. Let\'s go have some fun.'],
+  gift: ['I saw this and thought of you! For you, {name}!', 'A little something for my favourite person in the city!', 'You dropped this... just kidding, it\'s a gift. You\'re wonderful!',
+    'I\'ve been carrying this around hoping to run into you!', 'For the hero of the street! Please take it!'],
+  selfie: ['Oh my gosh, can I get a selfie?!', 'Selfie! Selfie! Please?!', 'Wait wait wait, picture with you?!', 'My friends won\'t believe I met you!'],
+  mainOn: ['MAIN CHARACTER MODE!', 'YOU ARE THE MAIN CHARACTER!', 'THE CITY IS YOURS!'],
+  mainLines: ['That\'s THEM! That\'s the one!', 'Everybody look!', 'Make way for {name}!', 'It\'s really you!', 'The main character just walked by!'],
+  outpost: ['LIBERATED!', 'TERRITORY FREED!', 'THE PEOPLE CHEER!', 'HERO OF THE BLOCK!'],
+  borrow: ['Keys are in it, superstar! Have fun!', 'Take her for a spin, {name}! Bring her back... eventually!', 'For you? Anything! Drive safe-ish!', 'You need a car? Take mine! I insist!'],
+};
+D.TIPS.push('Watch for the red ❗: a figment is winding up. Hold G (or right-click, or 🛡️) just before it hits for a PERFECT PARRY.',
+  'Figments have taken over Tom Hearton\'s 🍩 and grocery stores 🛒. Clear them out: more energy and more health, for good.',
+  'Press E next to a parked car to borrow it. Smash stuff: it stays smashed until you come back.',
+  'Fill your ✨ Swagger by fighting, smashing and being adored. Full = MAIN CHARACTER MODE.');
+D.CHATTER.push('Did you hear? Somebody freed a Tom Hearton\'s from the figments! Was that you?', 'You look like you could take on the whole city today.');
+
+// New missions for the update: they teach the new things one by one
+S('s-hold-line', 'Hold the Line', 'max', 'home', { m: ['s-static'] }, ['Max: Okay, champ, fighting tip. The figments always wind up before they hit. See the red ❗?',
+  'Max: Hold G (or right-click, or the 🛡️ button) right before they swing. Time it perfectly and they bounce right off you.'],
+  [{ do: 'count', key: 'blocks', n: 3, text: 'Block 3 attacks (hold G / right-click / 🛡️)' }, { do: 'count', key: 'parries', n: 1, text: 'Land a PERFECT PARRY (block just before the hit)' }],
+  ['Max: Did you see your face? Pure main character. I\'m so proud of you.'], { money: 60, xp: 260, stats: { fit: 1 }, rel: { max: 8 } });
+S('s-morning-rush', 'Morning Rush', 'bouchard', 'community', { m: ['c1-sleep'] }, ['Bouchard: Citizen. We have a situation. Figments have taken over a Tom Hearton\'s.',
+  'Bouchard: No coffee. No Tom-Bits. The whole precinct is in shock. You\'re the only one who can see them. Go.'],
+  [{ do: 'count', key: 'lib_hearton', n: 1, text: 'Liberate a Tom Hearton\'s 🍩 (the minimap shows them)' }],
+  ['Bouchard: You did it! Free double-doubles for the hero. Between you and me, you\'re my favourite citizen.'], { money: 90, xp: 300, stats: { cred: 1 }, rel: { bouchard: 15 } });
+S('s-aisle-hero', 'Aisle Hero', 'rosa', 'bakery', { m: ['c1-rosa'] }, ['Rosa: Dear, the grocery store is full of those shadowy things you see. The cashier is hiding behind the melons!',
+  'Rosa: You\'re so brave. Go clear them out, and I\'ll make you my famous soup.'],
+  [{ do: 'count', key: 'lib_grocery', n: 1, text: 'Liberate a grocery store 🛒' }],
+  ['Rosa: My hero! You\'re the best thing that ever happened to this street. Soup is on Sunday.'], { money: 80, xp: 280, happy: 8, rel: { rosa: 12 } });
+S('s-wrecking-ball', 'Wrecking Ball', 'kai', 'park', { m: ['c3-kai'] }, ['Kai: Rough day? Mine too. You know what helps? Breaking stuff. Harmless stuff. Bins. Benches.',
+  'Kai: Bonk it or drive into it. Don\'t worry, the city fixes everything by tomorrow.'],
+  [{ do: 'count', key: 'smash', n: 10, text: 'Smash 10 things on the street 💥' }],
+  ['Kai: Feel better? You look ten years younger. And taller. Is that possible?'], { money: 70, xp: 240, happy: 10, rel: { kai: 10 } });
+S('s-keys', 'Keys in the Ignition', 'kai', 'park', { m: ['s-wrecking-ball'] }, ['Kai: Next level. People around here love you so much they\'d hand you their car keys. Literally. Try it.',
+  'Kai: Walk up to a parked car and press E. Then... let\'s say "test the bumpers".'],
+  [{ do: 'count', key: 'borrowed', n: 1, text: 'Borrow a parked car (E next to one)' }, { do: 'count', key: 'carsmash', n: 5, text: 'Smash 5 things with it 🚗💥' }],
+  ['Kai: HAHA! You drive like a movie star. A slightly chaotic movie star.'], { money: 120, xp: 320, stats: { cred: 1 }, rel: { kai: 10 } });
+S('s-main-character', 'Main Character Energy', 'max', 'home', { m: ['s-hold-line'] }, ['Max: Have you noticed? People stop and stare when you walk by. You\'ve got something.',
+  'Max: Fill up your ✨ Swagger: fight, smash, let people adore you. When it\'s full, the whole city will know.'],
+  [{ do: 'count', key: 'maincharacter', n: 1, text: 'Go into MAIN CHARACTER MODE ✨' }],
+  ['Max: THAT. That\'s who you are. Never forget it.'], { money: 150, xp: 400, happy: 12, stats: { charm: 1, style: 1 }, rel: { max: 12 } });
+S('s-liberator', 'The Liberator', 'bouchard', 'community', { m: ['s-morning-rush', 's-aisle-hero'] }, ['Bouchard: Word is spreading. Every coffee shop and grocery wants their hero.',
+  'Bouchard: Free five places in total. The city will never forget it.'],
+  [{ do: 'count', key: 'liberated', n: 5, text: 'Liberate 5 outposts (🍩 or 🛒)' }],
+  ['Bouchard: The mayor wants to give you a medal. I told her you\'d want a double-double instead.'], { money: 300, xp: 700, stats: { cred: 2, charm: 1 }, rel: { bouchard: 15 } });
 
 window.CFT_DATA = D;
 })();

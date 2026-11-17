@@ -1,36 +1,5 @@
 allow_embedding: false
 db_schema:
-  error_log:
-    client: none
-    columns:
-    - admin_ui: {order: 0, width: 200}
-      name: when
-      type: datetime
-    - admin_ui: {order: 1, width: 120}
-      name: source
-      type: string
-    - admin_ui: {order: 2, width: 160}
-      name: kind
-      type: string
-    - admin_ui: {order: 3, width: 300}
-      name: message
-      type: string
-    - admin_ui: {order: 4, width: 300}
-      name: traceback
-      type: string
-    - admin_ui: {order: 5, width: 200}
-      name: page
-      type: string
-    - admin_ui: {order: 6, width: 120}
-      name: session
-      type: string
-    - admin_ui: {order: 7, width: 200}
-      name: user
-      target: users
-      type: link_single
-    indexes: []
-    server: full
-    title: Error log
   app_settings:
     client: none
     columns:
@@ -47,6 +16,53 @@ db_schema:
     indexes: []
     server: full
     title: App settings
+  error_log:
+    client: none
+    columns:
+    - admin_ui:
+        order: 0
+        width: 200
+      name: when
+      type: datetime
+    - admin_ui:
+        order: 1
+        width: 120
+      name: source
+      type: string
+    - admin_ui:
+        order: 2
+        width: 160
+      name: kind
+      type: string
+    - admin_ui:
+        order: 3
+        width: 300
+      name: message
+      type: string
+    - admin_ui:
+        order: 4
+        width: 300
+      name: traceback
+      type: string
+    - admin_ui:
+        order: 5
+        width: 200
+      name: page
+      type: string
+    - admin_ui:
+        order: 6
+        width: 120
+      name: session
+      type: string
+    - admin_ui:
+        order: 7
+        width: 200
+      name: user
+      target: users
+      type: link_single
+    indexes: []
+    server: full
+    title: Error log
   feedback:
     client: none
     columns:
@@ -313,9 +329,10 @@ db_schema:
     server: full
     title: Users
 metadata:
-  description: "Your real neighbourhood, rebuilt in 3D from the map. Run errands, make friends, fall in love, open businesses and take over the blocks. 150+ missions at real places."
-  logo_img: "asset:icon-512.png"
-  title: "City Fun Time: a life-sim game on your real streets in 3D"
+  description: Your real neighbourhood, rebuilt in 3D from the map. Run errands, make friends, fall in love, open businesses
+    and take over the blocks. 150+ missions at real places.
+  logo_img: asset:icon-512.png
+  title: 'City Fun Time: a life-sim game on your real streets in 3D'
 name: City Fun Time
 native_deps:
   head_html: |
@@ -376,19 +393,20 @@ native_deps:
     <!-- Prepsto feedback panel: every "Submit feedback" link and button opens it (it is the only feedback channel). No floating button, no cookies, nothing loads until it is opened. Codes: APP_MAKER/prepsto-links.json -->
     <script src="https://prepsto.com/_/theme/widget.js" data-prepsto="xz9nut9" data-button="false" data-label="Submit feedback" async></script>
     <link rel="stylesheet" href="_/theme/icons.css?v=8f508d76cd">
-    <link rel="stylesheet" href="_/theme/app.css?v=7382bdc9af">
+    <link rel="stylesheet" href="_/theme/app.css?v=49a140d46a">
     <script src="_/theme/app-kit.js?v=9ddf8e5515"></script>
     <script src="_/theme/ark-music.js?v=4ee0f1e082"></script>
-    <script src="_/theme/cft-kit.js?v=5e90d0646f"></script>
+    <script src="_/theme/cft-kit.js?v=8aa27f3923"></script>
     <!-- the game engine, loaded only when a page needs it (cft-kit.js reads these; tools/assets.py keeps ?v= current) -->
     <meta name="cft-asset" content="_/theme/three.min.js?v=a13f10ad8e">
-    <meta name="cft-asset" content="_/theme/cft-content.js?v=f36269f172">
+    <meta name="cft-asset" content="_/theme/cft-content.js?v=b5f703bad8">
     <meta name="cft-asset" content="_/theme/cft-tiles.js?v=a65067908e">
-    <meta name="cft-asset" content="_/theme/cft-world.js?v=0c406eb54b">
-    <meta name="cft-asset" content="_/theme/cft-fun.js?v=150ddf572f">
-    <meta name="cft-asset" content="_/theme/cft-rpg.js?v=37e5f7c88a">
-    <meta name="cft-asset" content="_/theme/cft-ui.js?v=2b94ebdca3">
-    <meta name="cft-asset" content="_/theme/cft-game.js?v=35ca93f3a1">
+    <meta name="cft-asset" content="_/theme/cft-world.js?v=c08ff2cd2e">
+    <meta name="cft-asset" content="_/theme/cft-fun.js?v=b2b406613e">
+    <meta name="cft-asset" content="_/theme/cft-rpg.js?v=39a3ced9b8">
+    <meta name="cft-asset" content="_/theme/cft-hero.js?v=f3e44eaec3">
+    <meta name="cft-asset" content="_/theme/cft-ui.js?v=d00742e2ad">
+    <meta name="cft-asset" content="_/theme/cft-game.js?v=90251b0d35">
 package_name: City_Fun_Time
 runtime_options:
   client_version: '3'

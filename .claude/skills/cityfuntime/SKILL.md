@@ -1,6 +1,6 @@
 ---
 name: cityfuntime
-description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 165 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
+description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 173 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events) and the main character update (blocks and parries, compliments and hype, Tom Hearton's and grocery outposts, smashing things, borrowed cars, GTA mission letters). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
 ---
 
 # City Fun Time: working on the app
@@ -81,7 +81,9 @@ theme/assets/
                       (W.burst, W.pop, W.shake), minimap + big map, snapshot
   cft-content.js      window.CFT_DATA: everything that is data (see Recipes). The last third is "the wacky update".
   cft-game.js         window.CFTGame: newSave / migrate / summary / missionBoard / reqMet + mount(root, opts) -> {G, destroy}; G = the rules
-  cft-fun.js          window.CFTFun.attach(G, api) -> G.fun: street life (see below)
+  cft-fun.js          window.CFTFun.attach(G, api) -> G.fun: street life + combat (see below)
+  cft-rpg.js          window.CFTRpg.attach(G, api) -> G.rpg: the long game (loot, talents, reputation...)
+  cft-hero.js         window.CFTHero.attach(G, api) -> G.hero: the main character update (hype, swagger, outposts, mission blips, borrowed cars)
   cft-ui.js           window.CFTUI.create(G, root) -> U: HUD, feed, banners, dialogue, U.choose, phone + 12 apps, panels, minigames, start screen
   app.css             all styles; the game's are the `/* ===== play.html =====` block (.cft-*)
 server_code/          Game.py (get_save, put_save, reset_save, leaderboard, admin_players...), Tiles.py (map backup), DemoData.py,
@@ -101,7 +103,7 @@ look}], grudges {placeId: bannedUntilDay}, feats {stickerId: day}}. Every positi
 now), dates, dramas, jokes, pedbonks, alarms, helped, dodged, crowned, pranks, escapes, caught, slides, bounces, ufos, crates,
 mobs, events.
 
-**Time and money:** 1 real second = 1 game minute (a day = 24 min). Walking 6.2 m/s, sprint 12.5 (`D.WALK`), rides in
+**Time and money:** 1 real second = 1 game minute (a day = 24 min). Walking 8.4 m/s, sprint 15.5 (`D.WALK`, 2026-11-17), rides in
 `D.VEHICLES`. Businesses earn `income × (1 + 0.6 × (lvl-1)) × incomeMul` per game hour. Level: `xpAt(l) = 60 × (l-1)^1.8`.
 
 ## The city (cft-world.js): what the wacky update added
@@ -228,6 +230,62 @@ eq {c1, c2, c3}, tal {}, rep {}, seen {}, ach {}, title, titles[], streets[], bl
 - HUD: health chip (first), the foe bar `U.foe(info)`, red edge `U.hurt()`, the 🍵 button. Tests: `tools/live/combattest.js`
   (`game_test.py --combat`, last in the full run); pictures `--monsters DIR`.
 
+## The main character update (cft-hero.js + combat in cft-fun.js + world in cft-world.js, 2026-11-17)
+
+The user: "move faster by default; upgrade graphics, more polygons; fighting needs blocks and an ability to anticipate an
+attack, so there is both chance and skill; the player needs to feel their ego massively boosted: other characters flirt and
+give compliments, a lot of text across the screen for the dopamine hit (this is for people having a tough time after work);
+missions on the map with an arrow and a big letter like GTA; wear gear, find it or receive it; Tim Hortons (named Tom
+Hearton's) and grocery stores to take over for energy and health (Far Cry); destroy things, they stay destroyed for the session;
+Diablo 2 monsters + gear, GTA missions slowly disclosed + cars destroying things, Far Cry outposts."
+- **Tone (keep it):** relentlessly kind. Compliments and flirts are PG and never about bodies; people cheer, never mock.
+  Settings → "Compliments and hype" Max (default) / Some / Off (`save.settings.hype`).
+- **Combat** (cft-fun.js, data `D.COMBAT`): `windUp(m)` when a chaser is within `m.r + reach * 0.85` → `m.wind` (0.55-1.05 s,
+  longer for big ones) with `m.tele` (❗ label) and `m.ring` (shrinks to the reach, gold in the parry window) → `strike(m)`:
+  out of reach = dodge; `F.blocking` = block (`F.blockPower()`, 22% guard break for champions/guards/bosses/rares, 6% others);
+  blocking started within `F.parryWindow()` before the strike = parry (stun 2.2 s, `F.counter` armed 3.5 s: next hit ×2.5);
+  else a 5%+ lucky dodge, else `touch(m)` (the old hit + coin grab). `m.recover` after a strike: hits are OPENINGS (×1.35).
+  Combos within `comboT`; aim assist + lunge in `F.attack`. Contact alone no longer hurts. `F.setBlock(on)` from cft-ui.js (G,
+  right mouse, the 🛡️ button). `W.blocking` slows you to 45% and raises fists/shield (cft-world.js updatePlayer). Driving at
+  > 7 m/s into a figment hits it (`runover`). Tests set `CFT_TEST.noLuck` to switch off the dice.
+- **Smashing** (cft-world.js): every lamp, bench, bin, hydrant, mailbox, tree and parked car is in `propBuckets` (`indexProp`
+  at register time; `s.inst[kind]` = its InstancedMeshes, instance i = item i). `W.propNear`, `W.hitProp(e, dmg, dir)` ->
+  'hit' | 'smashed' | 'wreck' (`PROP_HP`), debris chunks, hydrant geysers, wreck fires, a falling tree. `smashed` (a Map in the
+  world) = session only: a new visit builds a new world. Rebuilt sub-tiles re-apply it in `inst()`. cft-fun.js `smashProp`
+  adds counters (`smash`, `carsmash`, `wrecks`), coins, words. `W.onDriveHit` (set by cft-game.js) smashes what you drive into.
+- **Borrowed cars:** `W.borrowable(x, z, r)`, `W.borrowCar(pc)` hides the parked instance; `G.hero.borrow` sets a drive ride
+  without touching `save.equip.ride` (nothing saved); V (`G.toggleRide`) → `G.hero.park()` → `W.parkCar` leaves a loose car
+  (collidable, borrowable, smashable). `setRide` parks a borrowed car first.
+- **Outposts** (`D.OUTPOSTS`): `W.placeFix` (cft-game.js startWorld) renames every Tim Hortons (`D.HEARTON_RE`) to "Tom Hearton's"
+  and makes cafés/fast food among them kind `hearton`; made-up ones come from `D.SHOP_MIX` (`D.shopName('hearton')` is always
+  the chain name). Every `hearton` and `grocery` place starts occupied: within 62 m `spawnPack` (3-6 + a captain, leash 26 m,
+  `m.outpost` = place id); far away the pack despawns. Last one down → `liberate`: `save.hero.out[id]` (+ `outKind`),
+  `H.energyBonus()` (read by `G.maxEnergy`) / `H.hpBonus()` (read by `F.maxHp`), capped by `D.OUTPOSTS[kind].cap` (100 / 150:
+  a city has dozens of groceries), free item, a chest drop, a party. At most two packs at once (`packs.size`).
+  `H.placeGate(pl)` = the E prompt (occupied / free treat once a day in `save.hero.free`). `H.signInfo` shows 😈 / ⭐ on signs.
+- **The hype** (`D.HYPE`): `H.word(text, tone, sub, big)` (DOM `.cft-hw`, max 3), `H.ticker(text, who, emoji)` (`.cft-tk`, three
+  lanes sliding across), `H.event(name, o)` from the game: kill (streaks), parry, dodge, block, combo, smash, mission, level.
+  Ambient compliments every 6-11 s (Max), fans (`save.hero.fans`) every 80-140 s, admirers' gifts (gear incl. shields) every
+  170-260 s, both by a passer-by who runs over (`ped.ctl`). Swagger `save.hero.swag` 0-100 → `mainMode()` 25 s:
+  `H.speedMul()` 1.25 (in `speedMul`), `H.dmgMul()` 1.5 (in `F.attack`), a golden point light on the avatar.
+- **Mission blips:** `H.letterOf(spot)` = the giver's initial (titles like Officer/Chef dropped). 3D: a beam + a big letter label
+  per open spot within 1.1 km (`updateBlips3D`); DOM pointers (`.cft-blip`) for the tracked goal + the 4 nearest, clamped to the
+  screen edge with an arrow (`W.project`). Minimap/big map: markers with `letter` (drawn by `W.drawMinimap` / `W.drawMap`; edge
+  markers get an arrow). Quests page: `mystery()` in cft-kit.js shows "???" for locked missions whose requirements are not yet
+  open or done.
+- **Shields:** gear slot `hand` (`D.RPG.GEAR.hand`, `it.blk`, bonus key `block`), drawn by `W.shieldMesh` on the left forearm
+  (`look.shield` from `R.lookParts`), raised by the block pose.
+- **Graphics (high quality only; low keeps the old look):** 4096 shadow map where the GPU allows + a fill light; 512 px window
+  texture; walls darken towards the ground (two bands in `addWalls`); `cornice()` ledges (roof line, above shopfronts) in the
+  roofs geometry; pavements (`KERB_Y` 0.13 above the ground, skipped where another road crosses) and edge lines; three-puff tree
+  crowns + branched trunks (vertex colours × instance colour); detailed parked cars (`carBody`) and traffic (`W.vehicle`);
+  lamp halos (`MAT.halo`); CSS vignette + `saturate/contrast` on the canvas (not on touch devices).
+- **Outposts never spawn within 90 m of home** (home is calm). The older suites set `CFT_TEST.outposts = false` (with ~70
+  groceries in reach, packs joined their night-monster checks and knocked the tester out); herotest.js turns them on.
+- **A new mission's giver must already have met you** and should use that person's usual spot (`at`): a second spot key for
+  the same person (e.g. `rosa@home` next to `rosa@bakery`) puts two copies of them in one place and E talks to the wrong one.
+- **Tests:** `game_test.py --hero` (herotest.js, also last in the full run); pictures `--heroshots DIR`.
+
 ## Recipes
 
 - **New page:** copy a similar `client_code/Pages/<Name>/`, register it in `client_code/router.py`; new field on Life / Quests /
@@ -249,6 +307,10 @@ eq {c1, c2, c3}, tal {}, rep {}, seen {}, ach {}, title, titles[], streets[], bl
   `D.CITY_MONSTERS[id]`. **New gear base:** `D.RPG.GEAR[slot]` (head/body need a `look`).
 - **New achievement / faction / talent / rare:** an entry in `D.RPG.ACH` / `FACTIONS` / `TALENTS` / `RARES`; a new bonus key
   also needs reading where it applies. **New loot source:** `D.RPG.SOURCES` + a `G.rpg.drop('name')` call.
+- **New hype line / word:** `D.HYPE` lists ({name} = the player's name). **New outpost kind:** `D.OUTPOSTS[kind]` (+ a captain
+  name in `D.OUTPOST_CAPTAIN`; a bonus `what` other than energy/health needs reading in `H.energyBonus`/`H.hpBonus`).
+  **New smashable kind:** a list in `layProps` via `put(kind, ...)`, `PROP_HP`, `DEBRIS_COL`, `SMASH_FX`, drawn by `inst(kind, ...)`.
+  **New shield:** `D.RPG.GEAR.hand` + a case in `W.shieldMesh`.
 - **New street person:** `D.STREETFOLK` ({id, n, e, hi, story[2], look}); props per persona in `spawnFolk`.
 - **Balance:** prices in ITEMS, BUSINESSES income/cost, mission rewards, `D.MONSTERS` (speed below `D.WALK.run`: the content
   check insists), chaser speed in `updateChasers`, event pace `eventT`, spawn counts in cft-world.js `life`.
@@ -263,6 +325,8 @@ eq {c1, c2, c3}, tal {}, rep {}, seen {}, ach {}, title, titles[], streets[], bl
 
 ## Gotchas
 
+- **Tim Hortons is always "Tom Hearton's"** (the user's rule, for legal reasons): never show the real name. Outposts are
+  liberations (figments occupy the place; staff thank you), never mockery of the business.
 - **Real places are real businesses.** Shops from the map carry real names: never write content that mocks one, and keep pranks,
   bans, angry owners and rivals on `place.virtual` (made-up) shops only. The Terms say the game puts fiction near real places.
 - **three.js is r149.** It keeps one shader per material, so a material shared by InstancedMeshes with and without per-instance

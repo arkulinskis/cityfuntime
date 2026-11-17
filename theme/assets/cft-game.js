@@ -170,7 +170,7 @@ function mount(root, opts) {
   }
   G.stat = stat;
   G.level = () => levelOf(save.xp);
-  G.maxEnergy = () => 100 + Math.floor(stat('fit')) * 2 + (save.maxE || 0) + setBonus('energy') + (isFriend('kim') ? 10 : 0);
+  G.maxEnergy = () => 100 + Math.floor(stat('fit')) * 2 + (save.maxE || 0) + setBonus('energy') + (isFriend('kim') ? 10 : 0) + (G.hero ? G.hero.energyBonus() : 0);  // + liberated Tom Hearton's
   G.discount = () => Math.min(0.4, Math.min(0.25, stat('style') * 0.006) + (G.rpg ? G.rpg.bonus('discount') : 0));
   G.relMul = () => 1 + stat('charm') * 0.03;
   G.happyMul = () => 0.8 + save.happy / 250;
@@ -191,6 +191,7 @@ function mount(root, opts) {
     if (save.energy <= 0 && !ride) m *= 0.8;
     if (G.fun) m *= G.fun.speedMul();
     if (G.rpg) m *= 1 + G.rpg.bonus('speed');
+    if (G.hero) m *= G.hero.speedMul();  // main character mode
     return m;
   }
   G.happyTarget = function () {
@@ -223,6 +224,7 @@ function mount(root, opts) {
       G.sfx.level();
       U.banner('Level ' + after + '!', G.rpg ? G.rpg.levelText(after) : 'You\'re getting better at city life.', 'level');
       if (G.rpg) G.rpg.onLevel(after);
+      if (G.hero) G.hero.event('level', { lv: after });
       log('Reached level ' + after, '⭐');
       save.energy = G.maxEnergy();
     }
@@ -604,6 +606,7 @@ function mount(root, opts) {
     U.confetti();
     if (m.outro && m.outro.length) await U.dialog({ who: m.giver, lines: m.outro.map(l => G.text(l)) });
     U.banner('🏆 ' + m.title, parts.join(' · ') || 'Mission complete!', 'done');
+    if (G.hero) G.hero.event('mission', { m });
     if (save.dyn[id]) { delete save.dyn[id]; delete save.m[id]; }
     refreshAvailability();
     dirty(true);
@@ -1306,6 +1309,7 @@ function mount(root, opts) {
   G.playerLook = playerLook;
   function setRide(id) {
     if (id && !owned(id)) return;
+    if (G.hero && G.hero.borrowed) G.hero.park();  // leave the borrowed car at the kerb
     save.equip.ride = id || null;
     if (id) save.equip.lastRide = id;
     const v = id ? D.VEHICLES[id] : null;
@@ -1316,6 +1320,7 @@ function mount(root, opts) {
   }
   G.setRide = setRide;
   G.toggleRide = function () {
+    if (G.hero && G.hero.borrowed) { G.hero.park(); U.toast('🚗 Parked. Press E next to it to drive again.'); refreshFollowers(); return; }
     if (save.equip.ride) { setRide(null); U.toast('On foot'); return; }
     const best = save.equip.lastRide && owned(save.equip.lastRide) ? save.equip.lastRide : Object.keys(D.VEHICLES).filter(owned).pop();
     if (!best) { U.toast('No ride yet. Bike & board shops sell skateboards.'); return; }
@@ -1901,6 +1906,10 @@ function mount(root, opts) {
     // home
     const h = homeSpot();
     if (Math.hypot(h.x - p.x, h.z - p.z) < 8) return { t: '🏠 Home', fn: () => U.homePanel() };
+    // a parked car you're touching: borrow it (GTA-style; cft-hero.js)
+    const onFootNow = W.ride().mode === 'foot';
+    const pcar = G.hero && onFootNow && !save.equip.ride && W.borrowable(p.x, p.z, 1.3);
+    if (pcar) return { t: '🚗 Borrow this car', fn: () => G.hero.borrow(pcar) };
     // shops
     let pl = null, pd = 9;
     for (const q of G.allPlaces()) { const d = Math.hypot(q.pin.x - p.x, q.pin.z - p.z); if (d < pd) { pd = d; pl = q; } }
@@ -1908,11 +1917,15 @@ function mount(root, opts) {
       if (pl.kind === 'metro' && metroOpen(pl)) visitMetro(pl);
       const gate = G.fun && G.fun.shopGate(pl); // a made-up shop that banned you after a prank
       if (gate) return gate;
+      const og = G.hero && G.hero.placeGate(pl); // Tom Hearton's / groceries: occupied, or a free treat once liberated
+      if (og) return og;
       const k = D.KINDS[pl.kind];
       if (pl.kind === 'metro') return metroOpen(pl) ? { t: '🚇 Ride the metro', fn: () => U.metroPanel(pl) } : { t: '🚇 ' + (G.fun ? G.fun.stationName(pl) : pl.name || 'Metro') + ': a guardian blocks the stairs', fn: () => U.toast('Beat the guardian here and this station joins your metro network.') };
       if (pl.kind === 'bank') return { t: '🏦 ' + (pl.name || 'Bank'), fn: () => U.bankPanel(pl) };
       if (k && k.sells.length) return { t: k.e + ' ' + (pl.name || k.n), fn: () => U.shopPanel(pl) };
     }
+    const pcar2 = G.hero && onFootNow && !save.equip.ride && W.borrowable(p.x, p.z, 2.4);
+    if (pcar2) return { t: '🚗 Borrow this car', fn: () => G.hero.borrow(pcar2) };
     // followers you can talk to
     for (const f of rt.followers) { if (D.CAST[f.who] && !D.CAST[f.who].animal && Math.hypot(f.obj.position.x - p.x, f.obj.position.z - p.z) < 2.6) { const fw = f.who; return { t: '💬 Talk to ' + D.CAST[fw].n, fn: () => talkTo({ who: fw, open: G.openMissions().filter(id => getM(id).giver === fw), active: G.activeMissions().filter(id => { const s = curStep(id); return s && s.who === fw && s.do === 'talk'; }) }) }; } }
     // people on the street
@@ -2040,6 +2053,7 @@ function mount(root, opts) {
     updateSigns();
     if (G.fun) G.fun.tick(dt, paused || rt.busy);
     if (G.rpg) G.rpg.tick(dt, paused || rt.busy);
+    if (G.hero) G.hero.tick(dt, paused || rt.busy);
     rt.promptTimer -= dt;
     if (rt.promptTimer <= 0) { rt.promptTimer = 0.15; rt.interact = (paused || rt.busy) ? null : findInteraction(); U.prompt(rt.interact ? rt.interact.t : null); }
     // goal beam + arrow
@@ -2080,12 +2094,19 @@ function mount(root, opts) {
       for (const m of D.SHOP_MIX) { if (r < m[1]) { kind = m[0]; break; } r -= m[1]; }
       return { kind, name: D.shopName(kind, hash(seed + 23)) };
     };
+    // every Tim Hortons on the map is shown as Tom Hearton's (the user's request, for legal reasons), and is an outpost
+    W.placeFix = pl => {
+      if (!pl.name || !D.HEARTON_RE.test(pl.name)) return;
+      if (['cafe', 'fastfood', 'bakery', 'restaurant'].includes(pl.kind) || !pl.kind) { pl.name = 'Tom Hearton\'s'; pl.kind = 'hearton'; }
+      else pl.name = pl.name.replace(/tim\s*hortons?/ig, 'Tom Hearton\'s');
+    };
     W.signList = () => G.allPlaces();
     W.signInfo = pl => {
       const k = D.KINDS[pl.kind];
       if (!k) return null;
       for (const id of Object.keys(save.biz)) if (dist(xz(save.biz[id]), pl.pin) < 16) return null; // your own sign hangs there
-      return { e: k.e, name: pl.name || k.n, col: D.SIGN_COLS[pl.kind] || '#6b4eff' };
+      const info = { e: k.e, name: pl.name || k.n, col: D.SIGN_COLS[pl.kind] || '#6b4eff' };
+      return G.hero ? G.hero.signInfo(pl, info) : info;
     };
     W.setOrigin(save.home.lat, save.home.lon);
     W.setLook(playerLook());
@@ -2114,6 +2135,9 @@ function mount(root, opts) {
     for (const id of Object.keys(save.biz)) buildBizSign(id);
     if (window.CFTFun) G.fun = window.CFTFun.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, chatPed, setBusy: v => { rt.busy = !!v; } });
     if (window.CFTRpg) G.rpg = window.CFTRpg.attach(G, { spawnPickup });
+    if (window.CFTHero) G.hero = window.CFTHero.attach(G, { bump, spawnPickup });
+    // driving into things smashes them (borrowed cars and your own rides alike)
+    W.onDriveHit = (e, speed, dir) => { if (G.fun) G.fun.smashProp(e, speed > 9 ? 99 : speed * 0.5, dir, true); };
     W.setLook(playerLook());
     refreshAvailability();
     refreshFollowers();
@@ -2158,6 +2182,7 @@ function mount(root, opts) {
       if (window.ArkMusic) window.ArkMusic.stop();
       if (G.fun) G.fun.destroy();
       if (G.rpg) G.rpg.destroy();
+      if (G.hero) G.hero.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();
       U.destroy();

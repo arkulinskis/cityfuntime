@@ -54,6 +54,7 @@ window.__cftOut = []; window.__cftDone = false;
     G.accept('c1-rosa');
     goLL(s.m['c1-rosa'].tg);
     await talk('rosa');
+    if (st('c1-rosa') !== 'done') { const a = near('rosa'); out.push('INFO ' + 'rosa debug: actor ' + !!a + (a ? ' at ' + Math.round(Math.hypot(a.x - W.player.pos.x, a.z - W.player.pos.z)) + ' m' : '') + ', peek ' + JSON.stringify((G.peek() || {}).t) + ', open ' + U.isOpen() + ' [' + [...document.querySelectorAll('.cft-ov')].map(o => o.className).join(' | ') + '], busy ' + G.rt.busy + ', state ' + JSON.stringify(s.m['c1-rosa'])); }
     ok(st('c1-rosa') === 'done', 'met Nonna Rosa at ' + s.spots['rosa@bakery'].name);
     ok(s.bag.cannoli >= 1, 'Rosa handed over a cannoli');
 

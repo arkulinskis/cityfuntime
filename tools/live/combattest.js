@@ -10,7 +10,7 @@ window.__cmbOut = []; window.__cmbDone = false;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const G = window.__cft, W = G.W, U = G.ui, s = G.save, D = G.D, F = G.fun, R = G.rpg;
   const sim = n => G.stepSim(n);
-  const T = window.CFT_TEST = Object.assign(window.CFT_TEST || {}, { norender: true, calm: true });
+  const T = window.CFT_TEST = Object.assign(window.CFT_TEST || {}, { norender: true, calm: true, outposts: false });
   async function drain() {
     for (let i = 0; i < 60; i++) {
       await sleep(70);

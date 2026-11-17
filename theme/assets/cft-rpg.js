@@ -17,7 +17,7 @@
 (function () {
 'use strict';
 const STATS = ['fit', 'charm', 'smarts', 'style', 'cred'];
-const GEAR = ['weapon', 'head', 'body', 'feet'];  // gear you can see on your character (Diablo-style), next to three charms
+const GEAR = ['weapon', 'hand', 'head', 'body', 'feet'];  // hand = the off-hand shield (2026-11-17: blocks)  // gear you can see on your character (Diablo-style), next to three charms
 
 function attach(G, api) {
   const D = G.D, W = G.W, U = G.ui, X = D.RPG, THREE = W.THREE;
@@ -50,7 +50,7 @@ function attach(G, api) {
     for (const slot of X.SLOTS.concat(GEAR)) {
       const it = item(r.eq[slot]); if (!it) continue;
       for (const k of Object.keys(it.st || {})) add('stat_' + k, it.st[k]); for (const k of Object.keys(it.px || {})) add(k, it.px[k]);
-      if (it.ar) add('armor', it.ar); if (it.lf) add('life', it.lf); if (it.sp) add('speed', it.sp);
+      if (it.ar) add('armor', it.ar); if (it.lf) add('life', it.lf); if (it.sp) add('speed', it.sp); if (it.blk) add('block', it.blk);
     }
     for (const f of X.FACTIONS) { const t = tier(f); for (let i = 1; i <= t; i++) { const rw = f.rewards[i]; if (rw && rw.fx) for (const k of Object.keys(rw.fx)) add(k, rw.fx[k]); } }
     return acc;
@@ -60,7 +60,7 @@ function attach(G, api) {
   // ------------------------------------------------------------------ loot
   const item = id => id ? st().loot.find(x => x.id === id) || null : null;
   const equipped = id => X.SLOTS.concat(GEAR).some(s => st().eq[s] === id);
-  function score(it) { if (!it) return -1; let v = 0; for (const k of Object.keys(it.st || {})) v += it.st[k]; if (it.px) v += 1.5 * (it.q >= 5 ? 1.6 : 1); v += (it.ar || 0) * 0.12 + (it.lf || 0) * 0.06 + (it.sp || 0) * 40 + (it.dmg || 0) * 2.5; return v; }
+  function score(it) { if (!it) return -1; let v = 0; for (const k of Object.keys(it.st || {})) v += it.st[k]; if (it.px) v += 1.5 * (it.q >= 5 ? 1.6 : 1); v += (it.ar || 0) * 0.12 + (it.lf || 0) * 0.06 + (it.sp || 0) * 40 + (it.dmg || 0) * 2.5 + (it.blk || 0) * 12; return v; }
   function perkText(it) {
     if (!it.px) return '';
     const k = Object.keys(it.px)[0], p = X.PERKS.find(x => x.k === k), v = it.px[k];
@@ -72,6 +72,7 @@ function attach(G, api) {
     if (it.ar) parts.push('Armour ' + it.ar);
     if (it.lf) parts.push('+' + it.lf + ' health');
     if (it.sp) parts.push('+' + Math.round(it.sp * 100) + '% speed');
+    if (it.blk) parts.push('Block +' + Math.round(it.blk * 100) + '%');
     parts.push(...Object.keys(it.st || {}).map(k => '+' + it.st[k] + ' ' + (D.STATS.find(x => x.id === k) || { name: k }).name));
     const pk = perkText(it); if (pk) parts.push(pk);
     return parts.join(' · ') || 'Sells for ' + fmt$(sellPrice(it));
@@ -117,6 +118,7 @@ function attach(G, api) {
       it.ar = Math.max(1, Math.round(X.GEAR_AR[slot] * (1 + il * 0.25) * k));
       if (slot === 'body') it.lf = Math.round((5 + il * 1.6) * k);
       if (slot === 'feet') it.sp = +(0.012 * k).toFixed(3);
+      if (slot === 'hand') it.blk = +Math.min(0.32, (0.05 + il * 0.006) * k).toFixed(3);  // a stronger block, an easier parry
     }
     const budget = (0.3 + il * 0.07) * k;
     if (q >= 2) { const f1 = o.focus || pick(STATS); it.st[f1] = r1(budget); if (q >= 3) it.st[pick(STATS.filter(x => x !== f1))] = r1(budget * 0.6); }
@@ -126,7 +128,7 @@ function attach(G, api) {
     it.v = Math.round((q + 1) * (q + 1) * (3 + il));
     return it;
   }
-  function pickSlot() { const x = Math.random(); return x < 0.3 ? 'charm' : x < 0.45 ? 'weapon' : x < 0.62 ? 'head' : x < 0.82 ? 'body' : 'feet'; }
+  function pickSlot() { const x = Math.random(); return x < 0.27 ? 'charm' : x < 0.41 ? 'weapon' : x < 0.52 ? 'hand' : x < 0.66 ? 'head' : x < 0.84 ? 'body' : 'feet'; }
   function ilvl(q) { return Math.max(1, G.level() + (q >= 4 ? 2 : 0) + Math.floor(rnd(-1, 2))); }
   // A drop from a source (D.RPG.SOURCES). Returns the item, or null when nothing dropped.
   function drop(src, o) {
@@ -177,7 +179,7 @@ function attach(G, api) {
     r.eq[slot] = id; it.fresh = 0;
     mark(); G.dirty(); return true;
   }
-  function unequip(slot) { const had = st().eq[slot]; st().eq[slot] = null; mark(); if (had && (slot === 'head' || slot === 'body' || slot === 'feet')) W.setLook(G.playerLook()); G.dirty(); }
+  function unequip(slot) { const had = st().eq[slot]; st().eq[slot] = null; mark(); if (had && (slot === 'head' || slot === 'body' || slot === 'feet' || slot === 'hand')) W.setLook(G.playerLook()); G.dirty(); }
   function sell(id, silent) {
     const r = st(), i = r.loot.findIndex(x => x.id === id);
     if (i < 0) return 0;
@@ -205,7 +207,8 @@ function attach(G, api) {
 
   // what your gear looks like on you (cft-game.js playerLook)
   function lookParts() {
-    const r = st(), o = {}, h = item(r.eq.head), b = item(r.eq.body), f = item(r.eq.feet);
+    const r = st(), o = {}, h = item(r.eq.head), b = item(r.eq.body), f = item(r.eq.feet), sh = item(r.eq.hand);
+    if (sh) o.shield = { kind: sh.base, col: sh.col };
     if (h) { const base = X.GEAR.head.find(x => x.id === h.base) || {}; if (base.look === 'beanie') { o.beanie = h.col; o.hat = null; } else { o.hat = h.col; o.beanie = null; } }
     if (b) { const L = (X.GEAR.body.find(x => x.id === b.base) || {}).look || {}; Object.assign(o, { shirt: b.col, sleeve: 'long', collar: !!L.collar, coat: L.coat ? b.col : null, stripes: L.stripes ? 0xf4f1ea : null, logo: null, tie: null }); }
     if (f) o.shoe = f.col;

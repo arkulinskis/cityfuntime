@@ -4,7 +4,7 @@ A life-simulation game on your real streets. Type your address and the neighbour
 OpenStreetMap, on its real hills: buildings, streets, parks, house numbers and shop names, filled with people walking dogs, traffic
 (that stops at red lights), pigeons and, after dark, cartoon monsters you bonk with a baguette. You arrive with $20 and a backpack, crash on Cousin Max's couch, and work your way up: errands for Nonna Rosa,
 odd jobs, a lemonade stand, a skateboard, friends, love, a wedding, kids, fifteen businesses, a penthouse, and every block
-won back from the crews. 165 missions, played at real places near you. Built on [Anvil](https://anvil.works); grown out of
+won back from the crews. 173 missions, played at real places near you. Built on [Anvil](https://anvil.works); grown out of
 City Coin Run (`Documents/CLAUDE/citycoinrun`).
 
 - **App repo:** github.com/arkulinskis/cityfuntime (branch `master`). Anvil pulls `master`.
@@ -16,7 +16,7 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
 - **Landing page** (`#landing`): the promise, how it works, everything in the game, the cast, FAQ.
 - **The game** (`#play`, full screen): a move-in screen (name, skin/hair/shirt, then an address search, "use where I am", or six
   featured neighbourhoods in Montréal and New York), then the 3D city. Guests save in the browser.
-- **Quests** (`#quests`): all 165 missions by chapter with status, story, steps and rewards. **Album** (`#album`): 84 stickers in 14
+- **Quests** (`#quests`): all 173 missions by chapter with status, story, steps and rewards. **Album** (`#album`): 84 stickers in 14
   sets plus the photos from photo missions. **Leaderboard** (`#ranks`): net worth, level, blocks, missions.
 
 **In the game:**
@@ -92,8 +92,8 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
 - **Made-up shops and signs:** besides the real places from the map, about one building in four along the streets holds a
   made-up shop (26 kinds, generated names, always the same shop in the same building). Every place, real or made-up, has a
   sign on its wall in its kind's colour, a striped awning and a round blade sign.
-- **Faster:** walking 6.2 m/s, sprinting 12.5 m/s, every ride about 12% quicker, a double jump (Space twice), the view widens
-  with speed.
+- **Faster:** walking 8.4 m/s, sprinting 15.5 m/s (since 2026-11-17; was 6.2 / 12.5), every ride about 12% quicker, a double
+  jump (Space twice), the view widens with speed.
 - **Monsters and silly weapons:** after 21:30 sidewalk slimes, cone gremlins, trash goblins and lost-sock ghosts come out,
   chase you and grab a few coins; bonk them (F, the hand button, or a click) and they pop into coins and give yours back.
   Pigeonzilla and King Blob (a boss with his own mission) show up now and then. Nine weapons from the shops: stale baguette,
@@ -112,6 +112,38 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
 - **Street events** every minute or so: a money truck spills coins, a flash mob you can join, a UFO whose beam leaves a gem, a
   furious goose, a slime alert, a parachuting mystery crate, a pack of friendly dogs, Pigeonzilla. Banana peels are speed
   boosts; trampolines throw you at coins in the air. A 14th sticker set, **Shenanigans**, is earned by feats only.
+
+**The main character update** (2026-11-17; for people unwinding after a tough day: everyone adores you):
+- **Blocks and parries:** every figment winds up before it strikes (a red ❗ and a ring on the ground that shrinks to its
+  reach and turns gold at the last moment). Hold **G**, the **right mouse button** or **🛡️** to block most of the damage
+  (heavy hitters can still break through); block in that last moment for a **PERFECT PARRY**: no damage, the figment reels,
+  your next hit is a **COUNTER** (×2.5). Step out of reach to dodge; hits while it recovers are **OPENINGS**; quick hits build
+  combos; a little aim assist and lunge. Luck plays a part too (lucky dodges, guard breaks, crits). A bit more Diablo:
+  more figments by day and night.
+- **Everyone loves you:** passers-by compliment you and flirt (PG) out loud, by name; their lines also slide across the
+  screen. Big hype words for streaks (DOUBLE BONK! → GODLIKE!), combos, parries, smashes, missions and level-ups; people
+  cheer after fights; fans run over for selfies; admirers bring gifts (gear). Settings → Compliments and hype: Max / Some / Off.
+- **✨ Swagger:** a meter that fills from all of that. Full = **MAIN CHARACTER MODE** for 25 s: faster, stronger, a golden
+  glow, the whole street stares and cheers.
+- **Tom Hearton's and groceries (Far Cry outposts):** every Tim Hortons on the map is shown as **Tom Hearton's** (and made-up
+  ones open in real buildings, so every city has some); every grocery store too. Figments hold them (a pack with a captain;
+  the sign shows 😈). Clear them out: Tom Hearton's gives **+5 max energy** for good and a free double-double every day; a
+  grocery gives **+5 max health** for good and a free snack bag every day (in all up to +100 energy and +150 health; at most
+  two outpost fights at a time). Plus gear and a party.
+- **Smash things:** bonk or drive into lamps, benches, bins, hydrants (a fountain), mailboxes, trees and parked cars (they
+  burn out into wrecks). Coins fall out. Smashed things stay smashed for the rest of the visit and are back next time.
+- **Borrow any parked car:** E next to it ("keys are in it, superstar!"); V parks it at the kerb again. Drive into things to
+  smash them, or into figments to knock them flat.
+- **GTA mission letters:** everyone with a mission has a light pillar and a big letter (M for Max, B for Bouchard...) over
+  them, on the minimap (stuck to the edge with an arrow when far) and as on-screen pointers with the distance. The Quests page
+  only names missions that are one step away; the rest are "???" until you get there.
+- **Shields:** a new off-hand gear slot (trash-can lid, pizza box, frying pan, umbrella, skateboard deck, cafeteria tray),
+  worn on your arm and raised when you block: a stronger block and an easier parry.
+- **High-end look:** pavements with kerbs, edge lines on big roads, cornices and shopfront ledges, walls that darken towards
+  the street, crisper windows with plants and rails, leafy trees, detailed cars (bumpers, lights, mirrors, hubcaps), lamp
+  halos at night, a fill light, sharper shadows, a soft vignette and colour grade (high graphics; low keeps the light version).
+- **Seven new missions:** Hold the Line, Morning Rush, Aisle Hero, Wrecking Ball, Keys in the Ignition, Main Character
+  Energy, The Liberator.
 
 **For members:** the same game saved to the server (and still in the browser), the **Life** page (`#life`, home after sign-in):
 level, money, net worth, stats, home, love & family, friends, businesses, blocks, stickers, the current mission and the diary.
@@ -167,7 +199,7 @@ What this project uses besides its own code. Generated by `APP_MAKER/tools/libra
 
 **Built into the browser:** Canvas 2D, WebGL, Pointer Lock, Geolocation, Web Audio API, localStorage, File downloads (Blob), IndexedDB.
 
-**Anvil platform:** Anvil, Anvil Data Tables, Anvil JS bridge (anvil.js), Anvil Users, Anvil Google service, Anvil HTTP.
+**Anvil platform:** Anvil, Anvil Data Tables, Anvil JS bridge (anvil.js), Anvil Secrets, Anvil Users, Anvil Google service, Anvil HTTP.
 
 **Build and test tools (not shipped):** axe-core, Node.js, Headless Chrome (DevTools Protocol), PyYAML.
 

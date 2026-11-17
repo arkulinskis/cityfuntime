@@ -11,7 +11,13 @@
    damage numbers, blacking out and coming to at home or the nearest freed metro station (your wallet stays where you fell),
    15 monster types named after your city, and a guardian at every metro entrance: beat it and the station opens.
    F.maxHp() · F.hurt(n) · F.heal(n) · F.quaff() · F.metroOpen(place) · F.localName(kind) · F.cityName()
-   Everything it keeps is in save.fun: {hearts, king, folk{}, folkAt{}, crushes[], grudges{}, feats{}, hp, cleared{}, wallet}. */
+   Everything it keeps is in save.fun: {hearts, king, folk{}, folkAt{}, crushes[], grudges{}, feats{}, hp, cleared{}, wallet}.
+   Combat rework (2026-11-17, "blocks and an ability to anticipate an attack, so there is both chance and skill"): a monster
+   in reach winds up (red ❗ + a ring that shrinks to its reach), then strikes. Step out of reach = dodged; hold block
+   (F.setBlock: G, right mouse, 🛡️) = most of the damage stopped (a heavy hitter can still break it); block in the last
+   moment before the strike (D.COMBAT.parry + shield) = PERFECT PARRY (no damage, a long stun, your next hit counters for
+   x2.5). Hits during a monster's recovery are OPENINGS (x1.35). Quick hits build a combo. F swings also smash street
+   furniture and parked cars (W.hitProp); driving into a monster knocks it flat. Hype events go to G.hero. */
 (function () {
 'use strict';
 
@@ -26,6 +32,10 @@ function attach(G, api) {
   const fmt$ = G.fmt$;
   const LOW = !W.renderer.shadowMap.enabled;
   const F = { monsters: [], folk: [], sweet: new Map(), chasers: [], peels: [], pads: [], shots: [], event: null, boost: 0, boostMul: 1 };
+  const CB = D.COMBAT || { wind: [0.55, 1.05], reach: 1.9, recover: 0.75, parry: 0.3, block: 0.6, counter: 2.5, opening: 1.35, comboT: 1.25 };
+  const hype = (ev, o) => { if (G.hero) G.hero.event(ev, o || {}); };
+  F.blocking = false; F.blockStart = -99; F.combo = 0; F.counter = 0;
+  let lastHitT = -99;
   let alive = true, cool = 0, slow = 0, propT = 0, eventT = 45 + Math.random() * 25, shopT = 0, rivalCool = 0, weaponOn, lastHurt = -99, foeT = 0, guardT = 0;
   F.guards = new Map();
 
@@ -99,11 +109,28 @@ function attach(G, api) {
     const it = D.ITEMS[save().equip.weapon];
     W.setWeapon(!onFoot() ? null : lw ? lw.mesh : it && it.weapon ? it.weapon.mesh : null);
   }
+  // Guarding: G, the right mouse button or the 🛡️ button, held. On foot only.
+  F.setBlock = function (on) {
+    on = !!on && alive && onFoot() && !F.dying;
+    if (on && !F.blocking) F.blockStart = G.rt.t;
+    F.blocking = on; W.blocking = on;
+  };
+  F.blockPower = () => clamp(CB.block + (G.rpg ? G.rpg.bonus('block') : 0), 0.4, 0.92);
+  F.parryWindow = () => CB.parry + (G.rpg ? G.rpg.bonus('block') : 0) * 0.6;
   F.attack = function () {
     if (!alive || quiet() || cool > 0) return false;
-    if (!onFoot()) { U.toast('Hop off your ride to bonk things (V).'); cool = 0.6; return false; }
-    const w = G.rpg ? G.rpg.modWeapon(weapon()) : weapon(), p = P(), f = facing();
+    if (!onFoot()) { U.toast('Hop off your ride to bonk things (V), or just drive into them.'); cool = 0.6; return false; }
+    if (F.blocking) return false;
+    const w = G.rpg ? G.rpg.modWeapon(weapon()) : weapon(), p = P();
+    // aim assist: turn to the nearest figment in front of you (or right next to you), with a little lunge. Never when
+    // one is already in reach and in front: that's the one you meant.
+    let aim = null, ad = w.reach + 2.6;
+    const lined = F.monsters.some(m => { if (m.dead) return false; const f0 = facing(), dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz); return d < w.reach + m.r && (d < 0.8 || (dx * f0.x + dz * f0.z) / d > 0.5); });
+    if (!lined) { const f0 = facing(); for (const m of F.monsters) { if (m.dead) continue; const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz) - m.r; if (d < ad && (d < w.reach * 0.6 || (dx * f0.x + dz * f0.z) / (d + m.r + 1e-6) > -0.2)) { ad = d; aim = m; } } }
+    if (aim) { W.player.face = Math.atan2(-(aim.x - p.x), -(aim.z - p.z)); if (ad > w.reach * 0.8 && ad < w.reach + 2.6) { const L = Math.max(0, ad - w.reach * 0.7), f1 = facing(); p.x += f1.x * Math.min(L, 1.8); p.z += f1.z * Math.min(L, 1.8); W.collide(p, 0.4); } }
+    const f = facing();
     w.dmg *= 1 + 0.15 * (G.level() - 1);  // you grow stronger with every level (monsters do too)
+    if (G.hero) w.dmg *= G.hero.dmgMul();  // main character mode
     cool = w.ranged === 'shot' ? 0.32 : 0.42;
     W.swing();
     G.sfx.swing();
@@ -116,11 +143,21 @@ function attach(G, api) {
       return true;
     }
     const cone = w.ranged === 'cone';
+    const countered = F.counter > G.rt.t;
     for (const m of F.monsters) {
       const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
       if (d > w.reach + m.r || (d > 0.8 && (dx * f.x + dz * f.z) / d < (cone ? 0.55 : 0.15))) continue;
-      hitMonster(m, w, f); hits++;
+      const hw = Object.assign({}, w);
+      if (countered) { hw.dmg *= CB.counter; hw.word = 'COUNTER!'; hw.stun = (hw.stun || 0) + 1; }
+      else if (m.recover > 0) { hw.dmg *= CB.opening; hw.word = 'OPENING!'; }
+      hw.dmg *= 1 + 0.06 * Math.min(10, F.combo);
+      hitMonster(m, hw, f); hits++;
       if (!cone && hits >= 3) break;
+    }
+    if (hits) {
+      if (countered) F.counter = 0;
+      F.combo = G.rt.t - lastHitT < CB.comboT ? F.combo + 1 : 1; lastHitT = G.rt.t;
+      if (F.combo >= 3) hype('combo', { n: F.combo });
     }
     for (const c of F.chasers) {
       const dx = c.x - p.x, dz = c.z - p.z, d = Math.hypot(dx, dz);
@@ -136,13 +173,39 @@ function attach(G, api) {
       if (Math.random() < 0.2) { const by = W.nearestPed(p.x, p.z, 10); if (by) { W.holdPed(by, 2, null); sayAt(by.obj, pick(D.STATIC_LINES), 2.2); } }  // they can't see what you're fighting
       return true;
     }
-    // nothing monstrous in reach: a passer-by, a sweetheart, or a parked car's alarm
+    // nothing monstrous in reach: street furniture to smash, a passer-by, or a parked car (alarm, then a wreck)
+    const thing = W.propNear && W.propNear(p.x + f.x * 1.3, p.z + f.z * 1.3, w.reach * 0.7 + 0.4);
+    if (thing) { smashProp(thing, w.dmg * 2.2, f, false); return true; }
     const ped = W.nearestPed(p.x + f.x * 1.2, p.z + f.z * 1.2, 1.9);
     if (ped && !cone) { bonkPed(ped, w); return true; }
     const car = W.carAt(p.x + f.x * 1.4, p.z + f.z * 1.4, 0.3);
-    if (car) { W.pop(car.x, W.groundAt(car.x, car.z) + 2.6, car.z, 'WEE-OO! WEE-OO!', '#ff5c8a'); G.sfx.alarm(); api.bump('alarms'); W.shake(0.1); }
+    if (car) {
+      W.pop(car.x, W.groundAt(car.x, car.z) + 2.6, car.z, 'WEE-OO! WEE-OO!', '#ff5c8a'); G.sfx.alarm(); api.bump('alarms'); W.shake(0.1);
+      if (car.prop) smashProp(car.prop, w.dmg * 1.6, f, false);
+    }
     return true;
   };
+  // Smashing street furniture, trees and parked cars: it stays broken until the next visit (cft-world.js W.hitProp)
+  function smashProp(e, dmg, f, byCar) {
+    const r = W.hitProp(e, dmg, f);
+    if (!r) return null;
+    G.sfx.bonk(); W.shake(r === 'hit' ? 0.12 : r === 'wreck' ? 0.55 : 0.3);
+    if (r === 'hit') { W.pop(e.x, W.groundAt(e.x, e.z) + 2, e.z, pick(['CLANG!', 'THUNK!', 'DENT!', 'BONG!']), '#ffffff', 0.7); return r; }
+    api.bump('smash'); if (byCar) api.bump('carsmash');
+    if (r === 'wreck') api.bump('wrecks');
+    const y = W.groundAt(e.x, e.z);
+    W.pop(e.x, y + 2.4, e.z, r === 'wreck' ? 'KABOOM!' : pick(D.HYPE ? D.HYPE.smash : ['SMASH!']), r === 'wreck' ? '#ff8a3d' : '#ffc21f', r === 'wreck' ? 1.4 : 1.0);
+    // a little something falls out: coins from bins and mailboxes, more from cars
+    const coins = r === 'wreck' ? 4 : e.k === 'bin' || e.k === 'box' ? (Math.random() < 0.5 ? 2 : 0) : Math.random() < 0.3 ? 1 : 0;
+    for (let i = 0; i < coins; i++) { const a = Math.random() * 6.28; api.spawnPickup('coin', e.x + Math.cos(a) * 1.6, e.z + Math.sin(a) * 1.6); }
+    if (r === 'wreck') { G.addXp(6, 'explore'); const by = W.nearestPed(e.x, e.z, 25); if (by) { W.holdPed(by, 2.2, 'air'); sayAt(by.obj, pick(['WHOA!', 'That was AWESOME!', 'Do it again!', 'Insurance will cover it!']), 2.2); } }
+    hype('smash', { kind: e.k, wreck: r === 'wreck', car: byCar });
+    G.dirty();
+    return r;
+  }
+  F.smashProp = smashProp;
+  F.removeMonster = (m, poof) => removeMonster(m, poof);
+  F.hitMonster = (m, w, f) => hitMonster(m, w, f || { x: 0, z: 1 });  // outposts + tests
   function bonkPed(ped, w) {
     if (ped.bonked && G.rt.t - ped.bonked < 4) return;
     ped.bonked = G.rt.t;
@@ -208,6 +271,7 @@ function attach(G, api) {
   F.spawnMonster = spawnMonster;
   F.streetSpot = (x, z, a, b) => streetSpot(x, z, a, b);
   function removeMonster(m, poof) {
+    removeTele(m);
     const i = F.monsters.indexOf(m);
     if (i >= 0) F.monsters.splice(i, 1);
     if (poof) W.burst(m.x, m.obj.position.y + 0.8, m.z, '💨', 5, { spread: 2, up: 2, size: 0.6 });
@@ -250,6 +314,8 @@ function attach(G, api) {
     const total = save().counters.bonks || 0, title = D.MONSTER_TITLES.find(t => t[0] === total);
     if (title && total > 1) U.banner('👾 ' + title[1], total + ' monsters bonked.', 'level');
     if (G.rpg) G.rpg.onKill(m);  // loot
+    hype('kill', { m });
+    if (m.outpost && G.hero) G.hero.outpostKill(m);
     removeMonster(m, true);
     G.dirty();
   }
@@ -258,7 +324,7 @@ function attach(G, api) {
     if (slow <= 0 && onStory() && !calm()) {
       // who is out: more at night, a couple by day (never close to home), fewer when you're happy, more when you're not
       const wild = F.monsters.filter(m => !m.event && !m.def.boss && !m.guard).length, mood = s.happy >= 75 ? 0.6 : s.happy < 30 ? 1.4 : 1;
-      const want = Math.round((night ? (LOW ? 3 : 5) : (LOW ? 1 : 2)) * mood);
+      const want = Math.round((night ? (LOW ? 4 : 6) : (LOW ? 2 : 3)) * mood);  // 2026-11-17: a little more Diablo
       if (wild < want && !quiet()) {
         const sp = W.randomWalkSpot(p.x, p.z, 30, 85, (x, z) => Math.hypot(x - home.x, z - home.z) > (night ? 30 : 90));
         if (sp) {
@@ -285,6 +351,7 @@ function attach(G, api) {
       }
     }
     for (let i = F.monsters.length - 1; i >= 0; i--) {
+      if (i >= F.monsters.length) continue;  // a strike that knocked you out cleared the street in the middle of this loop
       const m = F.monsters[i], def = m.def, d = Math.hypot(m.x - p.x, m.z - p.z);
       m.t += dt;
       // sunrise, or left far behind
@@ -295,6 +362,14 @@ function attach(G, api) {
         m.kx *= Math.exp(-6 * dt); m.kz *= Math.exp(-6 * dt);
         m.obj.position.set(m.x, W.groundAt(m.x, m.z), m.z);
       }
+      if (!onFoot() && Math.abs(W.player.speed) > 7 && d < m.r + 1.6 && !(m.runT > G.rt.t)) { // driving into one
+        m.runT = G.rt.t + 0.8;
+        const hx = -Math.sin(W.player.heading), hz = -Math.cos(W.player.heading);
+        hitMonster(m, { dmg: Math.abs(W.player.speed) * 0.28 * (1 + 0.15 * (G.level() - 1)), knock: 9, stun: 1.2, word: pick(['SPLAT!', 'BEEP BEEP!', 'VROOM!', 'BOINK!']) }, { x: hx, z: hz });
+        api.bump('runover'); W.shake(0.35);
+        if (m.dead || !F.monsters.includes(m)) continue;
+      }
+      if ((m.stun > 0 || m.grab > 0 || d > (m.aggro || 17) + 3 || !onFoot() || F.dying) && m.wind > 0) { m.wind = 0; removeTele(m); }
       if (m.stun > 0) { m.stun -= dt; m.obj.rotation.y += dt * 9; }
       else if (m.grab > 0) { // it got what it wanted: backs off for a moment
         m.grab -= dt; sp = def.speed * 0.8;
@@ -302,9 +377,17 @@ function attach(G, api) {
       } else if (m.home && Math.hypot(m.x - m.home.x, m.z - m.home.z) > (m.leash || 30)) { // a guardian never strays far from its station
         sp = def.speed; walk(m, m.home.x, m.home.z, sp, dt, m.r); m.hp = Math.min(m.mhp, m.hp + m.mhp * 0.1 * dt);
       } else if (d < (m.aggro || 17) && onFoot() && !quiet() && !F.dying && Math.hypot(p.x - home.x, p.z - home.z) > 14 && (!m.home || Math.hypot(p.x - m.home.x, p.z - m.home.z) < (m.leash || 30) + 4)) {
-        sp = def.speed;
-        walk(m, p.x, p.z, sp, dt, m.r);
-        if (d < m.r + 0.75 && Math.abs(p.y - m.obj.position.y) < 2.2) touch(m);
+        if (m.wind > 0) { // winding up: it plants its feet and telegraphs, then strikes
+          m.wind -= dt; sp = 0;
+          const want = Math.atan2(-(p.x - m.x), -(p.z - m.z)); m.obj.rotation.y += Math.atan2(Math.sin(want - m.obj.rotation.y), Math.cos(want - m.obj.rotation.y)) * Math.min(1, dt * 10);
+          teleTick(m);
+          if (m.wind <= 0) { strike(m); if (!F.monsters.includes(m)) continue; }
+        } else if (m.recover > 0) { m.recover -= dt; sp = def.speed * 0.25; walk(m, p.x, p.z, sp, dt, m.r); }
+        else {
+          sp = def.speed;
+          if (d > m.r + CB.reach * 0.7) walk(m, p.x, p.z, sp, dt, m.r);
+          if (d < m.r + CB.reach * 0.85 && Math.abs(p.y - m.obj.position.y) < 2.2) windUp(m);
+        }
       } else { // wandering
         sp = def.speed * 0.3;
         if (Math.random() < dt * 0.5) m.wanderA += rnd(-1.5, 1.5);
@@ -316,6 +399,79 @@ function attach(G, api) {
       if (m.say <= 0 && d < 25) { m.say = 5 + Math.random() * 7; sayAt(m.obj, m.kind === 'goose' ? 'HONK!' : pick(D.MONSTER_LINES), 1.8); }
     }
   }
+  // ---- the wind-up: a red ❗ over its head and a ring on the ground that shrinks to its reach as the strike lands
+  const RING_G = new THREE.RingGeometry(0.86, 1, 40).rotateX(-Math.PI / 2);
+  function windUp(m) {
+    if (m.wind > 0 || m.recover > 0 || m.stun > 0 || m.grab > 0 || F.dying) return;
+    const big = m.def.boss || m.guard || m.def.rare;
+    m.windT = m.wind = rnd(CB.wind[0], CB.wind[1]) * (big ? 1.2 : 1) * (m.champ ? 0.85 : 1) * Math.max(0.75, 1 - ((m.lvl || 1) - G.level()) * 0.04);
+    const s = m.obj.userData.size || 1;
+    m.tele = W.label('❗', { bg: '#ff3b30', fg: '#ffffff', size: 60, height: 0.75, border: '#1f1a3d', depthTest: false });
+    m.tele.position.y = ((m.obj.userData.h || 1.6) + 0.9) / s; m.obj.add(m.tele);
+    m.ring = new THREE.Mesh(RING_G, new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.0, depthWrite: false }));
+    m.ring.renderOrder = 4; W.scene.add(m.ring);
+  }
+  function teleTick(m) {
+    const k = 1 - Math.max(0, m.wind) / (m.windT || 1), reach = m.r + CB.reach, late = m.wind <= F.parryWindow();
+    if (m.ring) {
+      const R = reach * (2.1 - 1.1 * k);
+      m.ring.scale.set(R, 1, R); m.ring.position.set(m.x, W.groundAt(m.x, m.z) + 0.14, m.z);
+      m.ring.material.opacity = 0.25 + 0.6 * k; m.ring.material.color.setHex(late ? 0xffd23f : 0xff3b30);  // turns gold: block NOW
+    }
+    if (m.tele) { const sc = 0.75 * (1 + 0.35 * Math.abs(Math.sin(G.rt.t * (late ? 30 : 14)))); m.tele.scale.set(sc * m.tele.material.map.userData.aspect, sc, 1); }
+    const s = (m.obj.userData.size || 1) * (1 + 0.12 * k); m.obj.scale.set(s, s * (1 - 0.06 * k), s);  // it swells as it winds up
+  }
+  function removeTele(m) {
+    if (m.tele) { m.obj.remove(m.tele); m.tele.material.dispose(); m.tele = null; }
+    if (m.ring) { W.scene.remove(m.ring); m.ring.material.dispose(); m.ring = null; }
+    if (m.obj) m.obj.scale.setScalar(m.obj.userData.size || 1);
+  }
+  F.windUp = windUp;  // tests
+  function strike(m) {
+    removeTele(m);
+    m.recover = CB.recover;
+    const p = P(), d = Math.hypot(m.x - p.x, m.z - p.z), reach = m.r + CB.reach;
+    const lx = (p.x - m.x) / (d || 1), lz = (p.z - m.z) / (d || 1); m.kx = lx * 3; m.kz = lz * 3;  // the lunge
+    if (F.dying || !onFoot() || quiet()) return 'none';
+    if (d > reach || Math.abs(p.y - m.obj.position.y) > 2.2) { // stepped out of reach (or jumped over it)
+      api.bump('dodges');
+      W.pop(m.x, m.obj.position.y + 2.2, m.z, pick(D.HYPE ? D.HYPE.dodge : ['DODGED!']), '#20c997', 0.9);
+      hype('dodge'); return 'dodge';
+    }
+    if (F.blocking) {
+      api.bump('blocks');
+      if (G.rt.t - F.blockStart <= F.parryWindow()) { // PERFECT PARRY
+        api.bump('parries');
+        m.stun = 2.2; m.recover = 0; m.kx = -lx * 14; m.kz = -lz * 14; m.obj.userData.hurt = 0.4;
+        F.counter = G.rt.t + 3.5;
+        W.pop(p.x, p.y + 2.6, p.z, pick(D.HYPE ? D.HYPE.parry : ['PERFECT PARRY!']), '#ffd23f', 1.3);
+        W.burst(p.x - lx * 0.8, p.y + 1.3, p.z - lz * 0.8, '✨', 10, { spread: 3, up: 3 });
+        W.shake(0.28); G.sfx.done();
+        hype('parry', { m });
+        return 'parry';
+      }
+      const heavy = m.champ || m.guard || m.def.boss || m.def.rare;
+      if (Math.random() < (heavy ? 0.22 : 0.06) && !(window.CFT_TEST && window.CFT_TEST.noLuck)) { // the dice: a big hit can still crash through
+        W.pop(p.x, p.y + 2.4, p.z, 'GUARD BREAK!', '#ff8a3d', 0.9);
+        F.hurt((m.atk || 5) * 0.7, m); F.blockStart = G.rt.t + 99;
+        return 'break';
+      }
+      W.pop(p.x, p.y + 2.4, p.z, pick(['BLOCKED!', 'NOPE!', 'DENIED!', 'NOT TODAY!']), '#9fd0ff', 0.85);
+      W.burst(p.x - lx * 0.6, p.y + 1.3, p.z - lz * 0.6, '💥', 3, { spread: 1.5, up: 1.5, size: 0.4 });
+      F.hurt((m.atk || 5) * (1 - F.blockPower()), m);
+      hype('block');
+      return 'block';
+    }
+    // the dice again: sometimes you just slip out of it (Fitness and fast shoes help)
+    if (Math.random() < 0.05 + G.stat('fit') * 0.004 + (G.rpg ? G.rpg.bonus('speed') : 0) * 0.8 && !(window.CFT_TEST && window.CFT_TEST.noLuck)) {
+      api.bump('dodges');
+      W.pop(p.x, p.y + 2.4, p.z, 'LUCKY DODGE!', '#20c997', 0.9);
+      hype('dodge'); return 'lucky';
+    }
+    touch(m);
+    return 'hit';
+  }
+  F.strike = strike;  // tests
   function touch(m) {
     const s = save(), p = P();
     m.grab = m.guard ? 1.1 : 1.6;
@@ -331,7 +487,7 @@ function attach(G, api) {
     G.dirty();
   }
   // ------------------------------------------------------------------ health: armour, regeneration, healing, blacking out
-  F.maxHp = () => Math.round(60 + G.level() * 8 + G.stat('fit') * 3 + (G.rpg ? G.rpg.bonus('life') : 0));
+  F.maxHp = () => Math.round(60 + G.level() * 8 + G.stat('fit') * 3 + (G.rpg ? G.rpg.bonus('life') : 0) + (G.hero ? G.hero.hpBonus() : 0));
   function hp() { const f = fun(); if (typeof f.hp !== 'number' || f.hp !== f.hp) f.hp = F.maxHp(); return f.hp; }
   F.hp = hp;
   F.armor = () => Math.round(G.rpg ? G.rpg.bonus('armor') : 0);
@@ -1163,6 +1319,7 @@ function attach(G, api) {
     cool -= dt; slow -= dt;
     if (F.boost > 0) { F.boost -= dt; if (Math.random() < dt * 14) W.burst(P().x, P().y + 0.2, P().z, '💨', 1, { spread: 0.6, up: 0.6, size: 0.4, life: 0.4 }); }
     syncWeapon();
+    if (F.blocking && (!onFoot() || F.dying)) F.setBlock(false);
     updateMonsters(dt);
     updateShots(dt);
     updateSweet(dt);

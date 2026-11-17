@@ -11,7 +11,7 @@ window.__funOut = []; window.__funDone = false;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const G = window.__cft, W = G.W, U = G.ui, s = G.save, D = G.D, F = G.fun;
   const sim = n => G.stepSim(n);
-  const T = window.CFT_TEST = Object.assign(window.CFT_TEST || {}, { autoplay: true, norender: true, calm: true });
+  const T = window.CFT_TEST = Object.assign(window.CFT_TEST || {}, { autoplay: true, norender: true, calm: true, outposts: false });  // outposts: herotest.js
   async function drain(choose) {
     for (let i = 0; i < 60; i++) {
       await sleep(70);
@@ -98,7 +98,8 @@ window.__funOut = []; window.__funDone = false;
     ok(s.stickers.bonker > 0, 'the first bonk earns the Monster bonker sticker');
     const hp = F.spawnMonster('cone', pp.x + 2, pp.z, { event: 120 });
     W.teleport(hp.x + 1.2, hp.z); face(hp.x, hp.z); s.equip.weapon = null; sim(2); G.attack(); sim(3);
-    ok(hp.hp < hp.mhp && hp.mhp - hp.hp <= 0.5 * (1 + 0.15 * (G.level() - 1)) + 0.01, 'bare hands slap for half a point (more as you level)');
+    // (since 2026-11-17 quick hits build a combo, and main character mode hits harder)
+    ok(hp.hp < hp.mhp && hp.mhp - hp.hp <= 0.5 * (1 + 0.15 * (G.level() - 1)) * (1 + 0.06 * Math.min(10, F.combo)) * (G.hero ? G.hero.dmgMul() : 1) + 0.01, 'bare hands slap for half a point (more as you level)');
     s.equip.weapon = 'w_baguette'; sim(30);
     const myBiz = s.biz; s.biz = {};               // (no rival shopkeepers running out while we wait for the night)
     T.calm = false; s.clock = 23; sim(240);
@@ -123,6 +124,7 @@ window.__funOut = []; window.__funDone = false;
       U.lookEditor(); await sleep(150);
       ok(!!document.querySelector('.cft-look [data-style="4"].on') && W.showOff === true, 'the look editor opens with your choices and turns you to the camera');
       document.querySelector('.cft-look [data-style="0"]').click(); document.querySelector('.cft-look [data-x]').click(); await sleep(100);
+      if (!(s.look.style === 0 && !W.showOff && !U.isOpen())) out.push('INFO look debug: style ' + s.look.style + ', showOff ' + W.showOff + ', open [' + [...document.querySelectorAll('.cft-ov')].map(o => o.className + ': ' + o.textContent.slice(0, 80)).join(' | ') + ']');
       ok(s.look.style === 0 && !W.showOff && !U.isOpen(), 'picking a style in the editor saves it');
     }
 

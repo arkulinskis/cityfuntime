@@ -3,6 +3,8 @@
     python -I tools/live/game_test.py [OUTDIR]            the whole game: gametest.js (missions, shops, turf...), funtest.js, rpgtest.js
     python -I tools/live/game_test.py --fun [OUTDIR]      only funtest.js (monsters, weapons, strangers, street folk, pranks, events)
     python -I tools/live/game_test.py --combat [OUTDIR]   only combattest.js (monsters, health, guardians, gear you wear)
+    python -I tools/live/game_test.py --hero [OUTDIR]     only herotest.js (speed, block/parry, smashing, borrowed cars, outposts, hype, blips)
+    python -I tools/live/game_test.py --heroshots [OUTDIR] no tests: the main character update (graphics, a parry, the hype, an outpost, a wreck, blips, night)
     python -I tools/live/game_test.py --rpg [OUTDIR]      only rpgtest.js (loot, talents, rested XP, discovery, reputation, achievements, rares)
     python -I tools/live/game_test.py --shots [OUTDIR]    no tests: screenshots of the city by day, at dusk and at night
     python -I tools/live/game_test.py --monsters [OUTDIR] no tests: the 15 monster types, a metro guardian, a fight, loot gear on you
@@ -129,6 +131,26 @@ MONSTERS = (
     + scene("c5-character", "W.showOff = false; G.ui.phone('hero');", 3, 1500)
 )
 
+# The main character update (2026-11-17): the new graphics, a wind-up + parry, the hype on screen, an outpost, a wreck,
+# mission letters, the night with lamp halos.
+HERO = (
+    scene("h1-street", "s.m['c1-couch'] = { s: 'done', done: 1 }; s.money = 400; s.clock = 10.2;"
+          "const q = W.randomWalkSpot(0, 0, 40, 220, (x, z, sg) => sg.car && sg.w >= 10) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 13;", 400)
+    + scene("h2-parry", "const R = G.rpg, it = R.add(R.makeGear(4, 8, 'hand', { base: 'lid' }), 'test'); R.equip(it.id); const f = { x: -Math.sin(W.player.face), z: -Math.cos(W.player.face) };"
+            "const m = F.spawnMonster('brute', p.x + f.x * 2.6, p.z + f.z * 2.6, { event: 300, lvl: 1 }); F.windUp(m); m.wind = 0.2; m.windT = 0.9; F.setBlock(true); window.__m = m;"
+            "W.cam.yaw = W.player.face + 1.9; W.cam.pitch = 0.22; W.cam.dist = W.cam.cur = 6;", 4, 600)
+    + scene("h3-hype", "F.setBlock(false); for (const m of F.monsters.slice()) { m.t = 1e9; m.event = 1; } G.stepSim(3); s.settings.hype = 'max'; G.hero.test.swag(120);"
+            "G.hero.word('UNSTOPPABLE!', 'violet', '5 in a row'); G.hero.ticker('You look like a movie star today, {name}!', 'Maya', '😘'); G.hero.ticker('Hero of the neighbourhood, right there!', 'Omar', '🌟');"
+            "W.cam.pitch = 0.18; W.cam.dist = W.cam.cur = 7;", 3, 900)
+    + scene("h4-outpost", "const op = near(W.places.filter(q => G.D.OUTPOSTS[q.kind]), q => q.pin); if (op) { const w = W.nearestWalk(op.pin.x + 16, op.pin.z + 10, 40) || op.pin; W.teleport(w.x, w.z);"
+            "window.CFT_TEST.calm = false; for (let i = 0; i < 6 && !G.hero.test.packs.has(op.id); i++) G.stepSim(35); window.CFT_TEST.calm = true; for (const m of F.monsters) m.aggro = 0; look(op.pin.x, op.pin.z, 10, 0.2); }", 30)
+    + scene("h5-wreck", "for (const m of F.monsters.slice()) { m.t = 1e9; m.event = 1; } G.stepSim(3); let pc = null; for (let r = 2; r < 160 && !pc; r += 3) for (let a = 0; a < 6.28 && !pc; a += 0.4) pc = W.borrowable(p.x + Math.cos(a) * r, p.z + Math.sin(a) * r, 1.5);"
+            "if (pc) { W.teleport(pc.x + 6 * pc.uz + 3 * pc.ux, pc.z - 6 * pc.ux + 3 * pc.uz); for (let i = 0; i < 6; i++) F.smashProp(pc.prop, 99, { x: 0, z: 1 }, false); look(pc.x, pc.z, 7, 0.2); }", 12, 500)
+    + scene("h6-blips", "G.rt.actorTimer = 0; G.stepSim(10); const sp = near([...(G.rt.spots || new Map()).values()].filter(x => x.open && x.open.length), q => q); if (sp) { look(sp.x, sp.z, 9, 0.12); W.cam.yaw += 0.25; }", 20)
+    + scene("h7-night", "s.clock = 22.4; const q = W.randomWalkSpot(p.x, p.z, 30, 200, (x, z, sg) => sg.car && sg.w >= 9) || p; W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.22; W.cam.dist = W.cam.cur = 11;", 200)
+    + scene("h8-phone", "G.ui.phone('street');", 5, 1500)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
 elif "--shots" in flags:
@@ -139,10 +161,14 @@ elif "--long" in flags:
     steps = START + LONG
 elif "--monsters" in flags:
     steps = START + MONSTERS
+elif "--heroshots" in flags:
+    steps = START + HERO
 else:
     steps = START + [{"shot": "start"}]
     if "--combat" in flags:
         steps += script("combattest.js", "__cmbDone", "__cmbOut", 500000)
+    elif "--hero" in flags:
+        steps += script("herotest.js", "__heroDone", "__heroOut", 600000)
     elif "--rpg" in flags:
         steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
     else:
@@ -152,6 +178,7 @@ else:
         if "--fun" not in flags:
             steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
             steps += script("combattest.js", "__cmbDone", "__cmbOut", 500000)
+            steps += script("herotest.js", "__heroDone", "__heroOut", 600000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"
@@ -168,13 +195,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or evalfile:
+if "--shots" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

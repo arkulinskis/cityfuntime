@@ -35,7 +35,7 @@
   }
   function chain(list) { return list.reduce(function (p, n) { return p.then(function () { return script(n); }); }, Promise.resolve()); }
   var DATA = ['cft-content.js', 'cft-game.js'];
-  var ALL = ['three.min.js', 'cft-content.js', 'cft-tiles.js', 'cft-world.js', 'cft-ui.js', 'cft-fun.js', 'cft-rpg.js', 'cft-game.js'];
+  var ALL = ['three.min.js', 'cft-content.js', 'cft-tiles.js', 'cft-world.js', 'cft-ui.js', 'cft-fun.js', 'cft-rpg.js', 'cft-hero.js', 'cft-game.js'];
 
   function get(k, dflt) { try { var v = localStorage.getItem(STORE + k); return v == null ? dflt : JSON.parse(v); } catch (e) { return dflt; } }
   function set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch (e) { /* storage full or blocked */ } }
@@ -175,6 +175,17 @@
   };
 
   // ------------------------------------------------------------------ plain JSON views for the Forms pages
+  // GTA-style disclosure (2026-11-17): a locked mission is only named when everything it needs is done or under way
+  // (one step away); further ones stay "???" until you get there.
+  function mystery(id, stat, save) {
+    var G = window.CFTGame, M = G.MISSION[id], req = (M && M.req && M.req.m) || [];
+    if (stat && stat[id] !== 'locked') return false;
+    for (var i = 0; i < req.length; i++) {
+      var r = req[i], s = stat ? stat[r] : (save && save.m[r] ? save.m[r].s : (save && G.MISSION[r] && G.reqMet(save, G.MISSION[r]) ? 'open' : 'locked'));
+      if (s === 'locked' || s == null) return true;
+    }
+    return false;
+  }
   function stepText(s, id, M) {
     var ms = s.m[id], st = M.steps[ms.st] || {}, bf = s.pref === 'bf';
     var left = st.do === 'deliver' ? (st.n || 1) - (ms.p || 0) : '';
@@ -243,6 +254,7 @@
     quests: function (s, filter) {
       var G = window.CFTGame, D = window.CFT_DATA, board = G.missionBoard(s), all = [];
       board.forEach(function (c) { all = all.concat(c.missions); });
+      var stat = {}; all.forEach(function (m) { stat[m.id] = m.status; });
       var counts = { all: all.length };
       ['active', 'open', 'done', 'locked'].forEach(function (k) { counts[k] = all.filter(function (m) { return m.status === k; }).length; });
       return {
@@ -255,6 +267,7 @@
             e: c.ch.e, title: (c.ch.id < 10 ? 'Chapter ' + c.ch.id + ': ' : '') + c.ch.n, blurb: c.ch.blurb || '',
             count: done + ' / ' + c.missions.length, pct: pct(done, c.missions.length),
             missions: list.map(function (m) {
+              if (mystery(m.id, stat)) return { id: m.id, e: '❔', title: '???', sub: 'A story for later. Keep playing.', status: m.status, label: STATUS[m.status] };
               return { id: m.id, e: m.status === 'locked' ? '🔒' : m.giver.e, title: m.title, sub: m.giver.n + (m.tracked ? ' · 🎯 tracking' : ''),
                 status: m.status, label: STATUS[m.status] };
             })
@@ -265,6 +278,8 @@
     mission: function (save, id) {
       var G = window.CFTGame, D = window.CFT_DATA, M = G.MISSION[id], c = D.CAST[M.giver];
       var st = save && save.m[id], status = st ? st.s : (save && G.reqMet(save, M) ? 'open' : 'locked');
+      if (status === 'locked' && mystery(id, null, save)) return { id: id, e: '❔', title: '???', who: 'Someone you have not met yet', status: status, reqs: ['🔒 Finish the missions before it first'],
+        quote: '"Keep playing. This part of the story shows itself when you get closer."', steps: [], rewards: [], canTrack: false };
       var cur = st && st.s === 'active' ? st.st : st && st.s === 'done' ? 99 : -1;
       var req = M.req || {}, reqs = [];
       (req.m || []).forEach(function (r) { var x = G.MISSION[r]; reqs.push((save && save.m[r] && save.m[r].s === 'done' ? '✅ ' : '⬜ ') + (x ? x.title : r)); });

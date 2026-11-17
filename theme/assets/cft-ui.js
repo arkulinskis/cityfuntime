@@ -48,6 +48,7 @@ function create(G, root) {
         <button class="cft-act" data-act type="button" hidden><kbd>E</kbd><span data-acttext></span></button>
         <div class="cft-btns">
           <button type="button" data-quaff title="Eat or drink to heal (Q)" aria-label="Heal">🍵</button>
+          <button type="button" data-block title="Block: hold (G or right mouse). Time it just before a hit for a PERFECT PARRY" aria-label="Block">🛡️</button>
           <button type="button" data-bonk title="Bonk (F)" aria-label="Bonk">🖐️</button>
           <button type="button" data-ride title="Ride (V)">🛹</button>
           <button type="button" data-phone title="Phone (P)">📱</button>
@@ -409,9 +410,9 @@ function create(G, root) {
     const t = shell.classList.contains('touch');
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
-      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>📱</kbd> your phone</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
-      '</div><p class="muted">The <b>gold arrow</b> over your head always points to your current goal. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
+      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone</div>'
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things)</div><div><kbd>G</kbd> or right mouse, held: block (time it for a PERFECT PARRY)</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
+      '</div><p class="muted">Watch for the red <b>❗</b> over a figment: it is about to strike. When its ring turns gold, block. Big gold <b>letters</b> on the map are people with missions; E next to a parked car borrows it. The <b>gold arrow</b> over your head always points to your current goal. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
     ov.el.querySelector('[data-letsgo]').onclick = e => { e.stopPropagation(); ov.close(); if (G.W && !t) G.W.lock(); };
@@ -576,7 +577,10 @@ function create(G, root) {
     for (const k of G.rt.pickups) if (!k.dead) markers.push({ x: k.x, z: k.z, color: k.mission ? '#ff5c8a' : D.PICKUPS[k.type].bg, r: k.mission ? 5 : 3.2, ring: k.mission ? '#fff' : 'rgba(0,0,0,.45)', edge: !!k.mission });
     if (radar) for (const pl of G.allPlaces()) { if (Math.abs(pl.pin.x - p.x) > mmRadius * 1.4 || Math.abs(pl.pin.z - p.z) > mmRadius * 1.4) continue; const k = D.KINDS[pl.kind]; if (k && (k.sells.length || pl.kind === 'metro' || pl.kind === 'bank')) markers.push({ x: pl.pin.x, z: pl.pin.z, color: '#ffffff', r: 5.5, emoji: k.e, ring: 'rgba(31,26,61,.5)' }); }
     for (const id of Object.keys(s.biz)) { const q = G.xz(s.biz[id]); markers.push({ x: q.x, z: q.z, color: '#6b4eff', r: 7, emoji: G.BIZ[id].e, ring: '#fff', edge: true }); }
-    if (G.rt.spots) for (const sp of G.rt.spots.values()) if (sp.open.length || sp.who === 'boss') markers.push({ x: sp.x, z: sp.z, color: '#ffc21f', r: 6.5, emoji: sp.who === 'boss' ? '⚔️' : '❗', ring: '#1f1a3d', edge: true });
+    // missions: a big letter per person (M for Max...), GTA-style; they stick to the minimap's edge with an arrow
+    if (G.rt.spots) for (const sp of G.rt.spots.values()) if (sp.open.length || sp.who === 'boss') markers.push(sp.who === 'boss' ? { x: sp.x, z: sp.z, color: '#ffc21f', r: 6.5, emoji: '⚔️', ring: '#1f1a3d', edge: true }
+      : { x: sp.x, z: sp.z, color: '#ffc21f', r: 8, letter: G.hero ? G.hero.letterOf(sp) : '!', ring: '#1f1a3d', edge: true });
+    if (G.hero) G.hero.markers(markers);
     for (const id of Object.keys(s.turf)) {
       const t = s.turf[id];
       if (!t.spots) continue;
@@ -617,11 +621,24 @@ function create(G, root) {
     else if (e.code === 'KeyP' || e.code === 'Tab' || e.code === 'Escape') { e.preventDefault(); U.phone(); }
     else if (e.code === 'KeyV') G.toggleRide();
     else if (e.code === 'KeyF') { if (!e.repeat) G.attack(); }
+    else if (e.code === 'KeyG') { if (!e.repeat && G.fun) G.fun.setBlock(true); }
     else if (e.code === 'KeyQ') { if (!e.repeat && G.fun) G.fun.quaff(); }
     else if (e.code === 'KeyM') toggleZoom();
     else if (e.code === 'KeyH') U.help();
   }
   document.addEventListener('keydown', onKey);
+  const unblock = () => { if (G.fun && G.fun.blocking) G.fun.setBlock(false); };
+  function onKeyUp(e) { if (e.code === 'KeyG') unblock(); }
+  document.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', unblock);
+  // the right mouse button guards while held (anywhere on the game); the 🛡️ button too (touch: hold it)
+  U.canvas.addEventListener('contextmenu', e => e.preventDefault());
+  U.canvas.addEventListener('mousedown', e => { if (e.button === 2 && G.W && G.state() === 'play' && !stack.length && G.fun) { e.preventDefault(); G.fun.setBlock(true); } });
+  const onMouseUp = e => { if (e.button === 2) unblock(); };
+  window.addEventListener('mouseup', onMouseUp);
+  { const b = $('[data-block]');
+    b.addEventListener('pointerdown', e => { e.preventDefault(); if (G.fun && G.state() === 'play' && !stack.length) G.fun.setBlock(true); });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, unblock); }
   $('[data-act]').addEventListener('click', () => G.interact());
   $('[data-phone]').addEventListener('click', () => U.phone());
   $('[data-ride]').addEventListener('click', () => G.toggleRide());
@@ -810,7 +827,10 @@ function create(G, root) {
     const s = save(), v = G.fun.summary(), w = v.weapon;
     const weapons = Object.keys(s.owned).filter(k => D.ITEMS[k] && D.ITEMS[k].weapon);
     const hearts = n => '❤️'.repeat(Math.max(1, Math.round(n / 20)));
-    return '<div class="cft-pcard"><b>' + (v.king ? '👑 ' : '🧡 ') + esc(v.folkTitle) + '</b><span>' + v.hearts + ' street hearts' + (v.king ? ' · a tribute arrives every morning' : ' · crowned at ' + v.crownAt) + '</span>' +
+    const hv = G.hero ? G.hero.summary() : null;
+    const heroCard = hv ? '<div class="cft-pcard"><b>✨ ' + (hv.main ? 'MAIN CHARACTER MODE' : 'Swagger ' + hv.swag + '/100') + '</b><span>' + hv.fans + ' fans · ' + hv.gifts + ' gifts from admirers · ' + hv.compliments + ' compliments</span>' + (hv.main ? '' : bar(hv.swag, 100)) +
+      '<small>🍩 Tom Hearton\'s freed: ' + hv.hearton + ' (+' + hv.energy + ' max energy) · 🛒 groceries freed: ' + hv.grocery + ' (+' + hv.hp + ' max health)<br>💥 ' + hv.smash + ' smashed · ' + hv.wrecks + ' wreck' + (hv.wrecks === 1 ? '' : 's') + ' · 🚗 ' + hv.borrowed + ' borrowed · 🛡️ ' + hv.parries + ' perfect parr' + (hv.parries === 1 ? 'y' : 'ies') + '</small></div>' : '';
+    return heroCard + '<div class="cft-pcard"><b>' + (v.king ? '👑 ' : '🧡 ') + esc(v.folkTitle) + '</b><span>' + v.hearts + ' street hearts' + (v.king ? ' · a tribute arrives every morning' : ' · crowned at ' + v.crownAt) + '</span>' +
       (v.king ? '' : bar(v.hearts, v.crownAt)) + '<small>Street folk sit on corners all over town (🧡 on the map). A coin, some food or a listening ear earns hearts.</small></div>' +
       '<div class="cft-sec"><h4>💕 Sweethearts (' + v.crushes.length + ')' + (v.crushTitle ? ' · ' + esc(v.crushTitle) : '') + '</h4>' +
       (v.crushes.length ? v.crushes.map(c => '<div class="cft-li"><span>💕</span><div><b>' + esc(c.name) + ' ' + hearts(c.love) + '</b><small>' + c.dist + ' m away · ' + (c.seen > 1 ? 'misses you (' + c.seen + ' days)' : 'saw you ' + (c.seen ? 'yesterday' : 'today')) + '</small>' + bar(c.love, 100, 'rel') + '</div>' +
@@ -884,6 +904,7 @@ function create(G, root) {
       (s.pref ? '<div class="cft-row"><span>Looking for: <b>' + (s.pref === 'bf' ? 'a boyfriend' : 'a girlfriend') + '</b></span><button type="button" class="cft-btn sm" data-act="pref">Switch</button></div>' : '') + '</div>' +
       '<div class="cft-sec"><h4>Game</h4><label class="cft-check"><input type="checkbox" data-set="sound" ' + (st.sound ? 'checked' : '') + '> Sound effects</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="music" ' + (st.music !== false ? 'checked' : '') + '> Music</label>' +
+      '<div class="cft-row"><span>Compliments and hype</span><div class="cft-chips">' + [['max', 'Max'], ['some', 'Some'], ['off', 'Off']].map(q => '<button type="button" class="cft-chipb ' + ((st.hype || 'max') === q[0] ? 'on' : '') + '" data-act="hype" data-id="' + q[0] + '">' + q[1] + '</button>').join('') + '</div></div>' +
       '<div class="cft-row"><span>Graphics</span><div class="cft-chips">' + ['auto', 'high', 'low'].map(q => '<button type="button" class="cft-chipb ' + (st.quality === q ? 'on' : '') + '" data-act="quality" data-id="' + q + '">' + q + '</button>').join('') + '</div></div>' +
       '<p class="muted small">Graphics changes apply next time you open the game. "low" turns off shadows and draws fewer people, for phones and older laptops.</p></div>' +
       '<div class="cft-sec"><h4>Home address</h4><p class="muted small">Your world is built around ' + esc(s.home.short || s.home.label) + '. To live somewhere else, start a new life.</p><button type="button" class="cft-btn danger" data-act="reset">Start a new life…</button></div>' +
@@ -936,6 +957,7 @@ function create(G, root) {
       case 'look': phoneOv.close(); U.lookEditor(); break;
       case 'pref': s.pref = s.pref === 'bf' ? 'gf' : 'bf'; G.refreshFollowers(); G.dirty(); U.refreshPhone(); break;
       case 'quality': s.settings.quality = id; G.dirty(); U.refreshPhone(); break;
+      case 'hype': s.settings.hype = id; G.dirty(); U.refreshPhone(); break;
       case 'reset': if (await U.confirm('Start a brand-new life? Your money, missions, home and everything else will be gone for good.', 'Yes, start over')) G.reset(); break;
       case 'help': phoneOv.close(); U.help(); break;
       case 'exit': phoneOv.close(); G.exit(); break;
@@ -1048,6 +1070,9 @@ function create(G, root) {
   U.init = function () { sizeMinimap(); setTimeout(() => U.onReady && U.onReady(), 0); };
   U.destroy = function () {
     document.removeEventListener('keydown', onKey);
+    document.removeEventListener('keyup', onKeyUp);
+    window.removeEventListener('blur', unblock);
+    window.removeEventListener('mouseup', onMouseUp);
     window.removeEventListener('resize', sizeMinimap);
     U.closeAll();
     root.innerHTML = '';

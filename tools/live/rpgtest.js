@@ -126,7 +126,7 @@ window.__rpgOut = []; window.__rpgDone = false;
     R.setTitle('the Heartthrob');
 
     // ---------- rare monsters
-    const T = window.CFT_TEST; T.calm = false; s.clock = 13;
+    const T = window.CFT_TEST; T.calm = false; T.outposts = false; s.clock = 13;
     const m = R.spawnRare(X.RARES[0]);
     ok(!!m && m.def.rare && m.def.n === X.RARES[0].n && m.hp > D.MONSTERS[m.kind].hp * 3, 'a rare monster: ' + (m && m.def.n) + ' (' + (m && m.hp) + ' hit points)');
     if (m) {
