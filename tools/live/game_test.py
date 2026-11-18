@@ -7,6 +7,7 @@
     python -I tools/live/game_test.py --heroshots [OUTDIR] no tests: the main character update (graphics, a parry, the hype, an outpost, a wreck, blips, night)
     python -I tools/live/game_test.py --rpg [OUTDIR]      only rpgtest.js (loot, talents, rested XP, discovery, reputation, achievements, rares)
     python -I tools/live/game_test.py --shots [OUTDIR]    no tests: screenshots of the city by day, at dusk and at night
+    python -I tools/live/game_test.py --ground [OUTDIR]   no tests: the ground photo textures (pavement, road, lawn, plaza, woods/sand, overview, dusk)
     python -I tools/live/game_test.py --monsters [OUTDIR] no tests: the 15 monster types, a metro guardian, a fight, loot gear on you
     python -I tools/live/game_test.py --long [OUTDIR]     no tests: the Character / Reputation / Achievements apps, a Legendary drop, a rare monster, a level-up
     python -I tools/live/game_test.py --people [OUTDIR]   no tests: close-ups of the characters (you, passers-by in poses, the look editor)
@@ -151,10 +152,26 @@ HERO = (
     + scene("h8-phone", "G.ui.phone('street');", 5, 1500)
 )
 
+# Ground photo textures (2026-11-17): waits for the texture array, then roads/pavements, a lawn, a plaza, woods/sand, overview, dusk.
+AREA_SHOT = "const a = W.findArea(%s, %d); if (a) { W.teleport(a.x, a.z); } W.cam.pitch = %s; W.cam.dist = W.cam.cur = %d;"
+GROUND = (
+    [{"waitFor": "window.__cft.W.groundTextures === true", "timeout": 60000}]
+    + scene("g1-pavement", "s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11;"
+            "const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 10) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw + 0.9); W.cam.pitch = 0.42; W.cam.dist = W.cam.cur = 6;", 200)
+    + scene("g2-road-above", "W.cam.pitch = 1.05; W.cam.dist = W.cam.cur = 16;", 20)
+    + scene("g3-lawn", AREA_SHOT % ("['park', 'grass', 'pitch', 'cemetery']", 1500, "0.34", 8), 60)
+    + scene("g4-plaza", AREA_SHOT % ("['plaza']", 150, "0.4", 8), 60)
+    + scene("g5-wood-sand", AREA_SHOT % ("['wood', 'sand', 'playground']", 100, "0.4", 8), 60)
+    + scene("g6-overview", "const q = W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.75; W.cam.dist = W.cam.cur = 38;", 60)
+    + scene("g7-dusk", "s.clock = 19.2; W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 9;", 60)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
 elif "--shots" in flags:
     steps = START + SCENES
+elif "--ground" in flags:
+    steps = START + GROUND
 elif "--people" in flags:
     steps = START + PEOPLE
 elif "--long" in flags:
@@ -195,13 +212,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

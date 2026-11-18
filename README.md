@@ -181,6 +181,10 @@ doesn't answer, so every neighbourhood someone has played keeps working; places 
 4. **Run** it and sign up with **your admin email** (App Secret `admin_emails`) straight away (that account becomes the admin).
 5. **Publish** (Publish → public URL, or your own domain).
 
+## Ground textures
+
+The road, pavement, grass, woods, plaza, sand and path textures are photos from [Poly Haven](https://polyhaven.com) (CC0, free for any use): asphalt_02, concrete_pavement, leafy_grass, forest_leaves_02, pavement_03, sand_01, grass_path_3, concrete_floor_01. `tools/ground_textures.py` downloads and prepares them.
+
 <!-- libraries:start -->
 ## Libraries and outside services
 

@@ -290,6 +290,17 @@ Diablo 2 monsters + gear, GTA missions slowly disclosed + cars destroying things
   roofs geometry; pavements (`KERB_Y` 0.13 above the ground, skipped where another road crosses) and edge lines; three-puff tree
   crowns + branched trunks (vertex colours × instance colour); detailed parked cars (`carBody`) and traffic (`W.vehicle`);
   lamp halos (`MAT.halo`); CSS vignette + `saturate/contrast` on the canvas (not on touch devices).
+- **Ground photo textures (2026-11-17, user: "better flooring terrain... sidewalks, roads, grass look more high detail"):**
+  8 Poly Haven CC0 photos in `theme/assets/ground-*.jpg` (asphalt_02, concrete_pavement, leafy_grass, forest_leaves_02,
+  pavement_03, sand_01, grass_path_3, concrete_floor_01; 1024 px, AO baked in, ~2.4 MB) made by `tools/ground_textures.py`.
+  cft-world `TEX` / `TL` / `groundify` / `loadGround`: one `DataArrayTexture` (WebGL2 only; without it, or before the photos
+  load, the ground stays plain colours), patched into `MAT.drape` + `MAT.terrain` with `onBeforeCompile`. Drape geometry is
+  `new Geo(false, true)`: set `geo.layer = TL.x` before adding a surface (`AREA[k][3]`, `ROAD_STYLE.*.l`); `geo.fr` lays the
+  photo along a street (pavement slabs start at the kerb and run on across segments), null = world x/z. The shader divides
+  each photo by its average colour, so the vertex colours still decide the palette; `TEX[i].real` mixes in the photo's own
+  hue, `k` = detail strength, `m` = metres per photo (their real size). A second, 14x larger sample breaks up the repeat.
+  Every mesh drawn with MAT.drape/terrain must carry `glayer` + `guv`. Both quality levels get them (low = 512 px).
+  Pictures: `game_test.py --ground DIR` (`W.findArea(kinds, minArea)` finds a park/plaza to stand in).
 - **Outposts never spawn within 90 m of home** (home is calm). The older suites set `CFT_TEST.outposts = false` (with ~70
   groceries in reach, packs joined their night-monster checks and knocked the tester out); herotest.js turns them on.
 - **A new mission's giver must already have met you** and should use that person's usual spot (`at`): a second spot key for

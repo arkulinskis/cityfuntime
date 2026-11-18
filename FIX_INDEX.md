@@ -64,6 +64,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | HUD chips, buttons | "button too small on phone" | cft-ui markup at the top of `create`, `U.hud.frame`; CSS `/* ===== play.html` block | | ui_test --shots |
 | Phone apps | "Street life card wrong" | cft-ui `render` + `VIEWS.<app>` (e.g. `VIEWS.street`) | | --heroshots |
 | Buildings, roads, pavements | "pavement over the road", "roof ledge odd" | cft-world `buildSub` `addWalls` `cornice` `gable` `roofClutter`; constants `KERB_Y` `paveCol` | | --heroshots |
+| Ground textures (road, pavement, grass, plaza look) | "grass too yellow", "tiles too big", "cracks too strong" | cft-world `TEX` (m = size, k = detail, real = photo colour), `TL`, `groundify` (shader), `loadGround`; which surface gets which photo: `AREA[k][3]`, `ROAD_STYLE.*.l`, `TERRAIN_COL`; photos: `tools/ground_textures.py` | | --ground |
 | Trees, lamps, halos, street furniture | | cft-world `TRUNK_G`/`CROWN_G` (top), `PROP`, `layProps`, halos in `W.setClock` | | --heroshots |
 | Sky, day/night, lighting, shadows | "night too dark" | cft-world `W.setClock` (`SKY`, `SKY_TOP`), lights at the top of `create` | | --shots |
 | Performance | "laggy" | cft-world `layProps` (density), `TRUNK_G` detail, `SHADOW`, `D.TUNE.world` | | real device |

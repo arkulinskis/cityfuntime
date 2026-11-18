@@ -201,7 +201,7 @@ function create(opts) {
   const MAT = {
     walls: new THREE.MeshLambertMaterial({ map: winDay, emissiveMap: winNight, emissive: 0xffffff, emissiveIntensity: 0, vertexColors: true }),
     plain: new THREE.MeshLambertMaterial({ vertexColors: true }),
-    terrain: new THREE.MeshLambertMaterial({ color: GROUND_COL }),
+    terrain: new THREE.MeshLambertMaterial({ vertexColors: true }),   // photo-textured (groundify, below)
     // parks, water, roads draped on the hills: pulled towards the camera so they never flicker into the ground
     drape: new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }),
     trunk: new THREE.MeshLambertMaterial({ color: 0x6b4f37 }),
@@ -219,18 +219,100 @@ function create(opts) {
     wreck: new THREE.MeshLambertMaterial({ color: 0x2b2a2e }),
     halo: new THREE.MeshBasicMaterial({ color: 0xffd890, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
   };
+
+  // ---------------------------------------------------------------- ground textures (2026-11-17)
+  // Photo textures on every floor surface: Poly Haven CC0 photos (theme/assets/ground-*.jpg, 1024 px, AO baked in; the
+  // sources are listed in the guide). They sit in one texture array (WebGL2), so a sub-tile's whole drape mesh stays one
+  // draw call. Each drape/terrain vertex carries `glayer` (TEX index, -1 = plain colour, e.g. water) and `guv`, ground
+  // coordinates in metres (world x/z, or along the street for pavement slabs). The vertex colour stays the surface's
+  // colour: the shader divides the photo by its average colour, so it adds detail and keeps the palette, then mixes in
+  // `real` of the photo's own hues. m = metres one photo covers (their real size), k = how strong the detail is.
+  // Without WebGL2, or until the photos load, the ground looks as it did before (plain colours).
+  const TEX = [
+    { f: 'asphalt', m: 3.0, k: 1.0, real: 0.1 },    // 0 car roads, service lanes, cycleways, road paint
+    { f: 'sidewalk', m: 1.8, k: 1.0, real: 0.25 },  // 1 pavements + kerbs (slabs laid along the street)
+    { f: 'grass', m: 2.4, k: 0.95, real: 0.4 },     // 2 grass, parks, pitches, cemeteries
+    { f: 'forest', m: 3.0, k: 0.9, real: 0.45 },    // 3 woods
+    { f: 'bricks', m: 2.4, k: 0.9, real: 0.5 },     // 4 plazas, pedestrian streets, steps
+    { f: 'sand', m: 1.8, k: 0.9, real: 0.35 },      // 5 sand, playgrounds
+    { f: 'ground', m: 2.6, k: 0.85, real: 0.3 },    // 6 the terrain between everything (yards, lots)
+    { f: 'path', m: 2.0, k: 0.9, real: 0.2 },       // 7 footways, park paths (plain concrete, no slab joints)
+  ];
+  const TL = { asphalt: 0, sidewalk: 1, grass: 2, forest: 3, bricks: 4, sand: 5, ground: 6, path: 7, none: -1 };
+  const NT = TEX.length, TERRAIN_COL = new THREE.Color(0x8f9282);  // a touch greener than the far floor: yards
+  const blankArr = new THREE.DataArrayTexture(new Uint8Array(4 * NT).fill(255), 1, 1, NT);
+  blankArr.needsUpdate = true;
+  const GU = {
+    groundTex: { value: blankArr }, gOn: { value: 0 },
+    gMean: { value: TEX.map(() => new THREE.Vector3(1, 1, 1)) },
+    gScale: { value: TEX.map(t => 1 / t.m) }, gK: { value: TEX.map(t => t.k) }, gReal: { value: TEX.map(t => t.real) },
+  };
+  function groundify(mat) {
+    mat.onBeforeCompile = sh => {
+      Object.assign(sh.uniforms, GU);
+      sh.vertexShader = 'attribute float glayer;\nattribute vec2 guv;\nvarying float vGL;\nvarying vec2 vGUV;\n' +
+        sh.vertexShader.replace('#include <color_vertex>', '#include <color_vertex>\n\tvGL = glayer; vGUV = guv;');
+      sh.fragmentShader = `uniform highp sampler2DArray groundTex;
+uniform float gOn; uniform vec3 gMean[${NT}]; uniform float gScale[${NT}]; uniform float gK[${NT}]; uniform float gReal[${NT}];
+varying float vGL; varying vec2 vGUV;
+` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+	if (gOn > 0.5 && vGL > -0.5) {
+		int L = int(vGL + 0.5);
+		vec2 uv = vGUV * gScale[L];
+		vec3 m = gMean[L];
+		vec3 t = texture(groundTex, vec3(uv, float(L))).rgb;
+		// big soft patches (the same photo, ~14x larger and turned) so wide lawns and long roads don't repeat
+		vec3 big = texture(groundTex, vec3(mat2(0.8, -0.6, 0.6, 0.8) * uv * 0.071 + 0.37, float(L))).rgb / m;
+		float patchy = mix(1.0, dot(big, vec3(0.3333)), 0.55);
+		vec3 base = diffuseColor.rgb;
+		vec3 detail = mix(vec3(1.0), t / m, gK[L]) * patchy;
+		vec3 photo = t * (dot(base, vec3(0.3333)) / max(dot(m, vec3(0.3333)), 0.02)) * patchy;
+		diffuseColor.rgb = mix(base * detail, photo, gReal[L]);
+	}`);
+    };
+    mat.customProgramCacheKey = () => 'cft-ground';
+  }
+  groundify(MAT.terrain); groundify(MAT.drape);
+  // Loads the photos into the texture array (512 px on low quality) and measures each photo's average colour.
+  function loadGround() {
+    if (!renderer.capabilities.isWebGL2) return;
+    const S = LOW ? 512 : 1024;
+    const load = t => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = '_/theme/ground-' + t.f + '.jpg?v=1'; });
+    Promise.all(TEX.map(load)).then(ims => {
+      if (destroyed || ims.some(im => !im)) return;
+      const cv = document.createElement('canvas'); cv.width = cv.height = S;
+      const g = cv.getContext('2d', { willReadFrequently: true }), data = new Uint8Array(S * S * 4 * NT);
+      ims.forEach((im, i) => {
+        g.drawImage(im, 0, 0, S, S);
+        const px = g.getImageData(0, 0, S, S).data;
+        data.set(px, i * S * S * 4);
+        let r = 0, gg = 0, b = 0, n = 0;
+        for (let k = 0; k < px.length; k += 4 * 7) { r += px[k]; gg += px[k + 1]; b += px[k + 2]; n++; }
+        GU.gMean.value[i].set(r / n / 255, gg / n / 255, b / n / 255);
+      });
+      const tex = new THREE.DataArrayTexture(data, S, S, NT);
+      tex.format = THREE.RGBAFormat; tex.type = THREE.UnsignedByteType;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
+      tex.anisotropy = Math.min(LOW ? 4 : 8, renderer.capabilities.getMaxAnisotropy());
+      tex.needsUpdate = true;
+      GU.groundTex.value = tex; GU.gOn.value = 1;
+      W.groundTextures = true;
+    });
+  }
   const CAR = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'service', 'track']);
   const MAJOR = new Set(['motorway', 'trunk', 'primary', 'secondary']);
   const ROAD_STYLE = {
-    car: { col: new THREE.Color(0x46484d), y: 0.08 }, service: { col: new THREE.Color(0x56585c), y: 0.075 },
-    pedestrian: { col: new THREE.Color(0xc4baa6), y: 0.065 }, footway: { col: new THREE.Color(0xbab5ab), y: 0.05 },
-    steps: { col: new THREE.Color(0xa69d8f), y: 0.055 }, cycleway: { col: new THREE.Color(0x6e7c74), y: 0.06 },
+    car: { col: new THREE.Color(0x46484d), y: 0.08, l: TL.asphalt }, service: { col: new THREE.Color(0x56585c), y: 0.075, l: TL.asphalt },
+    pedestrian: { col: new THREE.Color(0xc4baa6), y: 0.065, l: TL.bricks }, footway: { col: new THREE.Color(0xbab5ab), y: 0.05, l: TL.path },
+    steps: { col: new THREE.Color(0xa69d8f), y: 0.055, l: TL.bricks }, cycleway: { col: new THREE.Color(0x6e7c74), y: 0.06, l: TL.asphalt },
   };
   const roadStyle = t => (t === 'service' || t === 'track') ? ROAD_STYLE.service : CAR.has(t) ? ROAD_STYLE.car : (ROAD_STYLE[t] || ROAD_STYLE.footway);
+  // [3D colour, lift, minimap colour, ground photo]
   const AREA = {
-    plaza: [0xb9b2a4, 0.012, '#d9d3c6'], grass: [0x76a457, 0.018, '#bfe0a6'], cemetery: [0x7f9f6a, 0.018, '#c4dcb4'],
-    park: [0x6c9a4e, 0.024, '#b4d89b'], wood: [0x4f7f3a, 0.03, '#9cc988'], pitch: [0x5f9e48, 0.036, '#a9d68f'],
-    playground: [0xc4a679, 0.036, '#e5d4b3'], sand: [0xd8c9a0, 0.036, '#efe4c4'], water: [0x4f8fbf, 0.045, '#9fcff0'],
+    plaza: [0xb9b2a4, 0.012, '#d9d3c6', TL.bricks], grass: [0x76a457, 0.018, '#bfe0a6', TL.grass], cemetery: [0x7f9f6a, 0.018, '#c4dcb4', TL.grass],
+    park: [0x6c9a4e, 0.024, '#b4d89b', TL.grass], wood: [0x4f7f3a, 0.03, '#9cc988', TL.forest], pitch: [0x5f9e48, 0.036, '#a9d68f', TL.grass],
+    playground: [0xc4a679, 0.036, '#e5d4b3', TL.sand], sand: [0xd8c9a0, 0.036, '#efe4c4', TL.sand], water: [0x4f8fbf, 0.045, '#9fcff0', TL.none],
   };
 
   // Merges coloured primitives into one vertex-coloured geometry (people, cars, props).
@@ -359,8 +441,18 @@ function create(opts) {
 
   // ---------------------------------------------------------------- flat-shaded city geometry
   class Geo {
-    constructor(withUV) { this.p = []; this.n = []; this.c = []; this.uv = withUV ? [] : null; }
-    vert(x, y, z, nx, ny, nz, col, u, v) { this.p.push(x, y, z); this.n.push(nx, ny, nz); this.c.push(col.r, col.g, col.b); if (this.uv) this.uv.push(u, v); }
+    // ground = true: a photo-textured drape (MAT.drape). Set geo.layer (TL.*) before adding a surface; geo.fr = null lays
+    // the photo in world x/z, or [ox, oz, ax, az, bx, bz, u0, v0] lays it along unit vector a (u) and across b (v).
+    constructor(withUV, ground) { this.p = []; this.n = []; this.c = []; this.uv = withUV ? [] : null; this.gl = ground ? [] : null; this.guv = ground ? [] : null; this.layer = -1; this.fr = null; }
+    vert(x, y, z, nx, ny, nz, col, u, v) {
+      this.p.push(x, y, z); this.n.push(nx, ny, nz); this.c.push(col.r, col.g, col.b); if (this.uv) this.uv.push(u, v);
+      if (this.gl) {
+        this.gl.push(this.layer);
+        const f = this.fr;
+        if (f) { const rx = x - f[0], rz = z - f[1]; this.guv.push(f[6] + rx * f[2] + rz * f[3], f[7] + rx * f[4] + rz * f[5]); }
+        else this.guv.push(x, z);
+      }
+    }
     flat(ax, az, bx, bz, cx, cz, y, col, down) {
       const up = (bz - az) * (cx - ax) - (bx - ax) * (cz - az) > 0;
       if (up === !!down) { let t = bx; bx = cx; cx = t; t = bz; bz = cz; cz = t; }
@@ -422,6 +514,7 @@ function create(opts) {
       g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
       g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
       if (this.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+      if (this.gl) { g.setAttribute('glayer', new THREE.Float32BufferAttribute(this.gl, 1)); g.setAttribute('guv', new THREE.Float32BufferAttribute(this.guv, 2)); }
       g.computeBoundingSphere();
       return g;
     }
@@ -550,6 +643,7 @@ function create(opts) {
     if (archQueue.size && !archFull && !destroyed) archTimer = setTimeout(flushArchive, 1500);
   }
   let destroyed = false;
+  loadGround();
 
   // ---------------------------------------------------------------- terrain (Mapterhorn elevation tiles)
   // Terrarium WebP, 512 px: metres = R * 256 + G + B / 256 - 32768. Zoom 15 (about 1.7 m a pixel) where the country
@@ -1284,11 +1378,14 @@ function create(opts) {
     const ni = i1 - i0, nj = j1 - j0;
     if (ni <= 0 || nj <= 0) return null;
     const W1 = ni + 1, nv = W1 * (nj + 1), pos = new Float32Array(nv * 3), nrm = new Float32Array(nv * 3);
+    const col = new Float32Array(nv * 3), lay = new Float32Array(nv).fill(TL.ground), guv = new Float32Array(nv * 2);
     let p = 0;
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const dx = node(i - 1, j) - node(i + 1, j), dz = node(i, j - 1) - node(i, j + 1), l = Math.hypot(dx, 2 * GS, dz);
       pos[p] = i * GS; pos[p + 1] = node(i, j); pos[p + 2] = j * GS;
       nrm[p] = dx / l; nrm[p + 1] = 2 * GS / l; nrm[p + 2] = dz / l;
+      col[p] = TERRAIN_COL.r; col[p + 1] = TERRAIN_COL.g; col[p + 2] = TERRAIN_COL.b;
+      guv[p / 3 * 2] = i * GS; guv[p / 3 * 2 + 1] = j * GS;
       p += 3;
     }
     const idx = new (nv > 65535 ? Uint32Array : Uint16Array)(ni * nj * 6);
@@ -1300,6 +1397,9 @@ function create(opts) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('glayer', new THREE.BufferAttribute(lay, 1));
+    g.setAttribute('guv', new THREE.BufferAttribute(guv, 2));
     g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, MAT.terrain);
@@ -1321,20 +1421,24 @@ function create(opts) {
     const group = new THREE.Group();
     const gm = groundMesh(s);
     if (gm) group.add(gm);
-    const flat = new Geo(false), col = new THREE.Color();
+    const flat = new Geo(false, true), col = new THREE.Color();
     for (const a of s.areas.concat(s.water)) {
       const st = AREA[a.k] || AREA.grass;
       col.setHex(st[0]);
+      flat.layer = st[3];
       flat.dpolygon(a.p, a.hs, groundAt, st[1] + 0.03, col, 2 * GS);
     }
     for (const r of s.roads) {
       const st = roadStyle(r.t), hw = r.w / 2, p = r.p, n = p.length / 2;
       const lift = st.y + 0.03 + (r.br ? 0.006 : 0), hf = r.deck || groundAt;
       const marking = MAJOR.has(r.t) || r.t === 'tertiary';
+      flat.layer = st.l; flat.fr = null;
+      let run = 0;  // metres along the street so far: pavement slabs carry on from one segment to the next
       for (let i = 0; i < n - 1; i++) {
         const x1 = p[2 * i], z1 = p[2 * i + 1], x2 = p[2 * i + 2], z2 = p[2 * i + 3];
         const dx = x2 - x1, dz = z2 - z1, L = Math.hypot(dx, dz);
         if (L < 0.01) continue;
+        const run0 = run; run += L;
         const nx = -dz / L * hw, nz = dx / L * hw, k = Math.max(1, Math.ceil(L / GS));
         for (let q = 0; q < k; q++) { // short pieces so the road follows the slope
           const ax = x1 + dx * q / k, az = z1 + dz * q / k, bx = x1 + dx * (q + 1) / k, bz = z1 + dz * (q + 1) / k;
@@ -1354,8 +1458,11 @@ function create(opts) {
         // pavements: a lighter strip with a kerb along every street with cars (not on bridges, not across other roads)
         if (!LOW && !r.br && CAR.has(r.t) && r.t !== 'service' && r.t !== 'track') {
           const ex = -dz / L, ez = dx / L, pw = r.t === 'residential' ? 2.0 : 2.6;
+          flat.layer = TL.sidewalk;
           for (const sd of [1, -1]) {
             const oi = hw * sd, oo = (hw + pw) * sd, ok = (hw + 0.22) * sd;
+            // slabs laid along the street, the first row starting at the kerb
+            flat.fr = [x1, z1, dx / L, dz / L, ex * sd, ez * sd, run0, -hw];
             for (let q = 0; q < k; q++) {
               const t0 = q / k, t1 = (q + 1) / k, mx = x1 + dx * (t0 + t1) / 2 + ex * (hw + pw / 2) * sd, mz = z1 + dz * (t0 + t1) / 2 + ez * (hw + pw / 2) * sd;
               if (roadAt(mx, mz)) continue;  // another street crosses here: no pavement over it
@@ -1364,6 +1471,7 @@ function create(opts) {
               flat.dquad(ax + ex * oi, az + ez * oi, bx + ex * oi, bz + ez * oi, bx + ex * ok, bz + ez * ok, ax + ex * ok, az + ez * ok, groundAt, KERB_Y + 0.004, kerbCol);
             }
           }
+          flat.layer = st.l; flat.fr = null;
         }
       }
       for (let i = 0; i < n; i++) {
@@ -2500,6 +2608,20 @@ function create(opts) {
     avatar.rotation.y = player.face;
     avatar.rotation.x = player.pitch;
   }
+  // For tests and screenshots: a spot inside the nearest park / plaza / ... of these kinds (AREA keys), at least minA m².
+  W.findArea = function (kinds, minA) {
+    let best = null, bd = Infinity;
+    for (const s of allSubs) for (const a of s.areas || []) {
+      if (!kinds.includes(a.k) || Math.abs(signedArea(a.p)) < (minA || 300)) continue;
+      let x = 0, z = 0; const n = a.p.length / 2;
+      for (let i = 0; i < a.p.length; i += 2) { x += a.p[i]; z += a.p[i + 1]; }
+      x /= n; z /= n;
+      if (!inRings([a.p].concat(a.hs || []), x, z)) continue;
+      const d = Math.hypot(x - player.pos.x, z - player.pos.z);
+      if (d < bd) { bd = d; best = { x, z, k: a.k }; }
+    }
+    return best;
+  };
   W.teleport = function (x, z, yaw) {
     player.pos.set(x, surfaceAt(x, z), z); player.vel.set(0, 0, 0); player.vy = 0; player.speed = 0; player.grounded = true; player.pitch = 0;
     if (yaw != null) { player.face = player.heading = yaw; cam.yaw = yaw; }
@@ -2716,7 +2838,8 @@ function create(opts) {
     const g = new THREE.Group(), ends = n.ends, cnt = ends.length;
     const poles = new THREE.InstancedMesh(PROP.sigPole, MAT.prop, cnt), lamps = new THREE.InstancedMesh(PROP.sigLamp, MAT.signal, cnt * 3);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
-    const zebra = new Geo(false), white = new THREE.Color(0xf4f1ea);
+    const zebra = new Geo(false, true), white = new THREE.Color(0xf4f1ea);
+    zebra.layer = TL.asphalt;  // painted stripes keep the road's grain
     ends.forEach((en, i) => {
       const sg = en.sg, s = en.end === 1 ? -1 : 1;
       const ux = (sg.x2 - sg.x1) / sg.L * s, uz = (sg.z2 - sg.z1) / sg.L * s; // towards the corner
