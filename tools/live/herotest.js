@@ -197,6 +197,51 @@ window.__heroOut = []; window.__heroDone = false;
     const board = window.CFTGame.missionBoard(s), all = [].concat(...board.map(x => x.missions));
     ok(D.MISSIONS.some(x => x.id === 's-morning-rush') && D.MISSIONS.some(x => x.id === 's-hold-line'), 'new missions: Hold the Line, Morning Rush, Aisle Hero, Wrecking Ball, Keys in the Ignition, Main Character Energy, The Liberator');
     info(all.filter(x => x.status === 'locked').length + ' missions still locked');
+    // ---------- the wardrobe (2026-11-17): one thing per slot, from a shop or from loot
+    {
+      const old = { home: s.home, name: 'Old', equip: { outfit: 'suit', hat: 'helmet', acc: 'watch', phone: 'phone2', bag: 'laptop', shoes: 'sneakers1' },
+        rpg: { eq: { head: 'Lx' }, loot: [{ id: 'Lx', slot: 'head', q: 2 }] }, stats: {}, settings: {} };
+      const mg = window.CFTGame.migrate(old).equip;
+      ok(mg.body === 'suit' && mg.wrist === 'watch' && mg.pocket === 'phone2' && mg.back === 'laptop' && mg.feet === 'sneakers1' && !mg.head && !('outfit' in mg) && !('acc' in mg),
+        'old saves move to body-part slots, and a loot hat beats the shop helmet on the same head: ' + JSON.stringify(mg));
+      s.money = 100000; s.xp = Math.max(s.xp, G.xpAt(8));
+      ok(G.buy('helmet') && G.buy('snapback') && s.equip.head === 'snapback', 'buying a snapback swaps it onto your head (the helmet goes to the wardrobe)');
+      const credS = G.stat('cred');
+      const head = G.slotOptions('head');
+      ok(head.length >= 2 && head[0].on && head[0].id === 'snapback' && head.some(o => o.id === 'helmet' && !o.on), 'the head slot offers both: ' + head.map(o => o.n).join(' / '));
+      G.wearShop('helmet');
+      ok(s.equip.head === 'helmet' && Math.abs(G.stat('cred') - credS - 1) < 0.01, 'wearing the helmet instead: +1 street cred, the snapback\'s style gone');
+      const credH = G.stat('cred');
+      const bean = R.add(R.makeGear(3, 6, 'head', { base: 'beanie' }), 'test');
+      ok(s.rpg.eq.head !== bean.id && s.equip.head === 'helmet', 'a loot beanie does not push the helmet off by itself');
+      R.equip(bean.id); R.mark();
+      ok(s.rpg.eq.head === bean.id && !s.equip.head && G.wornIn('head').src === 'loot' && Math.abs(G.stat('cred') - (credH - 1 + (bean.st.cred || 0))) < 0.01, 'wearing the loot beanie takes the helmet off: one thing per slot');
+      G.wearShop('helmet');
+      ok(s.equip.head === 'helmet' && !s.rpg.eq.head && G.slotOptions('head').some(o => o.id === bean.id), 'and back: the beanie returns to the spare loot');
+      const sh = R.add(R.makeGear(3, 6, 'hand', { base: 'lid' }), 'test'); R.equip(sh.id); R.mark();
+      const blk = F.blockPower();
+      ok(G.buy('camera') && s.equip.hand === 'camera' && !s.rpg.eq.hand && F.blockPower() < blk, 'the free hand: a camera OR a shield (block ' + Math.round(blk * 100) + '% -> ' + Math.round(F.blockPower() * 100) + '%)');
+      // the screen: your character with slots
+      U.closeAll(); U.wardrobe('head'); await sleep(120);
+      const slots = document.querySelectorAll('.cft-wslot'), opts = document.querySelectorAll('.cft-wopt');
+      ok(slots.length === D.WEAR_SLOTS.length + 3 && W.showOff && opts.length >= 3, 'the wardrobe shows ' + slots.length + ' slots around your character; the head lists ' + opts.length + ' choices');
+      ok(!!document.querySelector('[data-wslot="head"] em') && !!document.querySelector('.cft-fx.up, .cft-fx.down'), 'a choice badge on the head slot, green/red numbers for each swap');
+      const sw = document.querySelector('[data-wact="loot"][data-wid="' + bean.id + '"]');
+      if (sw) { sw.click(); await sleep(80); }
+      ok(!!sw && s.rpg.eq.head === bean.id && !s.equip.head, 'tapping Swap in the wardrobe puts the beanie on');
+      document.querySelector('[data-wslot="hand"]').click(); await sleep(60);
+      const ls = document.querySelector('[data-wact="loot"][data-wid="' + sh.id + '"]');
+      if (ls) { ls.click(); await sleep(60); }
+      ok(s.rpg.eq.hand === sh.id && !s.equip.hand, 'and the shield back in the free hand');
+      document.querySelector('[data-wspare]').click(); await sleep(60);
+      ok(!!document.querySelector('.cft-ward-sheet.open') && /Spare loot/.test(document.querySelector('[data-wsheet]').textContent), 'the spare-loot list opens from the wardrobe');
+      document.querySelector('[data-wx]').click(); await sleep(60);
+      ok(!document.querySelector('.cft-wardwrap') && !W.showOff, 'closing the wardrobe brings the normal camera back');
+      U.phone('me'); await sleep(80);
+      ok(document.querySelectorAll('.cft-slots [data-act="wardrobe"]').length === D.WEAR_SLOTS.length, 'the Me app shows every slot, each opens the wardrobe');
+      U.closeAll();
+    }
+
     // ---------- the play-test panel (?debug=1)
     try { localStorage.setItem('cityfuntime.debug', '1'); } catch (err) { /* ignore */ }
     const dbg = window.CFTDebug && window.CFTDebug.attach(G);

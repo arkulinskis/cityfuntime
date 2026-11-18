@@ -150,7 +150,10 @@ window.__cmbOut = []; window.__cmbDone = false;
     ok(s.equip.weapon === (shopW || 'w_baguette') && !R.weapon(), 'picking a shop weapon swaps it in (one weapon at a time): ' + (shopW || 'w_baguette'));
     U.phone('hero'); await sleep(150);
     const body = document.querySelector('[data-pbody]');
-    ok(body && /What you wear/.test(body.textContent) && /Head/.test(body.textContent) && /armour/.test(body.textContent), 'the Character app lists weapon, head, body, feet and charms with your health and armour');
+    ok(body && /Gear/.test(body.textContent) && /armour/.test(body.textContent) && !!body.querySelector('[data-act="wardrobe"]'), 'the Character app shows your health and armour and opens the wardrobe');
+    U.closeAll(); U.wardrobe(); await sleep(100);
+    ok(['weapon', 'head', 'body', 'feet', 'hand', 'c1'].every(k => document.querySelector('[data-wslot="' + k + '"]')) && /armour|🛡️/.test(document.querySelector('[data-wsum]').textContent), 'the wardrobe has weapon, head, body, feet, free hand and charm slots');
+    U.closeAll();
     U.closeAll();
 
     // ---------- the Static

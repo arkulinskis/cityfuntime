@@ -61,6 +61,12 @@ for (const [id, it] of Object.entries(D.ITEMS)) {
   if (!(it.weapon.dmg > 0 && it.weapon.reach > 0 && it.weapon.word)) bad.push(id + ': weapon needs dmg, reach, word');
   if (!Object.values(D.KINDS).some(k => k.sells.includes(id))) bad.push(id + ': no shop sells it');
 }
+// the wardrobe (2026-11-17): every piece of shop gear names a body-part slot, and every slot has something to choose
+const WEAR = new Set((D.WEAR_SLOTS || []).map(x => x.id));
+for (const [id, it] of Object.entries(D.ITEMS)) if (it.type === 'gear' && !WEAR.has(it.slot)) bad.push(id + ': gear slot ' + it.slot + ' is not in D.WEAR_SLOTS');
+for (const sl of WEAR) { if (!Object.values(D.ITEMS).some(it => it.type === 'gear' && it.slot === sl) && !(D.RPG.GEAR[sl] || []).length) bad.push('wardrobe slot ' + sl + ': nothing fits it'); if (!D.RPG.SLOT_NAMES[sl]) bad.push('wardrobe slot ' + sl + ': no name in D.RPG.SLOT_NAMES'); }
+for (const sl of Object.keys(D.RPG.GEAR)) if (!WEAR.has(sl)) bad.push('loot gear slot ' + sl + ' has no wardrobe slot');
+for (const [id, it] of Object.entries(D.ITEMS)) if (it.type === 'gear' && !Object.values(D.KINDS).some(k => k.sells.includes(id)) && !it.weapon) bad.push(id + ': no shop sells this gear');
 if (Object.keys(D.MONSTERS).length < 15) bad.push('fewer than 15 monster types');
 for (const [k, m] of Object.entries(D.MONSTERS)) {
   if (!(m.atk > 0)) bad.push('monster ' + k + ': needs atk');

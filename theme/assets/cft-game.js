@@ -45,7 +45,23 @@ function migrate(s) {
   for (const k of Object.keys(base.stats)) if (typeof s.stats[k] !== 'number') s.stats[k] = 1;
   s.settings = Object.assign(base.settings, s.settings || {});
   s.settings.follow = Object.assign({ partner: true, kids: true, pets: true, friend: null }, s.settings.follow || {});
+  migrateWear(s);
   return s;
+}
+// The wardrobe (2026-11-17): shop gear moved to body-part slots (outfit -> body, shoes -> feet, hat -> head, acc -> face /
+// wrist / hand, bag -> back, phone -> pocket), and every slot holds one thing. Where a loot piece and a shop piece shared a
+// slot, the loot stays on; the shop piece stays owned, one tap away in the wardrobe.
+const OLD_SLOTS = ['outfit', 'shoes', 'hat', 'acc', 'phone', 'bag'];
+function migrateWear(s) {
+  const eq = s.equip || (s.equip = {});
+  for (const k of OLD_SLOTS) {
+    if (!(k in eq)) continue;
+    const id = eq[k], it = D.ITEMS[id];
+    delete eq[k];
+    if (it && it.slot && !eq[it.slot]) eq[it.slot] = id;
+  }
+  const r = s.rpg;
+  if (r && r.eq) for (const sl of ['head', 'body', 'feet', 'hand', 'weapon']) if (eq[sl] && r.eq[sl] && (r.loot || []).some(x => x.id === r.eq[sl])) delete eq[sl];
 }
 function bizValue(id, b) { const d = BIZ[id]; if (!d) return 0; let v = d.cost; for (let l = 1; l < (b.lvl || 1); l++) v += d.cost * [0.5, 1, 2, 4][l - 1]; return v; }
 function summary(s) {
@@ -186,7 +202,7 @@ function mount(root, opts) {
   function speedMul() {
     let m = 1 + Math.min(0.4, stat('fit') * 0.01) + setBonus('speed');
     const ride = save.equip.ride;
-    if (!ride) { const sh = D.ITEMS[save.equip.shoes]; if (sh && sh.speed) m += sh.speed; }
+    if (!ride) for (const sl of Object.keys(save.equip)) { const it = sl !== 'ride' && D.ITEMS[save.equip[sl]]; if (it && it.type === 'gear' && it.speed) m += it.speed; }  // shoes, a fitness band
     else if (isFriend('kai')) m += 0.05;
     if (save.energy <= 0 && !ride) m *= 0.8;
     if (G.fun) m *= G.fun.speedMul();
@@ -1260,7 +1276,7 @@ function mount(root, opts) {
     switch (it.type) {
       case 'food': addEnergy((it.energy || 0) * G.foodMul()); if (it.happy) addHappy(it.happy); if (it.stats) for (const k in it.stats) addStat(k, it.stats[k], true); U.feed(it.e, 'Yum! +' + Math.round((it.energy || 0) * G.foodMul()) + ' ⚡'); break;
       case 'snack': case 'gift': case 'quest': giveItem(it.give || id, 1); U.feed(it.e, it.n + ' added to your bag'); break;
-      case 'gear': save.owned[id] = true; save.equip[it.slot] = id; if (it.weapon && G.rpg) G.rpg.unequip('weapon'); if (it.slot !== 'weapon') W.setLook(playerLook()); U.feed(it.e, (it.weapon ? 'Armed with: ' : 'Wearing ') + it.n + (it.weapon ? ' (F to bonk)' : '')); if (it.happy) addHappy(it.happy); break;
+      case 'gear': { save.owned[id] = true; const was = wornIn(it.slot); wearShop(id); U.feed(it.e, (it.weapon ? 'Armed with: ' : 'Wearing ') + it.n + (it.weapon ? ' (F to bonk)' : '') + (was ? ' · ' + was.n + ' went to your wardrobe' : '')); if (it.happy) addHappy(it.happy); break; }
       case 'vehicle': save.owned[id] = true; setRide(id); U.banner(it.e + ' ' + it.n + '!', 'Press V (or the ride button) to hop on and off.', 'done'); log('Bought a ' + it.n, it.e); break;
       case 'furniture': save.owned[id] = true; if (it.energy) save.maxE = (save.maxE || 0) + it.energy; U.feed(it.e, it.n + ' delivered home. +' + it.happy + ' 😊 every day'); log('Bought ' + it.n, it.e); break;
       case 'pet': save.pets.push({ kind: it.pet, name: it.pet === 'dog' ? 'Biscuit' : 'Mochi', since: save.day }); addHappy(10); refreshFollowers(); U.banner(it.e + ' New best friend!', 'Your ' + it.pet + ' follows you everywhere.', 'friend'); log('Adopted a ' + it.pet, it.e); break;
@@ -1290,23 +1306,71 @@ function mount(root, opts) {
       scarf: null, collar: false, build: 1, h: 1, sleeve: 'short', bag: 0x6b4eff, shoe: 0xf2f2f2 }, save.look || {});
     if (base.style == null) base.style = base.long ? 1 : 0;
     if (base.pack === false) base.bag = null;
-    const eq = save.equip, o = D.ITEMS[eq.outfit];
+    const eq = save.equip, o = D.ITEMS[eq.body];  // shop gear by wardrobe slot (D.WEAR_SLOTS)
     if (o && o.color) base.shirt = o.color;
-    if (eq.outfit === 'tee') base.logo = 0xffc21f;
-    if (eq.outfit === 'jacket') { base.sleeve = 'long'; base.collar = true; }
-    if (eq.outfit === 'outfit_date') { base.sleeve = 'long'; base.collar = true; base.scarf = 0xf4f1ea; }
-    if (eq.outfit === 'suit') { base.sleeve = 'long'; base.tie = 0xe8453c; base.pants = 0x1f2937; base.shoe = 0x222222; }
-    if (eq.outfit === 'designer') { base.sleeve = 'long'; base.stripes = 0xffc21f; base.pants = 0xf4f1ea; }
+    if (eq.body === 'tee') base.logo = 0xffc21f;
+    if (eq.body === 'jacket') { base.sleeve = 'long'; base.collar = true; }
+    if (eq.body === 'outfit_date') { base.sleeve = 'long'; base.collar = true; base.scarf = 0xf4f1ea; }
+    if (eq.body === 'suit') { base.sleeve = 'long'; base.tie = 0xe8453c; base.pants = 0x1f2937; base.shoe = 0x222222; }
+    if (eq.body === 'designer') { base.sleeve = 'long'; base.stripes = 0xffc21f; base.pants = 0xf4f1ea; }
     const SHOE_COL = { sneakers1: 0x3aa6b9, sneakers2: 0xff8a3d, sneakers3: 0xe8453c };
-    if (SHOE_COL[eq.shoes]) base.shoe = SHOE_COL[eq.shoes];
-    if (eq.acc === 'headphones') base.phones = 0xff5c8a;
-    if (eq.acc === 'fakenose') base.glasses = true;
-    if (eq.hat === 'helmet') base.hat = 0xf2b134;
+    if (SHOE_COL[eq.feet]) base.shoe = SHOE_COL[eq.feet];
+    if (eq.face === 'headphones') base.phones = 0xff5c8a;
+    if (eq.face === 'fakenose' || eq.face === 'sunnies') base.glasses = true;
+    if (eq.head === 'helmet') base.hat = 0xf2b134;
+    if (eq.head === 'snapback') base.hat = 0xe8453c;
     if (G.rpg) Object.assign(base, G.rpg.lookParts());  // loot hats, jackets and shoes
     if (save.fun && save.fun.king) { base.crown = true; base.hat = null; base.beanie = null; }
     return base;
   }
   G.playerLook = playerLook;
+
+  // ------------------------------------------------------------------ the wardrobe: one thing per slot
+  // A slot holds a shop item (save.equip[slot] = item id) OR a loot piece (save.rpg.eq[slot] = loot id), never both.
+  function wornIn(slot) {
+    const lt = G.rpg && G.rpg.worn(slot);
+    if (lt) return { src: 'loot', id: lt.id, it: lt, n: lt.n, e: lt.e, q: lt.q };
+    const id = save.equip[slot], it = D.ITEMS[id];
+    return it && it.type === 'gear' ? { src: 'shop', id, it, n: it.n, e: it.e } : null;
+  }
+  function wearShop(id) {
+    const it = D.ITEMS[id];
+    if (!it || it.type !== 'gear' || !owned(id)) return false;
+    if (G.rpg) G.rpg.unequip(it.slot, true);
+    save.equip[it.slot] = id;
+    if (it.slot !== 'weapon') W.setLook(playerLook());
+    dirty();
+    return true;
+  }
+  function takeOff(slot) {
+    if (G.rpg && G.rpg.worn(slot)) G.rpg.unequip(slot);
+    if (save.equip[slot]) { delete save.equip[slot]; if (slot !== 'weapon') W.setLook(playerLook()); }
+    dirty();
+  }
+  // Everything that fits a slot: worn first, then shop gear you own, then loot in your bag (best first)
+  function slotOptions(slot) {
+    const out = [], cur = wornIn(slot);
+    if (cur) out.push(Object.assign({ on: true }, cur));
+    for (const id of Object.keys(save.owned)) { const it = D.ITEMS[id]; if (it && it.type === 'gear' && it.slot === slot && !(cur && cur.id === id)) out.push({ src: 'shop', id, it, n: it.n, e: it.e }); }
+    if (G.rpg) for (const lt of G.rpg.spare(slot)) out.push({ src: 'loot', id: lt.id, it: lt, n: lt.n, e: lt.e, q: lt.q });
+    return out;
+  }
+  // What a piece does, as numbers the wardrobe can compare (stats, armour, health, speed %, block %, bonk)
+  function wearFx(o) {
+    const f = {}, it = o && o.it;
+    if (!it) return f;
+    const add = (k, v) => { if (v) f[k] = Math.round(((f[k] || 0) + v) * 100) / 100; };
+    if (o.src === 'shop') {
+      for (const k in it.stats || {}) add(k, it.stats[k]);
+      add('speed', (it.speed || 0) * 100);
+      if (it.weapon) add('bonk', it.weapon.dmg);
+    } else {
+      for (const k in it.st || {}) add(k, it.st[k]);
+      add('armour', it.ar); add('life', it.lf); add('speed', (it.sp || 0) * 100); add('block', (it.blk || 0) * 100); add('bonk', it.dmg);
+    }
+    return f;
+  }
+  Object.assign(G, { wornIn, wearShop, takeOff, slotOptions, wearFx });
   function setRide(id) {
     if (id && !owned(id)) return;
     if (G.hero && G.hero.borrowed) G.hero.park();  // leave the borrowed car at the kerb

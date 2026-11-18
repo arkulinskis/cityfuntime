@@ -410,8 +410,8 @@ function create(G, root) {
     const t = shell.classList.contains('touch');
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
-      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things)</div><div><kbd>G</kbd> or right mouse, held: block (time it for a PERFECT PARRY)</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
+      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone (👕 Wardrobe: what you wear)</div>'
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things)</div><div><kbd>G</kbd> or right mouse, held: block (time it for a PERFECT PARRY)</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
       '</div><p class="muted">Watch for the red <b>❗</b> over a figment: it is about to strike. When its ring turns gold, block. Big gold <b>letters</b> on the map are people with missions; E next to a parked car borrows it. The <b>gold arrow</b> over your head always points to your current goal. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
@@ -473,6 +473,111 @@ function create(G, root) {
       ov.el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const p = PLACES[+b.dataset.p]; done({ lat: p.lat, lon: p.lon, label: p.name + ', ' + p.city, short: p.name }); });
     });
   };
+  // ------------------------------------------------------------------ the wardrobe (2026-11-17)
+  // Your live character in the middle (W.showOff), a slot per body part around it (D.WEAR_SLOTS) and three charms under it.
+  // Tap a slot: everything that fits it, from shops and from loot, with what each would change. Every slot holds ONE thing
+  // (G.wearShop / G.rpg.equip clear the other), so a cap and a helmet, or a shield and a camera, are a real choice.
+  const FX_LABEL = { fit: '💪', charm: '💬', smarts: '🧠', style: '🕶️', cred: '🔥', armour: '🛡️ armour', life: '❤️', speed: '% speed', block: '% block', bonk: '👊 bonk' };
+  function fxChips(f, base) {
+    const out = [];
+    for (const k of Object.keys(Object.assign({}, base, f))) {
+      const d = Math.round(((f[k] || 0) - ((base || {})[k] || 0)) * 10) / 10;
+      if (!d) continue;
+      const lab = FX_LABEL[k] || k;
+      out.push('<i class="cft-fx ' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '+' : '−') + Math.abs(d) + (lab.charAt(0) === '%' ? lab : ' ' + lab) + '</i>');
+    }
+    return out.join('');
+  }
+  let wardOv = null, wardSlot = null;
+  const CHARMS = ['c1', 'c2', 'c3'];
+  const lootOpt = (it, on) => ({ src: 'loot', id: it.id, it, n: it.n, e: it.e, q: it.q, on });
+  const charmOpts = c => { const w = G.rpg && G.rpg.worn(c); return (w ? [lootOpt(w, true)] : []).concat(G.rpg ? G.rpg.spare(c).map(it => lootOpt(it)) : []); };
+  U.wardrobe = function (slot) {
+    if (wardOv) { wardPick(slot || null); return; }
+    const W = G.W;
+    wardOv = overlay('<div class="cft-ward" role="dialog" aria-label="Wardrobe"><div class="cft-ward-top"><b>👕 Wardrobe</b><span class="cft-wsum" data-wsum></span>' +
+      '<button type="button" class="cft-btn sm" data-wspare>🎒 Spare loot</button><button type="button" class="cft-pbtn" data-wx aria-label="Close the wardrobe">✕</button></div>' +
+      '<div class="cft-ward-doll"><div class="cft-ward-col" data-wcol="L"></div><div class="cft-ward-col" data-wcol="R"></div></div>' +
+      '<div class="cft-wcharms" data-wcharms></div><div class="cft-ward-sheet" data-wsheet aria-live="polite"></div></div>',
+      'cft-wardwrap', { onclose: () => { wardOv = null; wardSlot = null; W.showOff = false; G.dirty(); } });
+    W.showOff = true;
+    wardOv.el.addEventListener('click', onWardClick);
+    wardPick(slot || null);
+  };
+  U.wardrobeOpen = () => !!wardOv;
+  function slotBtn(sl, n, e, cur, count) {
+    return '<button type="button" class="cft-wslot' + (cur ? ' full ' + (cur.q != null ? 'q' + cur.q : 'shop') : '') + (wardSlot === sl ? ' sel' : '') + '" data-wslot="' + sl + '" aria-label="' + esc(n + ': ' + (cur ? cur.n : 'empty') + (count > 1 ? ', ' + count + ' to choose from' : '')) + '">' +
+      '<span>' + (cur ? cur.e : e) + '</span><small>' + esc(n) + '</small>' + (count > 1 ? '<em>' + count + '</em>' : '') + '</button>';
+  }
+  function wardDraw() {
+    if (!wardOv) return;
+    const el = wardOv.el;
+    for (const side of ['L', 'R']) el.querySelector('[data-wcol="' + side + '"]').innerHTML = D.WEAR_SLOTS.filter(x => x.side === side).map(x => slotBtn(x.id, x.n, x.e, G.wornIn(x.id), G.slotOptions(x.id).length)).join('');
+    el.querySelector('[data-wcharms]').innerHTML = G.rpg ? '<small>Charms</small>' + CHARMS.map(c => { const o = charmOpts(c); return slotBtn(c, 'Charm', '✨', o.find(x => x.on), o.length); }).join('') : '';
+    const hp = G.fun ? G.fun.maxHp() : 0, ar = G.rpg ? Math.round(G.rpg.bonus('armor')) : 0;
+    el.querySelector('[data-wsum]').innerHTML = D.STATS.map(st => '<i title="' + st.name + '">' + st.e + ' ' + Math.floor(G.stat(st.id)) + '</i>').join('') +
+      '<i title="Armour">🛡️ ' + ar + '</i>' + (hp ? '<i title="Most health">❤️ ' + hp + '</i>' : '');
+  }
+  function wardPick(slot) {
+    if (!wardOv) return;
+    wardSlot = slot;
+    wardDraw();
+    const sh = wardOv.el.querySelector('[data-wsheet]');
+    sh.classList.toggle('open', !!slot);
+    if (!slot) { sh.innerHTML = '<p class="cft-ward-tip">Tap a slot. Each one holds <b>one</b> thing: a cap <i>or</i> a helmet, a shield <i>or</i> a camera. A pink number means you have a choice waiting.</p>'; return; }
+    if (slot === 'spare') { sh.innerHTML = spareSheet(); return; }
+    const charm = CHARMS.includes(slot);
+    const def = charm ? { n: 'Charm', e: '✨', hint: 'Charms add stats and perks. Monsters, treasure chests and mission rewards drop them.' } : D.WEAR_SLOTS.find(x => x.id === slot);
+    if (!def) { wardPick(null); return; }
+    const opts = charm ? charmOpts(slot) : G.slotOptions(slot);
+    const cur = opts.find(o => o.on), base = cur ? G.wearFx(cur) : {};
+    let h = '<div class="cft-wsheet-h"><b>' + def.e + ' ' + esc(def.n) + '</b><small>One at a time' + (opts.length > 1 ? ' · ' + opts.length + ' to choose from' : '') + '</small>' +
+      '<button type="button" class="cft-pbtn" data-wpick="" aria-label="Close the list">✕</button></div>';
+    if (!opts.length) h += '<p class="muted">Nothing for this slot yet.</p>';
+    for (const o of opts) {
+      const line = o.src === 'shop' ? itemLine(o.it) : G.rpg.statLine(o.it);
+      const tag = o.src === 'shop' ? '🛍️ Shop' : D.RPG.QUALITY[o.q].n + ' loot';
+      const chips = o.on ? '' : fxChips(G.wearFx(o), base);
+      h += '<div class="cft-wopt' + (o.on ? ' on' : '') + (o.q != null ? ' cft-loot q' + o.q : '') + '"><span>' + o.e + '</span><div><b>' + esc(o.n) + (o.on ? ' <i class="cft-new on">wearing</i>' : '') + '</b>' +
+        '<small><span class="cft-wsrc">' + tag + '</span>' + (line ? ' · ' + esc(line) : '') + '</small>' +
+        (o.on ? '' : '<div class="cft-fxs">' + (chips || '<i class="cft-fx">same numbers, new look</i>') + '</div>') + '</div>' +
+        (o.on ? '<button type="button" class="cft-btn sm ghost" data-wact="off" data-wid="' + slot + '">Take off</button>'
+          : '<button type="button" class="cft-btn sm primary" data-wact="' + o.src + '" data-wid="' + esc(o.id) + '">' + (cur ? 'Swap' : 'Wear') + '</button>') + '</div>';
+    }
+    h += '<p class="muted small">' + esc(def.hint) + (cur && opts.length > 1 ? ' Green and red show what a swap changes.' : '') + '</p>';
+    sh.innerHTML = h;
+  }
+  function spareSheet() {
+    if (!G.rpg) return '<p class="muted">Still loading.</p>';
+    const v = G.rpg.view(), junk = v.bag.filter(x => x.q === 0).length;
+    const h = '<div class="cft-wsheet-h"><b>🎒 Spare loot (' + v.bag.length + ' of 30)</b><small>Not worn right now</small><button type="button" class="cft-pbtn" data-wpick="" aria-label="Close the list">✕</button></div>' +
+      (junk ? '<div class="cft-row"><button type="button" class="cft-btn sm" data-wact="junk">🧾 Sell ' + junk + ' junk</button></div>' : '') +
+      (v.bag.length ? v.bag.map(it => lootRow(v, it, (it.q ? '<button type="button" class="cft-btn sm ' + (v.upgrade(it) ? 'primary' : '') + '" data-wact="loot" data-wid="' + it.id + '">' + (v.upgrade(it) ? '▲ Wear' : 'Wear') + '</button>' : '') +
+        '<button type="button" class="cft-btn sm ghost" data-wact="sell" data-wid="' + it.id + '">' + G.fmt$(v.sellPrice(it)) + '</button>')).join('') : '<p class="muted">Empty. Bonk monsters, open treasure chests 🧰 and finish missions.</p>');
+    for (const it of save().rpg.loot) it.fresh = 0;
+    return h;
+  }
+  function onWardClick(e) {
+    if (e.target.closest('[data-wx]')) { wardOv.close(); return; }
+    if (e.target.closest('[data-wspare]')) { wardPick(wardSlot === 'spare' ? null : 'spare'); return; }
+    const sl = e.target.closest('[data-wslot]');
+    if (sl) { wardPick(wardSlot === sl.dataset.wslot ? null : sl.dataset.wslot); return; }
+    const pk = e.target.closest('[data-wpick]');
+    if (pk) { wardPick(pk.dataset.wpick || null); return; }
+    const b = e.target.closest('[data-wact]');
+    if (!b) return;
+    const id = b.dataset.wid, act = b.dataset.wact, charm = CHARMS.includes(wardSlot), wear = act === 'shop' || act === 'loot';
+    if (act === 'shop') G.wearShop(id);
+    else if (act === 'loot') { if (charm) G.rpg.equip(id, wardSlot); else G.rpg.equip(id); }
+    else if (act === 'off') { if (charm) G.rpg.unequip(id); else G.takeOff(id); }
+    else if (act === 'sell') G.rpg.sell(id);
+    else if (act === 'junk') G.rpg.sellJunk();
+    if (G.rpg) G.rpg.mark();
+    if (wear) { const p = G.W.player.pos; G.W.burst(p.x, p.y + 1.6, p.z, '✨', 5, { spread: 1.2, up: 2.5 }); G.sfx.pick(); }
+    wardPick(wardSlot);
+    const sel = wear && wardOv && wardOv.el.querySelector('.cft-wslot.sel');
+    if (sel) sel.classList.add('pop');
+  }
   U.lookEditor = function () {
     const s = save(), W = G.W;
     const cur = Object.assign({ skin: hexN(SKIN[2]), hair: hexN(HAIR[1]), shirt: hexN(SHIRT[0]), style: s.look && s.look.long ? 1 : 0, glasses: false, beard: false, pack: true }, s.look || {});
@@ -610,7 +715,7 @@ function create(G, root) {
     if (!G.W || G.state() !== 'play') return;
     if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (stack.length) {
-      if (e.code === 'Escape' || ((e.code === 'KeyP' || e.code === 'Tab') && stack[stack.length - 1].el.classList.contains('cft-phone-wrap'))) {
+      if (e.code === 'Escape' || ((e.code === 'KeyP' || e.code === 'Tab') && stack[stack.length - 1].el.classList.contains('cft-phone-wrap')) || (e.code === 'KeyI' && stack[stack.length - 1].el.classList.contains('cft-wardwrap'))) {
         const top = stack[stack.length - 1];
         if (top.el.classList.contains('cft-dlg-wrap') || top.el.classList.contains('cft-fade')) return;
         e.preventDefault(); top.close();
@@ -625,6 +730,7 @@ function create(G, root) {
     else if (e.code === 'KeyQ') { if (!e.repeat && G.fun) G.fun.quaff(); }
     else if (e.code === 'KeyM') toggleZoom();
     else if (e.code === 'KeyH') U.help();
+    else if (e.code === 'KeyI') U.wardrobe();
   }
   document.addEventListener('keydown', onKey);
   const unblock = () => { if (G.fun && G.fun.blocking) G.fun.setBlock(false); };
@@ -654,7 +760,7 @@ function create(G, root) {
 
   // ------------------------------------------------------------------ the phone
   const APPS = [
-    ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['hero', '🧙', 'Character'], ['rep', '🤝', 'Reputation'], ['ach', '🏆', 'Achievements'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
+    ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['wardrobe', '👕', 'Wardrobe'], ['hero', '🧙', 'Character'], ['rep', '🤝', 'Reputation'], ['ach', '🏆', 'Achievements'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
     ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
   ];
   let phoneOv = null, phoneApp = null;
@@ -731,12 +837,12 @@ function create(G, root) {
   }
   VIEWS.me = function () {
     const s = save(), lv = G.level(), a = G.xpAt(lv), b = G.xpAt(lv + 1), sum = window.CFTGame.summary(s);
-    const eq = ['outfit', 'shoes', 'hat', 'acc', 'phone', 'bag'].map(k => { const it = D.ITEMS[s.equip[k]]; return '<div class="cft-slot"><span>' + (it ? it.e : '·') + '</span><small>' + (it ? esc(it.n) : k) + '</small></div>'; }).join('');
+    const eq = D.WEAR_SLOTS.map(x => { const w = G.wornIn(x.id); return '<button type="button" class="cft-slot' + (w ? '' : ' empty') + '" data-act="wardrobe" data-id="' + x.id + '"><span>' + (w ? w.e : x.e) + '</span><small>' + esc(w ? w.n : x.n) + '</small></button>'; }).join('');
     return '<div class="cft-me"><div class="cft-me-h"><button type="button" class="cft-face big" data-act="look" title="Change your look" aria-label="Change your look">🪞</button><div><b>' + esc(s.name) + (s.rpg && s.rpg.title ? ' <small class="cft-title">' + esc(s.rpg.title) + '</small>' : '') + '</b><span>Level ' + lv + ' · ' + (s.xp - a) + ' / ' + (b - a) + ' XP</span>' + bar(s.xp - a, b - a, 'xp') + '</div></div>' +
       '<div class="cft-grid2"><div class="cft-mini"><small>Cash</small><b>' + G.fmt$(s.money) + '</b></div><div class="cft-mini"><small>Net worth</small><b>' + G.fmt$(sum.worth) + '</b></div>' +
       '<div class="cft-mini"><small>⚡ Energy</small><b>' + Math.round(s.energy) + ' / ' + G.maxEnergy() + '</b></div><div class="cft-mini"><small>😊 Happiness</small><b>' + Math.round(s.happy) + '% → ' + Math.round(G.happyTarget()) + '%</b></div></div>' +
       '<div class="cft-sec"><h4>Stats</h4>' + D.STATS.map(st => { const v = G.stat(st.id); return '<div class="cft-stat"><span>' + st.e + '</span><div><b>' + st.name + ' ' + Math.floor(v) + '</b><small>' + esc(st.blurb) + '</small>' + bar(v % 1 || (v >= 1 ? 0 : 0), 1, 'st') + '</div></div>'; }).join('') + '</div>' +
-      '<div class="cft-sec"><h4>Wearing</h4><div class="cft-slots">' + eq + '</div></div>' +
+      '<div class="cft-sec"><h4>Wearing <button type="button" class="cft-btn sm" data-act="wardrobe" data-id="">👕 Open wardrobe</button></h4><div class="cft-slots">' + eq + '</div></div>' +
       '<div class="cft-sec"><h4>Life so far</h4><div class="cft-grid2">' + [['📜 Missions', sum.missions], ['💼 Odd jobs', sum.jobs], ['🪙 Coins', s.counters.coins || 0], ['🚶 Walked', ((s.walked || 0) / 1000).toFixed(1) + ' km'], ['📸 Photos', s.counters.photos || 0], ['🎨 Tags', s.counters.tags || 0], ['💬 Chats', s.counters.chats || 0], ['🏁 Races won', s.counters.races || 0]].map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div></div>';
   };
   VIEWS.bag = function () {
@@ -745,12 +851,12 @@ function create(G, root) {
     for (const k of Object.keys(s.bag)) { const it = D.ITEMS[k]; if (!it || s.bag[k] <= 0) continue; const g = it.type === 'snack' ? 'food' : it.type === 'gift' ? 'gift' : it.type === 'tool' ? 'tool' : 'quest'; groups[g].push(k); }
     const row = (k, btn) => { const it = D.ITEMS[k]; return '<div class="cft-li"><span>' + it.e + '</span><div><b>' + esc(it.n) + ' ×' + s.bag[k] + '</b><small>' + itemLine(it) + '</small></div>' + (btn || '') + '</div>'; };
     const rides = Object.keys(D.VEHICLES).filter(G.owned);
-    const gear = Object.keys(s.owned).filter(k => D.ITEMS[k] && D.ITEMS[k].type === 'gear');
+    const gear = Object.keys(s.owned).filter(k => D.ITEMS[k] && D.ITEMS[k].type === 'gear').length + (s.rpg ? s.rpg.loot.length : 0);
     return '<div class="cft-sec"><h4>🍎 Snacks</h4>' + (groups.food.map(k => row(k, '<button type="button" class="cft-btn sm primary" data-act="eat" data-id="' + k + '">Eat</button>')).join('') || '<p class="muted">Nothing to eat. Cafés, bakeries and groceries sell snacks.</p>') + '</div>' +
       '<div class="cft-sec"><h4>🎁 Gifts</h4>' + (groups.gift.map(k => row(k)).join('') || '<p class="muted">No gifts. Florists, bakeries and gift shops sell them. Give them to people to make them like you.</p>') + '</div>' +
       (groups.tool.length || groups.quest.length ? '<div class="cft-sec"><h4>🧰 Other</h4>' + groups.tool.concat(groups.quest).map(k => row(k)).join('') + '</div>' : '') +
       '<div class="cft-sec"><h4>🛹 Rides</h4>' + (rides.length ? '<div class="cft-chips"><button type="button" class="cft-chipb ' + (!s.equip.ride ? 'on' : '') + '" data-act="ride" data-id="">🚶 On foot</button>' + rides.map(k => '<button type="button" class="cft-chipb ' + (s.equip.ride === k ? 'on' : '') + '" data-act="ride" data-id="' + k + '">' + D.ITEMS[k].e + ' ' + esc(D.ITEMS[k].n) + '</button>').join('') + '</div>' : '<p class="muted">No rides yet. Skateboards are $120 at bike & board shops.</p>') + '</div>' +
-      '<div class="cft-sec"><h4>👕 Gear</h4>' + (gear.length ? gear.map(k => { const it = D.ITEMS[k], on = s.equip[it.slot] === k; return '<div class="cft-li"><span>' + it.e + '</span><div><b>' + esc(it.n) + '</b><small>' + itemLine(it) + '</small></div><button type="button" class="cft-btn sm ' + (on ? '' : 'primary') + '" data-act="equip" data-id="' + k + '">' + (on ? 'Take off' : 'Wear') + '</button></div>'; }).join('') : '<p class="muted">No gear yet. Clothes shops, tech shops and jewellers sell it.</p>') + '</div>';
+      '<div class="cft-sec"><h4>👕 Clothes and gear</h4><div class="cft-li"><span>👕</span><div><b>' + gear + ' piece' + (gear === 1 ? '' : 's') + ' of gear</b><small>Clothes, shoes, weapons, shields and charms live in the Wardrobe: one thing per slot.</small></div><button type="button" class="cft-btn sm primary" data-act="wardrobe" data-id="">Open</button></div></div>';
   };
   function itemLine(it) {
     const p = [];
@@ -855,12 +961,9 @@ function create(G, root) {
         v.titles.map(t => '<button type="button" class="cft-chipb ' + (v.title === t ? 'on' : '') + '" data-act="title" data-id="' + esc(t) + '">' + esc(t) + '</button>').join('') + '</div>'
         : '<small>Titles come from achievements and Exalted factions.</small>') + '</div>';
     if (v.pending) h += '<div class="cft-sec"><div class="cft-li"><span>🎁</span><div><b>' + v.pending + ' mission reward' + (v.pending > 1 ? 's' : '') + ' to choose</b><small>Pick one of three charms for each</small></div><button type="button" class="cft-btn sm primary" data-act="claim">Choose</button></div></div>';
-    h += '<div class="cft-sec"><h4>🛡️ What you wear · ❤️ ' + (G.fun ? Math.ceil(G.fun.hp()) + '/' + G.fun.maxHp() : '') + ' health · armour ' + v.armor + '</h4>' + v.worn.map(w => w.it ? lootRow(v, w.it, '<button type="button" class="cft-btn sm ghost" data-act="unequipc" data-id="' + w.slot + '">Take off</button>', w.label)
-      : '<div class="cft-li cft-loot empty"><span>⬚</span><div><b>' + w.label + ': empty</b><small>' + (w.slot === 'weapon' ? 'Your shop weapon (or bare hands) until loot gives you one' : 'Monsters, treasure chests, crates and missions drop these') + '</small></div></div>').join('') + '</div>';
-    const junk = v.bag.filter(x => x.q === 0).length;
-    h += '<div class="cft-sec"><h4>🎒 Bag (' + v.bag.length + ' of 30)</h4>' + (junk ? '<div class="cft-row"><button type="button" class="cft-btn sm" data-act="selljunk">🧾 Sell ' + junk + ' junk</button></div>' : '') +
-      (v.bag.length ? v.bag.map(it => lootRow(v, it, (it.q ? '<button type="button" class="cft-btn sm ' + (v.upgrade(it) ? 'primary' : '') + '" data-act="equipc" data-id="' + it.id + '">' + (v.upgrade(it) ? '▲ Wear' : 'Wear') + '</button>' : '') +
-        '<button type="button" class="cft-btn sm ghost" data-act="sellc" data-id="' + it.id + '">' + G.fmt$(v.sellPrice(it)) + '</button>')).join('') : '<p class="muted">Empty. Bonk monsters, open treasure chests 🧰 and finish missions.</p>') + '</div>';
+    const ups = v.bag.filter(it => v.upgrade(it)).length;
+    h += '<div class="cft-sec"><h4>🛡️ Gear · ❤️ ' + (G.fun ? Math.ceil(G.fun.hp()) + '/' + G.fun.maxHp() : '') + ' health · armour ' + v.armor + '</h4><div class="cft-li"><span>👕</span><div><b>' + v.worn.filter(w => w.it).length + ' loot pieces worn · ' + v.bag.length + ' spare</b>' +
+      '<small>' + (ups ? '▲ ' + ups + ' possible upgrade' + (ups > 1 ? 's' : '') + '. ' : '') + 'Swap gear and charms in the Wardrobe: your character with a slot for each thing.</small></div><button type="button" class="cft-btn sm primary" data-act="wardrobe" data-id="">Open</button></div></div>';
     h += '<div class="cft-sec"><h4>🌳 Talents · ' + v.points + ' point' + (v.points === 1 ? '' : 's') + ' to spend</h4><p class="muted small">A point every level. Three points in a branch open its next tier; the fifth tier is that branch\'s big one.</p>';
     for (const br of v.branches) {
       h += '<div class="cft-branch"><b class="cft-branch-h">' + br.b.e + ' ' + br.b.n + ' <small>' + br.spent + ' · ' + esc(br.b.blurb) + '</small></b>' + br.talents.map(x =>
@@ -913,7 +1016,7 @@ function create(G, root) {
 
   async function onPhoneClick(e) {
     const app = e.target.closest('[data-app]');
-    if (app) { render(app.dataset.app); return; }
+    if (app) { if (app.dataset.app === 'wardrobe') { phoneOv.close(); U.wardrobe(); } else render(app.dataset.app); return; }
     const fol = e.target.closest('[data-follow]');
     if (fol) { save().settings.follow[fol.dataset.follow] = fol.checked; G.refreshFollowers(); G.dirty(); return; }
     const set = e.target.closest('[data-set]');
@@ -934,7 +1037,7 @@ function create(G, root) {
       case 'zout': mapScale = Math.max(0.12, mapScale / 1.5); drawBigMap(); break;
       case 'eat': { const it = D.ITEMS[id]; G.giveItem(id, -1); G.addEnergy((it.energy || 0) * G.foodMul()); if (it.happy) G.addHappy(it.happy); if (it.give) G.giveItem(it.give, 1); U.feed(it.e, 'Yum!'); U.refreshPhone(); break; }
       case 'ride': G.setRide(id || null); U.refreshPhone(); break;
-      case 'equip': { const it = D.ITEMS[id]; if (s.equip[it.slot] === id) delete s.equip[it.slot]; else s.equip[it.slot] = id; G.W.setLook(G.playerLook()); U.refreshPhone(); G.dirty(); break; }
+      case 'wardrobe': phoneOv.close(); U.wardrobe(id || null); break;
       case 'gift': await G.giveGift(id); U.refreshPhone(); break;
       case 'hang': s.settings.follow.friend = s.settings.follow.friend === id ? null : id; G.refreshFollowers(); U.refreshPhone(); G.dirty(); break;
       case 'move': phoneOv.close(); await G.moveHome(+id); break;

@@ -57,6 +57,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Street events | "UFO too rare" | cft-fun `startEvent` `updateEvent` (`eventT` in `F.tick`) | `D.EVENTS` | --fun |
 | Loot, gear, shields | "drops too rare", "shield invisible" | cft-rpg `drop` `make` `makeGear` `add` `equip` `lookParts`, cft-world `W.shieldMesh` | `D.RPG` (QUALITY, SOURCES, GEAR) | --rpg --hero |
 | Talents, reputation, achievements | | cft-rpg `learn` `repTick` `achTick` | `D.RPG.TALENTS/FACTIONS/ACH` | --rpg |
+| Wardrobe (slots, one thing each) | "slot list wrong", "can't swap", "badge" | cft-ui `U.wardrobe` `wardPick` `wardDraw` `onWardClick` `fxChips`, cft-game `wornIn` `wearShop` `takeOff` `slotOptions` `wearFx` `migrateWear`, cft-rpg `equip` `worn` `spare`; CSS `.cft-ward*` `.cft-wslot` | `D.WEAR_SLOTS`, gear `slot` in `D.ITEMS` | --hero |
 | Your character's look | "hair clips hat" | cft-world `W.person` `W.animate`, cft-game `playerLook`, cft-ui `U.lookEditor` | | --people |
 | People and traffic | "streets empty", "cars stuck" | cft-world `updateLife` `spawnPed` `spawnCar` | `D.TUNE.world` | --shots |
 | Shops, buying | "can't buy", "price" | cft-ui `U.shopPanel`, cft-game `G.buy` | `D.ITEMS`, `D.KINDS[kind].sells` | gametest |

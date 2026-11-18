@@ -152,12 +152,12 @@ function attach(G, api) {
     if (it.q >= 3) r.pity = 0; else r.pity++;
     // an empty slot takes it straight away (a loot weapon only when you hold nothing from a shop)
     const gear = it.slot && it.slot !== 'charm';
-    const empty = gear ? (!item(r.eq[it.slot]) && (it.slot !== 'weapon' || !save().equip.weapon) ? it.slot : null) : X.SLOTS.find(s => !item(r.eq[s]));
+    const empty = gear ? (!item(r.eq[it.slot]) && !save().equip[it.slot] ? it.slot : null) : X.SLOTS.find(s => !item(r.eq[s]));  // never pushes off shop gear (the wardrobe's one-per-slot rule)
     if (it.q >= 1 && empty) { if (gear) equip(it.id); else { r.eq[empty] = it.id; mark(); } }
     if (quiet) return it;
     const Q = X.QUALITY[it.q];
     if (it.q >= 3) {
-      U.banner(it.e + ' ' + it.n, Q.n + ' · ' + statLine(it) + (empty && it.q >= 1 ? ' · equipped' : ' · in your bag (phone → Character)'), 'loot q' + it.q);
+      U.banner(it.e + ' ' + it.n, Q.n + ' · ' + statLine(it) + (empty && it.q >= 1 ? ' · equipped' : ' · in your wardrobe (I, or phone → Wardrobe)'), 'loot q' + it.q);
       const p = W.player.pos;
       W.burst(p.x, p.y + 1.8, p.z, it.q >= 5 ? '🌟' : it.q >= 4 ? '💜' : '💎', it.q >= 5 ? 14 : 8, { spread: 3, up: 5 });
       if (it.q >= 4) { lightBeam(it.q >= 5 ? 0xff9a1f : 0xb05cff); G.sfx.level(); } else G.sfx.done();
@@ -170,8 +170,8 @@ function attach(G, api) {
     if (!it || it.q === 0) return false;
     if (it.slot && it.slot !== 'charm') {
       r.eq[it.slot] = id; it.fresh = 0;
-      if (it.slot === 'weapon') delete save().equip.weapon;  // one weapon in hand at a time
-      else W.setLook(G.playerLook());
+      delete save().equip[it.slot];  // one thing per slot: the shop piece goes back to the wardrobe
+      if (it.slot !== 'weapon') W.setLook(G.playerLook());
       mark(); G.dirty(); return true;
     }
     for (const s of X.SLOTS) if (r.eq[s] === id) r.eq[s] = null;
@@ -179,7 +179,9 @@ function attach(G, api) {
     r.eq[slot] = id; it.fresh = 0;
     mark(); G.dirty(); return true;
   }
-  function unequip(slot) { const had = st().eq[slot]; st().eq[slot] = null; mark(); if (had && (slot === 'head' || slot === 'body' || slot === 'feet' || slot === 'hand')) W.setLook(G.playerLook()); G.dirty(); }
+  function unequip(slot) { const had = st().eq[slot]; if (!had) return; st().eq[slot] = null; mark(); if (slot === 'head' || slot === 'body' || slot === 'feet' || slot === 'hand') W.setLook(G.playerLook()); G.dirty(); }
+  const worn = slot => item(st().eq[slot]) || null;                                                   // the wardrobe (cft-game.js wornIn)
+  const spare = slot => st().loot.filter(x => x.q > 0 && !equipped(x.id) && (slot.charAt(0) === 'c' ? !x.slot || x.slot === 'charm' : x.slot === slot)).sort((a, b) => b.q - a.q || score(b) - score(a));
   function sell(id, silent) {
     const r = st(), i = r.loot.findIndex(x => x.id === id);
     if (i < 0) return 0;
@@ -202,7 +204,7 @@ function attach(G, api) {
   // Better than the worst thing you wear? (the green arrow)
   function upgrade(it) {
     if (!it || it.q === 0) return false;
-    if (it.slot && it.slot !== 'charm') { const cur = item(st().eq[it.slot]); if (cur) return score(it) > score(cur); if (it.slot === 'weapon') { const sw = D.ITEMS[save().equip.weapon]; return !sw || !sw.weapon || it.dmg > sw.weapon.dmg; } return true; }
+    if (it.slot && it.slot !== 'charm') { const cur = item(st().eq[it.slot]); if (cur) return score(it) > score(cur); if (it.slot === 'weapon') { const sw = D.ITEMS[save().equip.weapon]; return !sw || !sw.weapon || it.dmg > sw.weapon.dmg; } return !save().equip[it.slot]; }  // a shop piece there = a style choice, no arrow
     const r = st(); const worn = X.SLOTS.map(s => item(r.eq[s])); if (worn.some(x => !x)) return true; return score(it) > Math.min(...worn.map(score)); }
 
   // what your gear looks like on you (cft-game.js playerLook)
@@ -488,7 +490,7 @@ function attach(G, api) {
   quiet = true; repTick(); quiet = false;
   return {
     tick, bonus, xpMul, rested, onLevel, levelText, onKill, drop, add, make, questDone, claim, offline, onSleep, view, badge, equip, unequip, sell, sellJunk,
-    learn, respec, setTitle, modWeapon, spawnRare, lookParts, weapon, weaponId, makeGear, points, achPoints, tier, val, statLine, perkText, upgrade, score, mark,
+    learn, respec, setTitle, modWeapon, spawnRare, lookParts, weapon, weaponId, makeGear, worn, spare, points, achPoints, tier, val, statLine, perkText, upgrade, score, mark,
     destroy() { alive = false; if (beam) W.scene.remove(beam.m); },
   };
 }

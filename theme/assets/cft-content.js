@@ -55,11 +55,11 @@ D.KINDS = {
   icecream: { e: '🍦', n: 'Ice cream', fake: ['Scoops Ahoy', 'Polar Pals', 'Gelato Gelato'], sells: ['icecream', 'sundae'] },
   lounge: { e: '🎶', n: 'Lounge', fake: ['The Velvet Groove', 'Neon Owl', 'Club Disco Ball'], sells: ['mocktail', 'karaoke'] },
   grocery: { e: '🛒', n: 'Grocery', fake: ['Fresh Mart', 'Corner Dépanneur', 'Green Basket'], sells: ['apple', 'energybar', 'groceries', 'spraycan', 'picnic'] },
-  clothes: { e: '👕', n: 'Clothes', fake: ['Thread Lightly', 'Urban Closet', 'Fit Check'], sells: ['tee', 'sneakers1', 'jacket', 'sneakers2', 'outfit_date', 'suit', 'sneakers3', 'designer'] },
+  clothes: { e: '👕', n: 'Clothes', fake: ['Thread Lightly', 'Urban Closet', 'Fit Check'], sells: ['tee', 'snapback', 'sunnies', 'sneakers1', 'jacket', 'sneakers2', 'outfit_date', 'suit', 'sneakers3', 'designer'] },
   flowers: { e: '💐', n: 'Florist', fake: ['Petal Pushers', 'Bloom Room', 'Fleurs de Sam'], sells: ['bouquet', 'plant', 'orchid'] },
   books: { e: '📖', n: 'Bookshop', fake: ['Dog-Eared Books', 'Chapter & Verse', 'Page Turner'], sells: ['novel', 'textbook', 'pack', 'comic'] },
   library: { e: '🏛️', n: 'Library', fake: ['Public Library', 'Neighbourhood Library'], sells: ['study'] },
-  tech: { e: '📱', n: 'Tech shop', fake: ['Gizmo Hut', 'Pixel Palace', 'Byte Me'], sells: ['phone2', 'phone3', 'headphones', 'console', 'laptop', 'camera'] },
+  tech: { e: '📱', n: 'Tech shop', fake: ['Gizmo Hut', 'Pixel Palace', 'Byte Me'], sells: ['phone2', 'phone3', 'headphones', 'fitband', 'console', 'laptop', 'camera'] },
   pharmacy: { e: '💊', n: 'Pharmacy', fake: ['Pharma Plus', 'Remedy Corner'], sells: ['vitamins', 'energydrink', 'bandage'] },
   school: { e: '🏫', n: 'School', fake: ['City Community College', 'Night School'], sells: ['class', 'license_moped', 'license_car', 'mba'] },
   park: { e: '🌳', n: 'Park', fake: ['Pocket Park', 'Little Green'], sells: [] },
@@ -114,15 +114,15 @@ D.ITEMS = {
   groceries: { n: 'Bag of groceries', e: '🛍️', p: 25, type: 'snack', energy: 80, happy: 2 },
   spraycan: { n: 'Spray can', e: '🎨', p: 6, type: 'snack', give: 'spray' },
   picnic: { n: 'Picnic basket', e: '🧺', p: 30, type: 'gift', rel: 8 },
-  tee: { n: 'Graphic tee', e: '👕', p: 25, type: 'gear', slot: 'outfit', stats: { style: 1 }, color: 0x3aa6b9 },
-  jacket: { n: 'Denim jacket', e: '🧥', p: 80, type: 'gear', slot: 'outfit', stats: { style: 3 }, color: 0x2b4c7e },
-  outfit_date: { n: 'Date-night outfit', e: '👗', p: 160, type: 'gear', slot: 'outfit', stats: { style: 5, charm: 1 }, color: 0x9b2c4f },
-  suit: { n: 'Sharp suit', e: '🤵', p: 450, type: 'gear', slot: 'outfit', stats: { style: 8, charm: 2 }, color: 0x1f2937 },
-  designer: { n: 'Designer fit', e: '💃', p: 2500, type: 'gear', slot: 'outfit', stats: { style: 15, charm: 3 }, color: 0xef6aa5 },
-  sneakers1: { n: 'Comfy sneakers', e: '👟', p: 40, type: 'gear', slot: 'shoes', speed: 0.06 },
-  sneakers2: { n: 'Runner pro shoes', e: '🥾', p: 220, type: 'gear', slot: 'shoes', speed: 0.12, stats: { fit: 1 } },
-  sneakers3: { n: 'Rocket kicks', e: '🚀', p: 1200, type: 'gear', slot: 'shoes', speed: 0.2, stats: { fit: 2, style: 2 } },
-  helmet: { n: 'Cool helmet', e: '⛑️', p: 45, type: 'gear', slot: 'hat', stats: { cred: 1 } },
+  tee: { n: 'Graphic tee', e: '👕', p: 25, type: 'gear', slot: 'body', stats: { style: 1 }, color: 0x3aa6b9 },
+  jacket: { n: 'Denim jacket', e: '🧥', p: 80, type: 'gear', slot: 'body', stats: { style: 3 }, color: 0x2b4c7e },
+  outfit_date: { n: 'Date-night outfit', e: '👗', p: 160, type: 'gear', slot: 'body', stats: { style: 5, charm: 1 }, color: 0x9b2c4f },
+  suit: { n: 'Sharp suit', e: '🤵', p: 450, type: 'gear', slot: 'body', stats: { style: 8, charm: 2 }, color: 0x1f2937 },
+  designer: { n: 'Designer fit', e: '💃', p: 2500, type: 'gear', slot: 'body', stats: { style: 15, charm: 3 }, color: 0xef6aa5 },
+  sneakers1: { n: 'Comfy sneakers', e: '👟', p: 40, type: 'gear', slot: 'feet', speed: 0.06 },
+  sneakers2: { n: 'Runner pro shoes', e: '🥾', p: 220, type: 'gear', slot: 'feet', speed: 0.12, stats: { fit: 1 } },
+  sneakers3: { n: 'Rocket kicks', e: '🚀', p: 1200, type: 'gear', slot: 'feet', speed: 0.2, stats: { fit: 2, style: 2 } },
+  helmet: { n: 'Cool helmet', e: '⛑️', p: 45, type: 'gear', slot: 'head', stats: { cred: 1 } },
   bouquet: { n: 'Bouquet', e: '💐', p: 22, type: 'gift', rel: 8 },
   plant: { n: 'Potted fern', e: '🪴', p: 15, type: 'gift', rel: 4 },
   orchid: { n: 'Rare orchid', e: '🌺', p: 60, type: 'gift', rel: 15 },
@@ -135,12 +135,12 @@ D.ITEMS = {
   mba: { n: 'Business diploma', e: '📜', p: 5000, type: 'service', stats: { smarts: 10 }, energy: -40, hours: 6, once: true },
   license_moped: { n: 'Scooter licence', e: '🪪', p: 120, type: 'license', req: { m: 'c3-license' } },
   license_car: { n: "Driver's licence", e: '🪪', p: 600, type: 'license', req: { lvl: 12 } },
-  phone2: { n: 'Smartphone', e: '📱', p: 60, type: 'gear', slot: 'phone', radar: 1 },
-  phone3: { n: 'Pro phone', e: '📲', p: 900, type: 'gear', slot: 'phone', radar: 2, stats: { smarts: 1, style: 1 } },
-  headphones: { n: 'Big headphones', e: '🎧', p: 90, type: 'gear', slot: 'acc', stats: { style: 2 }, happy: 3 },
+  phone2: { n: 'Smartphone', e: '📱', p: 60, type: 'gear', slot: 'pocket', radar: 1 },
+  phone3: { n: 'Pro phone', e: '📲', p: 900, type: 'gear', slot: 'pocket', radar: 2, stats: { smarts: 1, style: 1 } },
+  headphones: { n: 'Big headphones', e: '🎧', p: 90, type: 'gear', slot: 'face', stats: { style: 2 }, happy: 3 },
   console: { n: 'Game console', e: '🎮', p: 400, type: 'furniture', happy: 6, apt: 1 },
-  laptop: { n: 'Laptop', e: '💻', p: 800, type: 'gear', slot: 'bag', stats: { smarts: 3 } },
-  camera: { n: 'Fancy camera', e: '📷', p: 350, type: 'gear', slot: 'acc', stats: { style: 1, smarts: 1 } },
+  laptop: { n: 'Laptop', e: '💻', p: 800, type: 'gear', slot: 'back', stats: { smarts: 3 } },
+  camera: { n: 'Fancy camera', e: '📷', p: 350, type: 'gear', slot: 'hand', stats: { style: 1, smarts: 1 } },
   vitamins: { n: 'Vitamins', e: '💊', p: 20, type: 'service', maxEnergy: 5 },
   energydrink: { n: 'Energy drink', e: '🥤', p: 6, type: 'snack', energy: 50 },
   bandage: { n: 'Bandages', e: '🩹', p: 5, type: 'snack', energy: 10 },
@@ -165,7 +165,7 @@ D.ITEMS = {
   records: { n: 'Vinyl records', e: '💿', p: 30, type: 'gift', rel: 7 },
   ring: { n: 'Engagement ring', e: '💍', p: 2500, type: 'quest' },
   necklace: { n: 'Necklace', e: '📿', p: 300, type: 'gift', rel: 25 },
-  watch: { n: 'Gold watch', e: '⌚', p: 1500, type: 'gear', slot: 'acc', stats: { style: 4, smarts: 1 } },
+  watch: { n: 'Gold watch', e: '⌚', p: 1500, type: 'gear', slot: 'wrist', stats: { style: 4, smarts: 1 } },
   toy: { n: 'Toy robot', e: '🤖', p: 25, type: 'gift', rel: 10 },
   kite: { n: 'Kite', e: '🪁', p: 18, type: 'gift', rel: 8 },
   plushie: { n: 'Plush dino', e: '🦖', p: 20, type: 'gift', rel: 9 },
@@ -185,7 +185,7 @@ D.ITEMS = {
   souvenir: { n: 'Snow globe', e: '🔮', p: 12, type: 'gift', rel: 5 },
   spa: { n: 'Spa day', e: '🧖', p: 180, type: 'service', energy: 100, happy: 12, hours: 3 },
   wash: { n: 'Laundry', e: '🧺', p: 6, type: 'service', happy: 2, stats: { style: 0.2 } },
-  toolkit: { n: 'Toolkit', e: '🧰', p: 70, type: 'gear', slot: 'bag', stats: { smarts: 1 } },
+  toolkit: { n: 'Toolkit', e: '🧰', p: 70, type: 'gear', slot: 'back', stats: { smarts: 1 } },
   // quest items (given by missions)
   bread: { n: 'Warm bread', e: '🍞', p: 0, type: 'quest' },
   flyers: { n: 'Flyers', e: '📄', p: 0, type: 'quest' },
@@ -961,10 +961,10 @@ Object.assign(D.ITEMS, {
   w_blower: { n: 'Leaf blower', e: '🍃', p: 380, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 9, knock: 11, ranged: 'cone', mesh: 'blower', word: 'WHOOSH!', puff: '🍃' } },
   w_guitar: { n: 'Smashing guitar', e: '🎸', p: 650, type: 'gear', slot: 'weapon', stats: { cred: 1, style: 1 }, weapon: { dmg: 4, reach: 2.9, knock: 5, mesh: 'guitar', word: 'KERRANG!', puff: '🎵' } },
   w_bubble: { n: 'Bubble blaster', e: '🫧', p: 900, type: 'gear', slot: 'weapon', req: { lvl: 6 }, weapon: { dmg: 3, reach: 18, knock: 4, ranged: 'shot', mesh: 'bubble', word: 'BLOOP!', puff: '🫧' } },
-  fakenose: { n: 'Fake nose and glasses', e: '🥸', p: 20, type: 'gear', slot: 'acc', stats: { charm: 1, cred: 1 } },
+  fakenose: { n: 'Fake nose and glasses', e: '🥸', p: 20, type: 'gear', slot: 'face', stats: { charm: 1, cred: 1 } },
   whoopee: { n: 'Whoopee cushion', e: '🎈', p: 8, type: 'gift', rel: 6 },
   fortune: { n: 'Your fortune', e: '🔮', p: 10, type: 'service', fortune: true },
-  luckycharm: { n: 'Lucky rabbit sock', e: '🧦', p: 150, type: 'gear', slot: 'bag', stats: { charm: 1, cred: 1 }, happy: 3 },
+  luckycharm: { n: 'Lucky rabbit sock', e: '🧦', p: 150, type: 'gear', slot: 'back', stats: { charm: 1, cred: 1 }, happy: 3 },
 });
 D.KINDS.bakery.sells.push('w_baguette');
 D.KINDS.toys.sells.push('w_chicken', 'w_noodle');
@@ -1370,7 +1370,7 @@ D.KINDS.pharmacy.sells.push('tea');
 D.PICKUPS.wallet = { e: '👛', n: 'Your dropped wallet', bg: '#ffd54a', w: 0, wallet: true, beam: true };
 D.TIPS.push('Your health is the red bar. Food and calm tea 🍵 heal (Q). Every metro entrance has a guardian: beat it and the station opens.',
   'Figments get tougher the further you roam from home. Home is always calm.',
-  'Loot hats, jackets, shoes and weapons show on your character. Phone → Character to swap them.');
+  'Loot hats, jackets, shoes and weapons show on your character. Phone → Wardrobe to swap them.');
 D.CHATTER.push('Big thing by the metro last night. Swear I heard it roar.', 'You look tired. Get some sleep, friend.');
 S('s-static', 'The Static', 'max', 'home', { m: ['c1-couch'] }, ['Max: Hey cuz... you okay? I saw you swatting at the air out there like it owed you money.',
   'Max: New city, no sleep, a million noises. My first month here my brain did weird stuff too. You\'re not the only one.',
@@ -1408,6 +1408,29 @@ D.RPG.GEAR.hand = [{ id: 'lid', n: 'Trash-Can Lid', e: '🛡️' }, { id: 'pizza
   { id: 'umbrella', n: 'Umbrella', e: '☂️' }, { id: 'deck', n: 'Skateboard Deck', e: '🛹' }, { id: 'tray', n: 'Cafeteria Tray', e: '🍽️' }];
 D.RPG.GEAR_AR.hand = 1;
 D.RPG.SLOT_NAMES.hand = 'Off-hand';
+
+// The wardrobe (2026-11-17, the user: "show the character with slots, so people have to make a choice between two types of
+// items for the same slot"). One slot per body part; every slot holds ONE thing, from a shop or from loot, so a snapback,
+// a bike helmet and a loot beanie compete for your head, a shield and a camera for your free hand. U.wardrobe (cft-ui.js)
+// draws them around your live character; G.wear* (cft-game.js) keeps the rule. Shop gear `slot` must be one of these ids.
+D.RPG.SLOT_NAMES = Object.assign(D.RPG.SLOT_NAMES, { weapon: 'Main hand', hand: 'Free hand', face: 'Face & ears', back: 'Back', wrist: 'Wrist', pocket: 'Pocket' });
+D.WEAR_SLOTS = [
+  { id: 'head', n: 'Head', e: '🧢', side: 'L', hint: 'Caps, beanies, helmets. Clothes and bike shops, or loot.' },
+  { id: 'face', n: 'Face & ears', e: '🕶️', side: 'L', hint: 'Sunglasses, headphones or a fake nose. Clothes, tech and joke shops.' },
+  { id: 'body', n: 'Body', e: '👕', side: 'L', hint: 'Outfits from clothes shops, or jackets from loot (armour).' },
+  { id: 'back', n: 'Back', e: '🎒', side: 'L', hint: 'What rides in your backpack: a laptop, a toolkit, a lucky sock.' },
+  { id: 'feet', n: 'Feet', e: '👟', side: 'L', hint: 'Fast shop sneakers, or tougher loot boots.' },
+  { id: 'weapon', n: 'Main hand', e: '✊', side: 'R', hint: 'Something to bonk figments with. Joke shops, bakeries, loot.' },
+  { id: 'hand', n: 'Free hand', e: '🛡️', side: 'R', hint: 'A shield blocks better; a camera makes you smarter and cooler.' },
+  { id: 'wrist', n: 'Wrist', e: '⌚', side: 'R', hint: 'A fitness band or a gold watch.' },
+  { id: 'pocket', n: 'Pocket', e: '📱', side: 'R', hint: 'Your phone. Better phones show more on the map.' },
+];
+Object.assign(D.ITEMS, {
+  snapback: { n: 'Snapback cap', e: '🧢', p: 30, type: 'gear', slot: 'head', stats: { style: 2 } },
+  sunnies: { n: 'Sunglasses', e: '🕶️', p: 55, type: 'gear', slot: 'face', stats: { style: 3 } },
+  fitband: { n: 'Fitness band', e: '⌚', p: 120, type: 'gear', slot: 'wrist', stats: { fit: 2 }, speed: 0.03 },
+});
+D.TIPS.push('One thing per slot: phone → Wardrobe (or I) shows your character with every slot. A helmet or a cap? A shield or a camera? Your call.');
 
 
 // The hype: everything people say to you, and the big words across the screen (cft-hero.js)

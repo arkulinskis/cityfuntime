@@ -104,7 +104,7 @@ tools/                check.py, assets.py, ui_test.py + ui/, live/ (harness.py, 
 
 **The save** (`newSave` in cft-game.js; JSON, ≤ 400k chars; the server stores it whole and validates little): name, look, pref,
 home {lat, lon, label, short} (= world origin), apt, pos, money, savings, xp, energy, happy, stats {fit, charm, smarts, style,
-cred}, day, clock, bag, owned, equip {outfit, shoes, hat, acc, phone, bag, ride, lastRide, **weapon**}, m {missionId: {s, st,
+cred}, day, clock, bag, owned, equip {head, face, body, back, feet, weapon, hand, wrist, pocket (shop gear by wardrobe slot, since 2026-11-17), ride, lastRide}, m {missionId: {s, st,
 p, b, tg, items, deadline}}, track, spots, castAt, vplaces, jobs, dyn, stickers, turf, biz, rel, friends, partner, engaged,
 married, kids, pets, counters, metro, log, settings, and **fun** {hearts, king ('King' | 'Queen' | 'Monarch' | null), folk
 {id: {day, got, story, asked, total}}, folkAt {id: {lat, lon, yaw, day}}, crushes [{id, name, lat, lon, love, met, seen, talk,
@@ -233,8 +233,8 @@ eq {c1, c2, c3}, tal {}, rep {}, seen {}, ach {}, title, titles[], streets[], bl
   an unfreed real metro entrance; size 2.4, hp `base × 8 + 8`, atk × 1.3, leash 30 m (walks home and heals beyond it), despawns
   beyond 140 m. Killed = `freeStation` → `save.fun.cleared`, `G.visitMetro` (the old "visit to unlock" now needs this), Epic+ loot.
   `F.metroOpen(place)` gates the stairs (cft-game.js findInteraction + visit steps); stations visited before this update stay open.
-- **Gear** (cft-rpg.js `makeGear`, `D.RPG.GEAR` / `GEAR_AR` / `GEAR_COLS` / `PREFIX`): slots weapon, head, body, feet (+ charms
-  c1-c3). Items carry `slot, base, col` and `ar` / `lf` / `sp` / `dmg`; `R.lookParts()` feeds `playerLook()` (a crown still wins
+- **Gear** (cft-rpg.js `makeGear`, `D.RPG.GEAR` / `GEAR_AR` / `GEAR_COLS` / `PREFIX`): slots weapon, head, body, feet, hand (+ charms
+  c1-c3); they share the wardrobe's one-per-slot rule with shop gear (see The wardrobe). Items carry `slot, base, col` and `ar` / `lf` / `sp` / `dmg`; `R.lookParts()` feeds `playerLook()` (a crown still wins
   over a hat); `R.weapon()` replaces the shop weapon in `F.weapon()` (one weapon at a time: buying or picking a shop weapon
   unequips the loot one, equipping loot clears `save.equip.weapon`).
 - HUD: health chip (first), the foe bar `U.foe(info)`, red edge `U.hurt()`, the 🍵 button. Tests: `tools/live/combattest.js`
@@ -307,6 +307,26 @@ Diablo 2 monsters + gear, GTA missions slowly disclosed + cars destroying things
   the same person (e.g. `rosa@home` next to `rosa@bakery`) puts two copies of them in one place and E talks to the wrong one.
 - **Tests:** `game_test.py --hero` (herotest.js, also last in the full run); pictures `--heroshots DIR`.
 
+## The wardrobe (2026-11-17: "show the character with slots, so people have to make a choice between two types of items for the same slot")
+
+- **Rule:** every slot in `D.WEAR_SLOTS` (head, face, body, back, feet | weapon, hand, wrist, pocket; `side` L/R = which column)
+  holds ONE thing: a shop item in `save.equip[slot]` or a loot piece in `save.rpg.eq[slot]`, never both. Shop gear's `slot`
+  is a wardrobe slot id (content_check insists, and that every slot has something that fits). `G.wearShop(id)` clears the loot
+  piece (`R.unequip(slot)`), `R.equip(id)` clears the shop piece (`delete save.equip[slot]`), `G.takeOff(slot)` clears both.
+  Loot drops auto-equip only into a slot with neither (`add` in cft-rpg.js); buying shop gear wears it straight away.
+- **Reading:** `G.wornIn(slot)` -> {src 'shop'|'loot', id, it, n, e, q}; `G.slotOptions(slot)` = worn first, then owned shop
+  gear, then spare loot (`R.spare(slot)`, best first; `R.spare('c1')` = charms); `G.wearFx(opt)` = comparable numbers (stats,
+  armour, life, speed %, block %, bonk) for the green/red chips. Shop gear `speed` counts from any slot (shoes, fitness band).
+- **Screen** (`U.wardrobe(slot)` in cft-ui.js, phone → Wardrobe, key I, Me app slot buttons, Bag/Character cards): an overlay
+  (`.cft-wardwrap`, pointer-events only on its panels) over the live avatar with `W.showOff = true`; slot buttons (`slotBtn`:
+  quality-coloured border for loot, grape for shop, pink count badge when more than one thing fits), charms row, a sheet
+  (`wardPick`: options with Wear/Swap/Take off; `'spare'` = unworn loot with sell + sell junk). The old Character "What you
+  wear"/"Bag" lists and the Bag app's Gear list were replaced by cards that open it.
+- **Old saves:** `migrateWear` (in `migrate`) renames outfit/shoes/hat/acc/phone/bag to the new slots (acc splits by item:
+  headphones/fake nose -> face, watch -> wrist, camera -> hand) and where loot and shop shared a slot, the loot stays on.
+- **New wardrobe slot:** an entry in `D.WEAR_SLOTS` + `D.RPG.SLOT_NAMES`, at least one shop item (and a seller) or loot base,
+  and its look in `playerLook()` if it shows. Tests: the wardrobe block in herotest.js (`game_test.py --hero`).
+
 ## Recipes
 
 - **New page:** copy a similar `client_code/Pages/<Name>/`, register it in `client_code/router.py`; new field on Life / Quests /
@@ -319,7 +339,7 @@ Diablo 2 monsters + gear, GTA missions slowly disclosed + cars destroying things
   a "right now" number such as `sweet`, `weapons`, `crowned`). Text tokens {name} {place} {n} {pt} {he} {him} {his} {kid} {biz}.
   Keep ids stable (saves hold them). Then `node tools/live/content_check.mjs` and the game test.
 - **New step type:** beginStep, updateMissions, stepGoal, G.stepText, triggerStep, findInteraction in cft-game.js; stepLabel in cft-kit.js.
-- **New shop item:** `D.ITEMS` + a `KINDS[...].sells` list. **New weapon:** an item with `weapon: {...}`, a shape in `W.propMesh`,
+- **New shop item:** `D.ITEMS` + a `KINDS[...].sells` list (gear: `slot` = a `D.WEAR_SLOTS` id; it shows in that slot's list). **New weapon:** an item with `weapon: {...}`, a shape in `W.propMesh`,
   its name in content_check.mjs `MESHES`. **New monster:** `D.MONSTERS` + a branch in `W.monster` / `W.animateMonster`.
 - **New place kind:** `D.KINDS` (+ `D.SIGN_COLS`, + the mapping in cft-tiles.js for real places, or `D.SHOP_MIX` + `NAME_B` for made-up ones).
 - **New street event:** `D.EVENTS` + a branch in `startEvent` and `updateEvent` (+ its id in content_check.mjs).

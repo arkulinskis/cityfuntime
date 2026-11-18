@@ -712,6 +712,64 @@ html.ui-dark .lp-svg .win { fill: #ffe27a; }
 .cft-look { pointer-events: auto; width: min(380px, 100%); } .cft-look .cft-row { flex-wrap: wrap; gap: 4px 14px; }
 button.cft-face { cursor: pointer; padding: 0; } button.cft-face:active { transform: translate(2px, 2px); }
 @media (max-width: 720px) { .cft-lookwrap { align-items: flex-end; justify-content: center; padding: 8px; } .cft-look { max-height: 52%; padding: 14px; } }
+/* ===== the wardrobe (2026-11-17): a slot per body part around your live character (U.wardrobe in cft-ui.js) */
+.cft-wardwrap { pointer-events: none; }
+.cft-hud:has(~ .cft-layer .cft-wardwrap) .cft-tl { visibility: hidden; }  /* the stat chips hide behind the wardrobe's own summary */
+.cft-ward { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; }
+.cft-ward-top { pointer-events: auto; justify-self: center; display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; max-width: 100%; background: #fff6e9; border: 2px solid #1f1a3d; border-radius: 16px; box-shadow: 3px 3px 0 #1f1a3d; padding: 6px 8px 6px 14px; color: #1f1a3d; }
+.cft-ward-top > b { font: 600 1.15rem/1.1 Fredoka, var(--font-body); }
+.cft-wsum { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: .85rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cft-wsum i { font-style: normal; }
+.cft-ward-doll { flex: 1 0 auto; display: flex; justify-content: space-between; align-items: center; width: min(560px, 100%); }
+.cft-ward-col { pointer-events: auto; display: grid; gap: 8px; }
+.cft-wslot { position: relative; width: 76px; min-height: 70px; display: grid; place-items: center; align-content: center; gap: 1px; padding: 6px 4px; background: rgba(255, 246, 233, .92); border: 2px dashed #8a83a8; border-radius: 14px; color: #1f1a3d; font: inherit; cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-fast) ease, border-color var(--dur-fast) ease, background-color var(--dur-fast) ease; }
+.cft-wslot span { font-size: 1.7rem; line-height: 1.1; opacity: .4; filter: grayscale(1); }
+.cft-wslot small { font-size: .75rem; font-weight: 800; color: #5f5980; line-height: 1.1; text-align: center; }
+.cft-wslot.full { border-style: solid; border-color: var(--q, #1f1a3d); background: #fff; box-shadow: 3px 3px 0 #1f1a3d; }
+.cft-wslot.full span { opacity: 1; filter: none; }
+.cft-wslot.shop { --q: #6b4eff; } .cft-wslot.q0 { --q: #8a8a8a; } .cft-wslot.q1 { --q: #4b4f5c; } .cft-wslot.q2 { --q: #1a9e2a; } .cft-wslot.q3 { --q: #0a6fd6; } .cft-wslot.q4 { --q: #9b3de0; } .cft-wslot.q5 { --q: #e0700a; background: #fff6ea; }
+.cft-wslot.sel { outline: 3px solid #ffc21f; outline-offset: 2px; }
+.cft-wslot:focus-visible { outline: 3px solid #6b4eff; outline-offset: 2px; }
+.cft-wslot.pop span { animation: cft-wpop var(--dur-slow) var(--ease-out); }
+@keyframes cft-wpop { 40% { transform: scale(1.3); } }
+@media (hover: hover) { .cft-wslot:hover { transform: translateY(-2px); border-color: #1f1a3d; } }
+.cft-wslot:active { transform: scale(.96); }
+.cft-wslot em { position: absolute; top: -8px; right: -8px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; display: grid; place-items: center; background: #ff5c8a; color: #fff; border: 2px solid #1f1a3d; font: 800 .75rem/1 var(--font-body); font-style: normal; }
+.cft-wcharms { pointer-events: auto; justify-self: center; display: flex; align-items: center; gap: 8px; background: rgba(255, 246, 233, .92); border: 2px solid #1f1a3d; border-radius: 14px; padding: 5px 10px; }
+.cft-wcharms > small { font-weight: 800; font-size: .75rem; color: #5f5980; }
+.cft-wcharms .cft-wslot { width: 46px; min-height: 44px; padding: 3px; box-shadow: none; } .cft-wcharms .cft-wslot span { font-size: 1.2rem; } .cft-wcharms .cft-wslot small { display: none; }
+.cft-ward-sheet { pointer-events: auto; flex: 0 1 auto; min-height: 0; width: min(560px, 100%); max-height: 44vh; overflow-y: auto; overscroll-behavior: contain; background: #fff6e9; border: 2px solid #1f1a3d; border-radius: 18px; box-shadow: 4px 4px 0 #1f1a3d; padding: 8px 14px; color: #1f1a3d; }
+.cft-ward-sheet.open { padding: 10px 12px; animation: cft-wsheet var(--dur-base) var(--ease-drawer) both; }
+@keyframes cft-wsheet { from { transform: translateY(14px); opacity: 0; } }
+.cft-ward-tip { margin: 0; font-size: .9rem; text-wrap: pretty; }
+.cft-wsheet-h { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; } .cft-wsheet-h b { font: 600 1.05rem/1.1 Fredoka, var(--font-body); } .cft-wsheet-h small { flex: 1; color: #5f5980; font-weight: 700; }
+.cft-wsheet-h .cft-pbtn { width: 32px; height: 32px; font-size: .95rem; }
+.cft-wopt { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 8px; margin-bottom: 6px; background: #fff; border: 2px solid #ece6f7; border-radius: 12px; }
+.cft-wopt > span { font-size: 1.5rem; text-align: center; }
+.cft-wopt small { display: block; color: #5f5980; font-size: .78rem; line-height: 1.3; }
+.cft-wopt.on { border-color: #ffc21f; background: #fffbea; }
+.cft-wsrc { font-weight: 800; color: var(--q, #6b4eff); }
+.cft-new.on { background: #20c997; }
+.cft-fxs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.cft-fx { font-style: normal; font-size: .75rem; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: #eeeaf7; color: #5f5980; font-variant-numeric: tabular-nums; }
+.cft-fx.up { background: #dcf7e6; color: #11743a; } .cft-fx.down { background: #ffe1e1; color: #b3261e; }
+button.cft-slot { font: inherit; color: #1f1a3d; cursor: pointer; } .cft-slot.empty span { opacity: .35; filter: grayscale(1); }
+.cft-sec h4 .cft-btn { float: right; margin-top: -4px; }
+@media (max-width: 720px) {
+  .cft-ward { padding: 8px; gap: 6px; }
+  .cft-ward-doll { align-items: start; }
+  .cft-wslot { width: 64px; min-height: 58px; } .cft-wslot span { font-size: 1.4rem; }
+  .cft-ward-col { gap: 6px; }
+  .cft-ward-sheet { max-height: 40vh; }
+  .cft-ward-top { padding: 5px 6px 5px 10px; } .cft-wsum { font-size: .78rem; gap: 2px 8px; }
+}
+@media (min-width: 1180px) {  /* wide screens: the list sits at the side, the character stays in full view */
+  .cft-ward-sheet.open { position: absolute; right: 16px; top: 76px; width: 350px; max-height: calc(100% - 96px); }
+  .cft-ward-doll { width: 460px; }
+}
+@media (max-height: 720px) and (min-width: 721px) { .cft-wslot { min-height: 58px; } .cft-wslot span { font-size: 1.4rem; } .cft-ward-col { gap: 6px; } }
+@media (prefers-reduced-motion: reduce) { .cft-ward-sheet.open, .cft-wslot.pop span { animation: none; } }
 .cft-search { display: flex; gap: 8px; }
 .cft-search-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0 6px; }
 .cft-msg { font-weight: 700; font-size: .88rem; color: #6b4eff; }
