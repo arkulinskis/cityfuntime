@@ -554,6 +554,13 @@ html.ui-dark .lp-svg .win { fill: #ffe27a; }
 .cft-clock { background: #1f1a3d; color: #fff; border-radius: 999px; padding: 6px 14px; font: 700 .9rem/1 var(--font-display); white-space: nowrap; box-shadow: 3px 3px 0 rgba(0,0,0,.25); }
 .cft-street { background: rgba(255,255,255,.92); border: 2px solid #1f1a3d; border-radius: 999px; padding: 4px 12px; font-weight: 700; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .cft-street:empty { display: none; }
+/* borough chip (2026-11-17): the borough's name in its own colour, under the clock */
+.cft-boro { --boro: #6b4eff; --boro-ink: #fff; display: flex; align-items: center; gap: 7px; max-width: 100%; background: var(--boro); color: var(--boro-ink); border: 2px solid #1f1a3d; border-radius: 999px; padding: 4px 12px 4px 6px; box-shadow: 3px 3px 0 rgba(0,0,0,.25); font: 700 .85rem/1.1 var(--font-display); }
+.cft-boro[hidden] { display: none; }
+.cft-boro i { flex: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #1f1a3d; }
+.cft-boro b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cft-boro-new { animation: cft-pop .3s var(--ease-out); }
+.cft-banner.boro { background: var(--boro, #6b4eff); color: var(--boro-ink, #fff); } .cft-banner.boro span { color: inherit; opacity: .9; }
 .cft-tr { position: absolute; right: 12px; top: 12px; width: min(340px, 42vw); }
 .cft-quest { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: #fff; border: 2.5px solid #1f1a3d; border-radius: 16px; box-shadow: 4px 4px 0 #1f1a3d; padding: 9px 12px; cursor: pointer; }
 .cft-quest.idle { background: #fff8ea; }
@@ -835,7 +842,7 @@ button.cft-slot { font: inherit; color: #1f1a3d; cursor: pointer; } .cft-slot.em
 .cft-shop-items .cft-btn { min-width: 70px; }
 @media (max-width: 720px) {
   .cft-tl { left: 8px; top: 8px; gap: 5px; } .cft-chip { padding: 4px 8px; font-size: .9rem; } .cft-money { font-size: 1rem; } .cft-bar { width: 64px; height: 8px; }
-  .cft-tc { top: auto; bottom: 150px; max-width: 70vw; } .cft-clock { font-size: .78rem; padding: 5px 10px; }
+  .cft-tc { top: auto; bottom: 150px; max-width: 70vw; } .cft-clock { font-size: .78rem; padding: 5px 10px; } .cft-boro { font-size: .76rem; padding: 3px 10px 3px 5px; } .cft-boro i { width: 11px; height: 11px; }
   .cft-tr { right: 8px; top: 8px; width: 60vw; } .cft-quest { padding: 7px 9px; gap: 8px; border-radius: 14px; } .cft-qarrow { width: 30px; height: 30px; } .cft-qarrow svg { width: 17px; height: 17px; }
   .cft-qtext b { font-size: .85rem; } .cft-qtext span { font-size: .72rem; -webkit-line-clamp: 1; } .cft-quest em { font-size: .75rem; }
   .cft-feed { top: 82px; right: 8px; }

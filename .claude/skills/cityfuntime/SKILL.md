@@ -368,6 +368,30 @@ vehicle, silly roof loads, the four trees and the bushes, animals, a street). Fr
 - **New wardrobe slot:** an entry in `D.WEAR_SLOTS` + `D.RPG.SLOT_NAMES`, at least one shop item (and a seller) or loot base,
   and its look in `playerLook()` if it shows. Tests: the wardrobe block in herotest.js (`game_test.py --hero`).
 
+## Boroughs (2026-11-17: "all neighborhoods look the same... a filter on each distinct neighborhood... by borough... identify the borough on the hud")
+
+- **Where the names come from:** the `place` layer of the zoom-11 OpenFreeMap tile (`TM.places` in cft-tiles.js; ~14 km
+  across, one per area, cached in IndexedDB as `11/x/y`, never sent to the server backup). Class `suburb` = Montréal's 19
+  boroughs, New York's five, Paris's arrondissements (plus some quartiers), and `town`/`village` points compete with them;
+  `city` points are only the fallback beyond `BORO_R` (6 km). `pumpBoroughs` loads the tile under the player and the
+  neighbour within 3 km of an edge (metro trips far away load theirs).
+- **Which borough a spot is in:** the nearest point (a Voronoi guess; real borders aren't in the tiles). `W.districtAt(x, z)`
+  -> `{ n, c, look }`; `W.districts()` lists them. Good enough for a HUD and colours; near a border it can be off by a block or two.
+- **Looks** (`LOOKS` in cft-world.js, 12 of them, `W.LOOKS`): `a`/`b` banner + HUD colours (`ink` = readable text colour),
+  `wall` (walls lerp toward it by `BORO_MIX` 0.5, ± jitter), `roof` (pitched roofs 60%, flat roofs 45%), pavements 35% toward
+  the wall colour (`pc`), kerbs painted in `a` stripes every 2.5 m, centre lines in `line` colour + `dash` pattern
+  (dash/long/dots/double; residential streets get them too inside a borough), tree crowns `tree` [h,s,l] on 7 in 10 trees,
+  a banner on every lamp post (`PROP.banner`, instance i = lamp i so smashing hides it), building fill on the minimap/map,
+  name pills on the big map. `assignLooks`: the name's hash picks a look unless a borough within 9 km has it, then the look
+  whose nearest twin is furthest (ordered by name, so the same boroughs keep the same looks every visit).
+- **Late names:** sub-tiles built before the names arrived (or whose borough changed) go into `boro.stale` (`s.looks` =
+  signature of corners + centre) and are rebuilt in place in `pumpTiles`, inside the frame budget.
+- **HUD + discovery:** chip `[data-boro]` under the clock (cft-ui hud tick, `--boro` / `--boro-ink`); `boroughTick` in
+  cft-rpg.js (every second from `explore`): 3 s inside a new borough -> banner in its colour (`U.banner(..., 'boro', look)`),
+  first visit ever = discovery XP (60 + 10/level) and `save.rpg.boros`; achievements `bo3` Borough Hopper, `bo8` Every Colour
+  of the City (title "the Local Everywhere"). Home borough on day one counts quietly.
+- **Tests:** `game_test.py --boro` (borotest.js, also last in the full run); pictures `--boroshots DIR`.
+
 ## Recipes
 
 - **New page:** copy a similar `client_code/Pages/<Name>/`, register it in `client_code/router.py`; new field on Life / Quests /

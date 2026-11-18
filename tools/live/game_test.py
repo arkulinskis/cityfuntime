@@ -5,6 +5,8 @@
     python -I tools/live/game_test.py --combat [OUTDIR]   only combattest.js (monsters, health, guardians, gear you wear)
     python -I tools/live/game_test.py --hero [OUTDIR]     only herotest.js (speed, block/parry, smashing, borrowed cars, outposts, hype, blips)
     python -I tools/live/game_test.py --heroshots [OUTDIR] no tests: the main character update (graphics, a parry, the hype, an outpost, a wreck, blips, night)
+    python -I tools/live/game_test.py --boro [OUTDIR]     only borotest.js (borough names, looks, HUD chip, banners, discovery)
+    python -I tools/live/game_test.py --boroshots [OUTDIR] no tests: two boroughs side by side, the chip + banner, the big map with names
     python -I tools/live/game_test.py --rpg [OUTDIR]      only rpgtest.js (loot, talents, rested XP, discovery, reputation, achievements, rares)
     python -I tools/live/game_test.py --shots [OUTDIR]    no tests: screenshots of the city by day, at dusk and at night
     python -I tools/live/game_test.py --ground [OUTDIR]   no tests: the ground photo textures (pavement, road, lawn, plaza, woods/sand, overview, dusk)
@@ -191,8 +193,26 @@ GROUND = (
     + scene("g7-dusk", "s.clock = 19.2; W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 9;", 60)
 )
 
+# Boroughs (2026-11-17): a street in the home borough, a street in the next one (its banner showing), from above, the map.
+BORO_WAIT = [{"waitFor": "window.__cft.W.districts().length > 0", "timeout": 60000}, {"wait": 1500}]
+BORO_O = "const ds = W.districts(), home = W.districtAt(0, 0), o = ds.filter(d => d.c !== 'city' && d.n !== home.n).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[%d];"
+# first a jump to the borough's centre (its streets load while the scene waits), then onto a street there
+BORO_GO = ("const ds = W.districts(), home = W.districtAt(0, 0), o = ds.filter(d => d.c !== 'city' && d.n !== home.n).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[%d];"
+           "const q = W.randomWalkSpot(o.x, o.z, 0, 300, (x, z, sg) => sg.car && sg.w >= 9) || W.nearestWalk(o.x, o.z, 400) || o; W.teleport(q.x, q.z, q.yaw);")
+def boro_jump(i):
+    return [{"eval": "(() => { const G = window.__cft, W = G.W; " + BORO_O % i + " W.teleport(o.x, o.z); return o.n; })()"}, {"wait": 9000}]
+BOROSHOTS = BORO_WAIT + (
+    scene("b1-home", "s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11; const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 9) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.22; W.cam.dist = W.cam.cur = 10;", 400)
+    + boro_jump(0) + scene("b2-next", BORO_GO % 0 + " W.cam.pitch = 0.22; W.cam.dist = W.cam.cur = 10;", 500, 3500)
+    + scene("b3-next-above", "W.cam.pitch = 0.75; W.cam.dist = W.cam.cur = 45;", 30)
+    + boro_jump(1) + scene("b4-third", BORO_GO % 1 + " W.cam.pitch = 0.22; W.cam.dist = W.cam.cur = 10;", 500, 3500)
+    + scene("b5-map", "G.ui.phone('map');", 5, 2000)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
+elif "--boroshots" in flags:
+    steps = START + BOROSHOTS
 elif "--shots" in flags:
     steps = START + SCENES
 elif "--ground" in flags:
@@ -215,6 +235,8 @@ else:
         steps += script("herotest.js", "__heroDone", "__heroOut", 600000)
     elif "--rpg" in flags:
         steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
+    elif "--boro" in flags:
+        steps += script("borotest.js", "__boroDone", "__boroOut", 300000)
     else:
         if "--fun" not in flags:
             steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
@@ -223,6 +245,7 @@ else:
             steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
             steps += script("combattest.js", "__cmbDone", "__cmbOut", 500000)
             steps += script("herotest.js", "__heroDone", "__heroOut", 600000)
+            steps += script("borotest.js", "__boroDone", "__boroOut", 300000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"
@@ -239,13 +262,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

@@ -34,7 +34,7 @@ function attach(G, api) {
     const s = save();
     if (!s.rpg || typeof s.rpg !== 'object') s.rpg = {};
     const r = s.rpg;
-    const dflt = { rested: 0, loot: [], eq: {}, tal: {}, rep: {}, ach: {}, title: null, titles: [], streets: [], blocks: [], pending: [], pity: 0, n: 1, rares: {}, grants: {} };
+    const dflt = { rested: 0, loot: [], eq: {}, tal: {}, rep: {}, ach: {}, title: null, titles: [], streets: [], blocks: [], boros: [], pending: [], pity: 0, n: 1, rares: {}, grants: {} };
     for (const k of Object.keys(dflt)) if (r[k] === undefined || r[k] === null && k !== 'title') r[k] = dflt[k];
     return r;
   }
@@ -289,6 +289,7 @@ function attach(G, api) {
       case 'level': return G.level();
       case 'streets': return r.streets.length;
       case 'blocks': return r.blocks.length;
+      case 'boros': return r.boros.length;
       case 'missions': return Object.keys(s.m).filter(id => G.MISSION[id] && s.m[id].s === 'done').length;
       case 'worth': return (window.CFTGame.summary(s) || {}).worth || 0;
       case 'biz': return Object.keys(s.biz).length;
@@ -369,9 +370,32 @@ function attach(G, api) {
     mark();
   }
 
-  // ------------------------------------------------------------------ discovery: new streets and blocks
+  // ------------------------------------------------------------------ discovery: new streets, blocks and boroughs
+  let boroSeen = null, boroHold = 0, boroCur = null;
+  // Boroughs (2026-11-17, cft-world W.districtAt): after 3 s inside a new one (no flicker on the border), a banner in its
+  // colour; the first visit ever pays discovery XP. The home borough on day one is counted quietly.
+  function boroughTick(r, p) {
+    const bd = W.districtAt && W.districtAt(p.x, p.z);
+    if (!bd) return;
+    if (bd.n === boroSeen) boroHold++; else { boroSeen = bd.n; boroHold = 0; }
+    if (boroHold < 2 || bd.n === boroCur) return;
+    const first = boroCur === null;
+    boroCur = bd.n;
+    if (!r.boros.includes(bd.n)) {
+      if (r.boros.length < 500) r.boros.push(bd.n);
+      if (r.boros.length > 1) {
+        const xp = 60 + G.level() * 10;
+        G.addXp(xp, 'explore');
+        U.banner('🏙️ New borough: ' + bd.n, '+' + Math.round(xp * G.xpMul()) + ' XP · look for the ' + bd.look.n.toLowerCase() + ' banners on the lamp posts', 'boro', bd.look);
+        G.log('Discovered ' + bd.n, '🏙️');
+        return;
+      }
+    }
+    if (!first) U.banner('🏙️ Welcome to ' + bd.n, bd.look.n + ' streets · borough ' + (r.boros.indexOf(bd.n) + 1) + ' of the ' + r.boros.length + ' you know', 'boro', bd.look);
+  }
   function explore() {
     const r = st(), s = save(), p = W.player.pos;
+    boroughTick(r, p);
     if (!streetSet) streetSet = new Set(r.streets);
     const name = W.streetAt(p.x, p.z);
     if (name && !streetSet.has(name)) {

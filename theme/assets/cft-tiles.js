@@ -359,7 +359,27 @@ function splitLine(line, S, subOf, emit) {
   }
 }
 
-const TileMaker = { Z, EXT, SUB, VERSION, TILEJSON, lonToX, latToY, xToLon, yToLat, key, decode, process, poiKind };
+// Borough / district names (2026-11-17): the place layer of a low-zoom tile (z11, ~14 km across at Montréal) has a point
+// for every borough or district (class suburb: Montréal's boroughs, New York's five, Paris's arrondissements) and every
+// town. Returns [{ n, c: 'suburb' | 'town' | 'city', lat, lon }]. The game gives each one its own look (cft-world boroughs).
+const PLACE_CLASS = { borough: 'suburb', suburb: 'suburb', town: 'town', village: 'town', city: 'city' };
+function places(buf, z, tx, ty) {
+  const l = decode(buf, new Set(['place'])).place, out = [];
+  if (!l) return out;
+  const n = 1 << z;
+  for (const f of l.features) {
+    const c = PLACE_CLASS[f.props.class], name = f.props['name:latin'] || f.props.name;
+    if (!c || !name || f.type !== 1 || !f.geom) continue;
+    for (const pt of geometry(f.geom, 1 / l.extent)) {
+      if (pt[0] < -0.25 || pt[0] > 1.25 || pt[1] < -0.25 || pt[1] > 1.25) continue; // the tile's buffer reaches past its edge: keep those too (deduped by the world)
+      const lon = (tx + pt[0]) / n * 360 - 180, m = Math.PI - 2 * Math.PI * (ty + pt[1]) / n;
+      out.push({ n: String(name).slice(0, 60), c, lat: 180 / Math.PI * Math.atan(Math.sinh(m)), lon });
+    }
+  }
+  return out;
+}
+
+const TileMaker = { Z, EXT, SUB, VERSION, TILEJSON, lonToX, latToY, xToLon, yToLat, key, decode, process, poiKind, places };
 if (typeof module !== 'undefined' && module.exports) module.exports = TileMaker;
 else root.TileMaker = TileMaker;
 })(typeof window !== 'undefined' ? window : globalThis);

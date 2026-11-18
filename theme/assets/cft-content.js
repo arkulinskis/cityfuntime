@@ -1294,6 +1294,8 @@ D.RPG = {
     { id: 'st400', cat: 'Exploration', e: '🌍', n: 'Every Corner', d: 'Discover 400 streets', k: 'streets', c: 400, pts: 50, title: 'the Wanderer' },
     { id: 'bl10', cat: 'Exploration', e: '🏙️', n: 'New Neighbourhoods', d: 'Discover 10 blocks', k: 'blocks', c: 10, pts: 10 },
     { id: 'bl40', cat: 'Exploration', e: '🏙️', n: 'All Over Town', d: 'Discover 40 blocks', k: 'blocks', c: 40, pts: 25 },
+    { id: 'bo3', cat: 'Exploration', e: '🚩', n: 'Borough Hopper', d: 'Visit 3 boroughs', k: 'boros', c: 3, pts: 10 },
+    { id: 'bo8', cat: 'Exploration', e: '🚩', n: 'Every Colour of the City', d: 'Visit 8 boroughs', k: 'boros', c: 8, pts: 25, title: 'the Local Everywhere' },
     { id: 'ch10', cat: 'Exploration', e: '🧰', n: 'Treasure Hunter', d: 'Open 10 treasure chests', k: 'chests', c: 10, pts: 10 },
     { id: 'm1', cat: 'Monsters', e: '👾', n: 'First Bonk', d: 'Bonk a monster', k: 'bonks', c: 1, pts: 10 },
     { id: 'm25', cat: 'Monsters', e: '👾', n: 'Pest Control', d: 'Bonk 25 monsters', k: 'bonks', c: 25, pts: 10 },

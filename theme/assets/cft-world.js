@@ -624,6 +624,7 @@ varying float vGL; varying vec2 vGUV;
     vanLo: propGeo(m => carBox(m, CAR_SPEC.van, 0xffffff)),
     sigPole: propGeo(m => { m.add(CYL, 0x33373f, 0, 2.0, 0, 0, 0, 0, 0.18, 4.0, 0.18); m.box(0.54, 1.56, 0.36, 0x1f2229, 0, 4.2, 0); m.box(0.7, 0.08, 0.5, 0xf2b134, 0, 5.02, 0); m.add(CYL, 0x1f2229, 0, 0.14, 0, 0, 0, 0, 0.44, 0.28, 0.44); }),
     sigLamp: shared(new THREE.SphereGeometry(0.19, 10, 8)),
+    banner: propGeo(m => { m.box(0.05, 0.05, 1.0, 0x2a2e37, 0, 4.75, 0.52); m.box(0.05, 0.05, 1.0, 0x2a2e37, 0, 2.75, 0.52); m.box(0.05, 1.95, 0.88, 0xffffff, 0, 3.75, 0.6); m.box(0.055, 0.22, 0.88, 0xdddddd, 0, 2.95, 0.6); m.box(0.055, 0.22, 0.88, 0xdddddd, 0, 4.55, 0.6); }),
   };
   // Parked cars: the low-quality box car, or the realistic body (carShape) with plain-coloured lights.
   function carBody(m, kind) {
@@ -832,6 +833,107 @@ varying float vGL; varying vec2 vGUV;
       return r.missing ? null : b64buf(r.data);
     } catch (e) { return undefined; }
   }
+  // ---------------------------------------------------------------- boroughs (2026-11-17): every borough looks different
+  // The names come from the place layer of zoom-11 tiles (TM.places, ~14 km across, cached in IndexedDB as '11/x/y'): a point
+  // per borough / district (class suburb: Montréal's boroughs, New York's five, Paris's arrondissements) and per town.
+  // A spot belongs to the nearest borough or town point within BORO_R (a fair guess at the real border); further out, the
+  // nearest city. Each borough gets one of LOOKS (boroughs near each other never share one): walls tinted toward `wall`,
+  // roofs from `roof`, kerbs painted in `a` stripes, centre lines in `line` colour and `dash` pattern, crowns of trees
+  // (`tree` = [h, s, l], null = green), lamp-post banners in `a` / `b`. W.districtAt(x, z) -> { n, look } (HUD, missions).
+  // Sub-tiles built before the names arrived (or whose borough changed) are rebuilt in place (boro.stale, in pumpTiles).
+  const LOOKS = [
+    { id: 'raspberry', n: 'Raspberry', a: 0xd4245e, b: 0xffe1ea, wall: 0xf0a6b8, roof: [0x8a3a4c, 0x6b2d3b], line: 0xffc21f, dash: 'dash', tree: [0.94, 0.5, 0.74] },
+    { id: 'mint', n: 'Mint', a: 0x20c997, b: 0xe0fff4, wall: 0x9fdcc5, roof: [0x2f6b5a, 0x3a5f55], line: 0xffffff, dash: 'double', tree: null },
+    { id: 'tangerine', n: 'Tangerine', a: 0xff8a1f, b: 0xfff0dc, wall: 0xf3bd88, roof: [0x9a4a22, 0x7a3d1e], line: 0xffffff, dash: 'long', tree: [0.07, 0.75, 0.5] },
+    { id: 'grape', n: 'Grape', a: 0x6b4eff, b: 0xece6ff, wall: 0xbcb0f3, roof: [0x3d3470, 0x2f2a55], line: 0xffc21f, dash: 'dots', tree: [0.42, 0.4, 0.36] },
+    { id: 'lemon', n: 'Lemon', a: 0xf2b705, b: 0xfff6cc, wall: 0xf2dc8a, roof: [0x6b5a2a, 0x5a4a22], line: 0xffffff, dash: 'dash', tree: [0.13, 0.75, 0.5] },
+    { id: 'sky', n: 'Sky', a: 0x2f9bff, b: 0xe1f0ff, wall: 0xa9cdf2, roof: [0x2e4a6b, 0x3a556e], line: 0xffc21f, dash: 'double', tree: null },
+    { id: 'terracotta', n: 'Terracotta', a: 0xe85d3c, b: 0xffe6dc, wall: 0xe6a68c, roof: [0xa8442a, 0x8e3a24], line: 0xffffff, dash: 'dots', tree: [0.2, 0.45, 0.4] },
+    { id: 'lime', n: 'Lime', a: 0x7cc417, b: 0xf1ffd9, wall: 0xcfe39a, roof: [0x4a5a28, 0x3f4d22], line: 0xffffff, dash: 'long', tree: [0.25, 0.7, 0.48] },
+    { id: 'teal', n: 'Teal', a: 0x0fa3b1, b: 0xdcf8fa, wall: 0x93d3d6, roof: [0x1f5a60, 0x24484c], line: 0xffc21f, dash: 'dash', tree: null },
+    { id: 'lavender', n: 'Lavender', a: 0xa35cff, b: 0xf3e8ff, wall: 0xd4b8f0, roof: [0x5a3f7a, 0x4a3466], line: 0xffffff, dash: 'double', tree: [0.76, 0.45, 0.66] },
+    { id: 'cherry', n: 'Cherry', a: 0xd62839, b: 0xffe0e3, wall: 0xdc9f9f, roof: [0x5a2a2a, 0x6e3030], line: 0xffffff, dash: 'dots', tree: [0.01, 0.6, 0.45] },
+    { id: 'slate', n: 'Slate', a: 0x3f4b5e, b: 0xf4f6fa, wall: 0xc4ccd6, roof: [0x2f3640, 0x3a4048], line: 0xffc21f, dash: 'long', tree: [0.36, 0.25, 0.42] },
+  ];
+  for (const L of LOOKS) { L.ac = new THREE.Color(L.a); L.bc = new THREE.Color(L.b); L.wc = new THREE.Color(L.wall); L.lc = new THREE.Color(L.line); L.rc = L.roof.map(c => new THREE.Color(c)); L.pc = new THREE.Color(0xb9b4aa).lerp(L.wc, 0.35); L.css = '#' + L.ac.getHexString(); L.ink = (0.2126 * L.ac.r + 0.7152 * L.ac.g + 0.0722 * L.ac.b) > 0.42 ? '#1f1a3d' : '#ffffff'; L.map = '#' + new THREE.Color(0xcbc3b4).lerp(L.ac, 0.35).getHexString(); L.mapLine = '#' + new THREE.Color(0xb3a998).lerp(L.ac, 0.45).getHexString(); }
+  W.LOOKS = LOOKS;
+  const BORO_Z = 11, BORO_R = 6000, CITY_R = 25000, BORO_MIX = 0.5;
+  const boro = { tiles: new Map(), pts: [], stale: new Set() };
+  const strHash = str => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; };
+  function districtAt(x, z) {
+    let best = null, bd = Infinity, city = null, cd = Infinity;
+    for (const p of boro.pts) {
+      const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
+      if (p.c === 'city') { if (d < cd) { cd = d; city = p; } } else if (d < bd) { bd = d; best = p; }
+    }
+    if (best && bd < BORO_R * BORO_R) return best;
+    if (city && cd < CITY_R * CITY_R) return city;
+    return best || city;
+  }
+  W.districtAt = (x, z) => { const p = districtAt(x, z); return p ? { n: p.n, c: p.c, look: LOOKS[p.li] } : null; };
+  W.districts = () => boro.pts.map(p => ({ n: p.n, c: p.c, x: p.x, z: p.z, look: LOOKS[p.li] }));
+  const lookAt = (x, z) => { const p = districtAt(x, z); return p ? LOOKS[p.li] : null; };
+  // Each borough takes its name's look unless a borough within LOOK_GAP already has it; then the look whose nearest
+  // twin is furthest away. The order is by name, so the same boroughs get the same looks on every visit.
+  const LOOK_GAP = 9000;
+  function assignLooks() {
+    const done = [];
+    for (const p of boro.pts.slice().sort((a, b) => a.n < b.n ? -1 : a.n > b.n ? 1 : a.x - b.x)) {
+      const gap = new Array(LOOKS.length).fill(Infinity);
+      for (const q of done) gap[q.li] = Math.min(gap[q.li], Math.hypot(q.x - p.x, q.z - p.z));
+      const pref = strHash(p.n) % LOOKS.length;
+      p.li = pref;
+      if (gap[pref] < LOOK_GAP) for (let k = 1; k < LOOKS.length; k++) { const i = (pref + k) % LOOKS.length; if (gap[i] > gap[p.li]) p.li = i; }
+      done.push(p);
+    }
+  }
+  // Which looks a sub-tile used (its corners + centre): when that changes, it is rebuilt.
+  const subLooks = s => [[s.x0, s.z0], [s.x1, s.z0], [s.x0, s.z1], [s.x1, s.z1], [(s.x0 + s.x1) / 2, (s.z0 + s.z1) / 2]].map(([x, z]) => { const p = districtAt(x, z); return p ? p.n + p.li : '-'; }).join('|');
+  function addBoroughs(list) {
+    let added = 0;
+    for (const p of list) {
+      const { x, z } = W.toXZ(p.lat, p.lon);
+      if (boro.pts.some(q => q.n === p.n && Math.hypot(q.x - x, q.z - z) < 1500)) continue;
+      boro.pts.push({ n: p.n, c: p.c, x, z, li: 0 }); added++;
+    }
+    if (!added) return;
+    assignLooks();
+    for (const s of allSubs) if (s.group && s.looks !== subLooks(s)) boro.stale.add(s);
+  }
+  function requestBoroTile(x, y) {
+    const k = BORO_Z + '/' + x + '/' + y, g = gen;
+    if (boro.tiles.has(k)) return;
+    boro.tiles.set(k, 'loading');
+    (async () => {
+      let buf = await idb('readonly', k);
+      if (!buf) {
+        const res = await fetchT((await tileUrl()).replace('{z}', BORO_Z).replace('{x}', x).replace('{y}', y), 20000);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        buf = await res.arrayBuffer();
+        idb('readwrite', k, buf);
+      }
+      if (g !== gen) return;
+      boro.tiles.set(k, 'ready');
+      addBoroughs(TM.places(buf, BORO_Z, x, y));
+    })().catch(err => {
+      if (g !== gen) return;
+      console.warn('borough names', k, err);
+      boro.tiles.set(k, 'error');
+      setTimeout(() => { if (g === gen && boro.tiles.get(k) === 'error') boro.tiles.delete(k); }, 30000);
+    });
+  }
+  // The zoom-11 tile under the player, plus the next one when the player is within 3 km of its edge.
+  function pumpBoroughs(px, pz) {
+    const sc = 1 << (TM.Z - BORO_Z), gx = (origin.gx0 + px / origin.M) / sc, gy = (origin.gy0 + pz / origin.M) / sc;
+    const e = 3000 / (origin.M * sc), tx = Math.floor(gx), ty = Math.floor(gy);
+    requestBoroTile(tx, ty);
+    const fx = gx - tx, fy = gy - ty, dx = fx < e ? -1 : fx > 1 - e ? 1 : 0, dy = fy < e ? -1 : fy > 1 - e ? 1 : 0;
+    if (dx) requestBoroTile(tx + dx, ty);
+    if (dy) requestBoroTile(tx, ty + dy);
+    if (dx && dy) requestBoroTile(tx + dx, ty + dy);
+  }
+  W.boroughsReady = () => boro.pts.length > 0 || (boro.tiles.size > 0 && [...boro.tiles.values()].every(v => v === 'error'));
+
   // Tiles this player loaded get copied to the server in small batches (it fetches them itself and keeps them).
   const ARCH_KEY = 'cityfuntime.archived', archQueue = new Set();
   let archived = null, archTimer = null, archFull = false;
@@ -1095,8 +1197,15 @@ varying float vGL; varying vec2 vGUV;
       if (!t || (t.state === 'error' && now > t.retryAt)) requestTile(x, y);
     }
     pumpTerrain(px, pz);
+    pumpBoroughs(px, pz);
     ground.position.y = terr.minY - 1.5;
     const t0 = performance.now();
+    for (const s of boro.stale) { // a borough's look arrived or changed: rebuild in place (the old group stays until the new one is up)
+      if (performance.now() - t0 > budget) break;
+      boro.stale.delete(s);
+      if (!s.group) continue;
+      const old = s.group; buildSub(s); dropSub({ group: old }); s.canvas = drawSubMap(s);
+    }
     const near = allSubs.map(s => [rectDist(s, px, pz), s]).sort((a, b) => a[0] - b[0]);
     for (const [d, s] of near) {
       if (d < SHOW_R) {
@@ -1651,6 +1760,7 @@ varying float vGL; varying vec2 vGUV;
     return b;
   }
   function buildSub(s) {
+    s.looks = subLooks(s);
     const group = new THREE.Group();
     const gm = groundMesh(s);
     if (gm) group.add(gm);
@@ -1665,6 +1775,8 @@ varying float vGL; varying vec2 vGUV;
       const st = roadStyle(r.t), hw = r.w / 2, p = r.p, n = p.length / 2;
       const lift = st.y + 0.03 + (r.br ? 0.006 : 0), hf = r.deck || groundAt;
       const marking = MAJOR.has(r.t) || r.t === 'tertiary';
+      const lk = n > 1 ? lookAt((p[0] + p[2 * n - 2]) / 2, (p[1] + p[2 * n - 1]) / 2) : null;  // the borough's look
+      const bline = !marking && lk && r.t === 'residential' && hw >= 4;  // side streets get the borough's centre line too
       flat.layer = st.l; flat.fr = null;
       let run = 0;  // metres along the street so far: pavement slabs carry on from one segment to the next
       for (let i = 0; i < n - 1; i++) {
@@ -1677,7 +1789,7 @@ varying float vGL; varying vec2 vGUV;
           const ax = x1 + dx * q / k, az = z1 + dz * q / k, bx = x1 + dx * (q + 1) / k, bz = z1 + dz * (q + 1) / k;
           flat.dquad(ax + nx, az + nz, bx + nx, bz + nz, bx - nx, bz - nz, ax - nx, az - nz, hf, lift, st.col);
         }
-        if (marking) dashes(flat, x1, z1, dx / L, dz / L, L, hf, lift + 0.012);
+        if (marking || bline) dashes(flat, x1, z1, dx / L, dz / L, L, hf, lift + 0.012, lk);
         if (!LOW && !r.br && marking && hw > 3.2) { // solid white lines along the edges of bigger roads
           const ex = -dz / L, ez = dx / L;
           for (const sd of [1, -1]) {
@@ -1700,8 +1812,8 @@ varying float vGL; varying vec2 vGUV;
               const t0 = q / k, t1 = (q + 1) / k, mx = x1 + dx * (t0 + t1) / 2 + ex * (hw + pw / 2) * sd, mz = z1 + dz * (t0 + t1) / 2 + ez * (hw + pw / 2) * sd;
               if (roadAt(mx, mz)) continue;  // another street crosses here: no pavement over it
               const ax = x1 + dx * t0, az = z1 + dz * t0, bx = x1 + dx * t1, bz = z1 + dz * t1;
-              flat.dquad(ax + ex * ok, az + ez * ok, bx + ex * ok, bz + ez * ok, bx + ex * oo, bz + ez * oo, ax + ex * oo, az + ez * oo, groundAt, KERB_Y, paveCol);
-              flat.dquad(ax + ex * oi, az + ez * oi, bx + ex * oi, bz + ez * oi, bx + ex * ok, bz + ez * ok, ax + ex * ok, az + ez * ok, groundAt, KERB_Y + 0.004, kerbCol);
+              flat.dquad(ax + ex * ok, az + ez * ok, bx + ex * ok, bz + ez * ok, bx + ex * oo, bz + ez * oo, ax + ex * oo, az + ez * oo, groundAt, KERB_Y, lk ? lk.pc : paveCol);
+              flat.dquad(ax + ex * oi, az + ez * oi, bx + ex * oi, bz + ez * oi, bx + ex * ok, bz + ez * ok, ax + ex * ok, az + ez * ok, groundAt, KERB_Y + 0.004, lk && Math.floor((run0 + L * (t0 + t1) / 2) / 2.5) % 2 ? lk.ac : kerbCol);
             }
           }
           flat.layer = st.l; flat.fr = null;
@@ -1726,12 +1838,14 @@ varying float vGL; varying vec2 vGUV;
       if (hsl.l < 0.3 || hsl.l > 0.85) wc.setHSL(hsl.h, hsl.s, Math.min(0.85, Math.max(0.3, hsl.l)));
       wc.getHSL(hsl);
       wc.setHSL(hsl.h, Math.min(0.9, hsl.s * 1.25 + 0.04), hsl.l); // a little more colour than the map's: sticker-book streets
+      const lk = lookAt(b.cx, b.cz);
+      if (lk) wc.lerp(lk.wc, BORO_MIX * (0.75 + hash(idx + 11) * 0.5));  // the borough's colour runs through its streets
       wc.multiplyScalar(0.82 + hash(idx + Math.round(b.x0)) * 0.18);
       // the street floor is a darker band (shopfronts), when the building is tall enough to have one
       const gf = b.m <= 0.5 && b.h > 6.2 ? gfc.copy(wc).lerp(shopfront, 0.38) : null;
       for (const ring of b.rings) addWalls(walls, ring, y0, top, wc, b.base, gf);
       const rcs = cssColor(b.r);
-      if (rcs) rc.set(rcs); else rc.copy(wc).lerp(gray, 0.55).multiplyScalar(0.85);
+      if (rcs) { rc.set(rcs); if (lk) rc.lerp(lk.rc[(idx & 1)], 0.6); } else { rc.copy(wc).lerp(gray, 0.55).multiplyScalar(0.85); if (lk) rc.lerp(lk.rc[(idx & 1)], 0.45); }
       if (!LOW && b.area > 40) { // ledges: a cornice under the roof line, a band above the shopfronts
         const lc = ccol.copy(wc).lerp(white, 0.42);
         if (!b.g && b.h >= 5) cornice(roofs, b.p, top + 0.12, lc, b.h > 20 ? 0.42 : 0.3, b.h > 20 ? 0.7 : 0.5);
@@ -1779,6 +1893,8 @@ varying float vGL; varying vec2 vGUV;
         else if (k === 1) c.setHSL(0.22 + h3 * 0.06, 0.38 + h4 * 0.14, 0.4 + h5 * 0.1);
         else if (k === 2) c.setHSL(0.36 + h3 * 0.06, 0.3 + h4 * 0.12, 0.3 + h5 * 0.08);
         else c.setHSL(0.17 + h3 * 0.06, 0.5 + h4 * 0.15, 0.52 + h5 * 0.1);
+        const tc = k !== 2 && (lookAt(sx, sz) || {}).tree;  // boroughs: 7 in 10 leafy trees wear the borough's colour (spruces stay green)
+        if (tc && hash(hh + 7) < 0.7) c.setHSL((tc[0] + (h3 - 0.5) * 0.05 + 1) % 1, tc[1] * (0.85 + h4 * 0.3), tc[2] * (0.88 + h5 * 0.24));
         ims[k][1].setColorAt(j, c); if (los) los[k][1].setColorAt(j, c);
       }
       ims.forEach((pair, k) => { if (pair) for (const im of pair) { im.castShadow = !LOW; im.userData.sp = k; if (los) im.userData.lod = 'hi'; keep('tree', culled(im)); } });
@@ -1825,6 +1941,15 @@ varying float vGL; varying vec2 vGUV;
       inst('lamp', PROP.bulb, MAT.bulb, pr.lamp, 3, false);
       const pool = inst('lamp', PROP.pool, MAT.pool, pr.lamp, 3, false); if (pool) pool.renderOrder = 2;
       if (!LOW) { const halo = inst('lamp', PROP.halo, MAT.halo, pr.lamp, 3, false); if (halo) halo.renderOrder = 3; }
+      // borough banners: one per lamp (instance i = lamp i, so smashing a lamp hides its banner), in the borough's two colours
+      const ban = inst('lamp', PROP.banner, MAT.tint, pr.lamp, 3, false);
+      if (ban) {
+        const c = new THREE.Color(), BRAND = new THREE.Color(0x6b4eff);
+        for (let i = 0; i < pr.lamp.length / 3; i++) {
+          const lk = lookAt(pr.lamp[i * 3], pr.lamp[i * 3 + 1]);
+          c.copy(lk ? (i & 1 ? lk.bc : lk.ac) : (i & 1 ? white : BRAND)); ban.setColorAt(i, c);
+        }
+      }
     }
     for (let v = 0; v < 3; v++) if (pr['car' + v]) {
       const im = inst('car', PROP.car[v], MAT.tint, pr['car' + v], 4, true); if (im) { im.userData.sp = v; if (!LOW) im.userData.lod = 'hi'; }
@@ -1955,12 +2080,18 @@ varying float vGL; varying vec2 vGUV;
   // 2026-11-17 graphics pass: road edge lines, pavements and their kerb strip (KERB_Y = height above the ground: just above
   // the road surface, so people's feet don't sink into it)
   const edgeCol = new THREE.Color(0xeeeee6), paveCol = new THREE.Color(0xb9b4aa), kerbCol = new THREE.Color(0xdcd7cd), KERB_Y = 0.13;
-  function dashes(geo, x, z, ux, uz, L, hf, lift) {
-    const hw = 0.09, nx = -uz * hw, nz = ux * hw;
-    for (let s = 2; s + 3 < L; s += 9) {
-      const ax = x + ux * s, az = z + uz * s, bx = ax + ux * 3, bz = az + uz * 3;
-      geo.dquad(ax + nx, az + nz, bx + nx, bz + nz, bx - nx, bz - nz, ax - nx, az - nz, hf, lift, dashCol);
-    }
+  // Centre lines. The borough's look picks the colour and pattern (dash 3 m every 9 m, long 6 every 9, dots 0.6 every 2.4,
+  // double = two solid lines), so each borough's streets read differently at a glance.
+  const DASH = { dash: [3, 9, 0.09], long: [6, 9, 0.11], dots: [0.6, 2.4, 0.16], double: [0, 0, 0.07] };
+  function dashes(geo, x, z, ux, uz, L, hf, lift, lk) {
+    const [len, step, hw] = DASH[lk ? lk.dash : 'dash'], col = lk ? lk.lc : dashCol;
+    const line = (off, a, b) => {
+      const nx = -uz * hw, nz = ux * hw, ox = -uz * off, oz = ux * off;
+      const ax = x + ux * a + ox, az = z + uz * a + oz, bx = x + ux * b + ox, bz = z + uz * b + oz;
+      geo.dquad(ax + nx, az + nz, bx + nx, bz + nz, bx - nx, bz - nz, ax - nx, az - nz, hf, lift, col);
+    };
+    if (!len) { for (let s = 0; s < L; s += GS) { const e = Math.min(L, s + GS); line(0.16, s, e); line(-0.16, s, e); } return; }
+    for (let s = 2; s + len < L; s += step) line(0, s, s + len);
   }
   function disk(geo, x, z, r, hf, lift, col) {
     for (let i = 0; i < 8; i++) {
@@ -1981,8 +2112,13 @@ varying float vGL; varying vec2 vGUV;
     pass(r => !CAR.has(r.t), '#f7f4ee', () => 2);
     pass(r => CAR.has(r.t) && !MAJOR.has(r.t), '#ffffff', r => Math.max(2, r.w));
     pass(r => MAJOR.has(r.t), '#ffe7a3', r => Math.max(2.5, r.w));
-    g.fillStyle = '#cbc3b4'; g.strokeStyle = '#b3a998'; g.lineWidth = 1;
-    for (const b of s.buildings) { if (b.m >= 2.5) continue; g.beginPath(); for (const r of b.rings) path(r, true); g.fill('evenodd'); g.stroke(); }
+    g.lineWidth = 1;
+    for (const b of s.buildings) { // buildings take their borough's colour on the maps too
+      if (b.m >= 2.5) continue;
+      const lk = lookAt(b.cx, b.cz);
+      g.fillStyle = lk ? lk.map : '#cbc3b4'; g.strokeStyle = lk ? lk.mapLine : '#b3a998';
+      g.beginPath(); for (const r of b.rings) path(r, true); g.fill('evenodd'); g.stroke();
+    }
     return c;
   }
 
@@ -3611,6 +3747,7 @@ varying float vGL; varying vec2 vGUV;
     buckets.clear(); nameBuckets.clear(); hchunks.clear(); rchunks.clear(); segBuckets.clear(); bridgeBuckets.clear();
     terr.tiles.clear(); terr.src.clear(); nodes.clear(); terr.inflight = 0; terr.h0 = null; terr.off = false; terr.minY = 0;
     W.places.length = 0; W.placeIds.clear();
+    boro.tiles.clear(); boro.pts.length = 0; boro.stale.clear();
     for (const n of sigList) dropSignal(n);
     snodes.clear(); sigList.length = 0; carBuckets.clear();
     for (const id of [...signs.keys()]) dropSign(id);
@@ -3773,6 +3910,18 @@ varying float vGL; varying vec2 vGUV;
       g.lineWidth = 1.5 * dpr; g.strokeStyle = mk.ring || 'rgba(0,0,0,.55)'; g.stroke();
       if (mk.letter) { g.font = '900 ' + Math.round(r * 1.35) + 'px Fredoka, Nunito, system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 2.5 * dpr; g.strokeStyle = '#1f1a3d'; g.strokeText(mk.letter, x, y + 1); g.fillStyle = '#fff'; g.fillText(mk.letter, x, y + 1); }
       else if (mk.emoji) { g.font = Math.round(r * 1.25) + 'px ' + EMOJI_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(mk.emoji, x, y + 0.5); }
+    }
+    // borough names: a pill in the borough's colour at its centre point
+    if (o.boroughs !== false) for (const p of boro.pts) {
+      if (p.c === 'city') continue;
+      const bx = Wd / 2 + (p.x - o.cx) * k, by = H / 2 + (p.z - o.cz) * k;
+      if (bx < -200 || by < -30 || bx > Wd + 200 || by > H + 30) continue;
+      const lk = LOOKS[p.li];
+      g.font = '700 ' + Math.round(12 * dpr) + 'px Fredoka, Nunito, system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const tw = g.measureText(p.n).width + 14 * dpr, th = 20 * dpr;
+      g.fillStyle = lk.css; g.strokeStyle = '#1f1a3d'; g.lineWidth = 2 * dpr;
+      g.beginPath(); if (g.roundRect) g.roundRect(bx - tw / 2, by - th / 2, tw, th, th / 2); else g.rect(bx - tw / 2, by - th / 2, tw, th); g.fill(); g.stroke();
+      g.fillStyle = '#fff'; g.fillText(p.n, bx, by + 0.5);
     }
     const x = Wd / 2 + (player.pos.x - o.cx) * k, y = H / 2 + (player.pos.z - o.cz) * k;
     g.save(); g.translate(x, y); g.rotate(-player.face);

@@ -34,7 +34,7 @@ function create(G, root) {
         <div class="cft-chip cft-meter" title="Energy"><span>⚡</span><div class="cft-bar e"><i data-ebar></i></div></div>
         <div class="cft-chip cft-meter" title="Happiness"><span data-hface>😊</span><div class="cft-bar h"><i data-hbar></i></div></div>
       </div>
-      <div class="cft-tc"><div class="cft-clock" data-clock></div><div class="cft-street" data-street></div></div>
+      <div class="cft-tc"><div class="cft-clock" data-clock></div><div class="cft-boro" data-boro hidden title="The borough you're in: each one has its own colours, banners and road lines"><i></i><b></b></div><div class="cft-street" data-street></div></div>
       <div class="cft-tr">
         <button class="cft-quest" data-quest type="button">
           <span class="cft-qarrow"><svg viewBox="0 0 24 24" data-qarrow><path d="M12 2 20 21 12 16.5 4 21z"/></svg></span>
@@ -108,7 +108,7 @@ function create(G, root) {
   };
   const bannerQ = [];
   let bannerBusy = false;
-  U.banner = function (title, sub, kind) { bannerQ.push({ title, sub, kind }); if (!bannerBusy) nextBanner(); };
+  U.banner = function (title, sub, kind, color) { bannerQ.push({ title, sub, kind, color }); if (!bannerBusy) nextBanner(); };
   function nextBanner() {
     const b = bannerQ.shift();
     if (!b) { bannerBusy = false; return; }
@@ -116,6 +116,7 @@ function create(G, root) {
     const el = document.createElement('div');
     el.className = 'cft-banner ' + (b.kind || '');
     el.innerHTML = '<b>' + esc(b.title) + '</b>' + (b.sub ? '<span>' + esc(b.sub) + '</span>' : '');
+    if (b.color) { el.style.setProperty('--boro', b.color.css || b.color); if (b.color.ink) el.style.setProperty('--boro-ink', b.color.ink); }  // borough banners wear the borough's colour
     $('[data-banners]').appendChild(el);
     const long = b.kind === 'done' || b.kind === 'level' || /^(loot|ach)/.test(b.kind || '');
     setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); nextBanner(); }, 350); }, bannerQ.length > 2 ? 1700 : long ? 3600 : 3000);  // a queue moves faster
@@ -654,6 +655,12 @@ function create(G, root) {
         const st = W.streetAt(W.player.pos.x, W.player.pos.z);
         const tid = G.turfIdOf(W.player.pos.x, W.player.pos.z), t = s.turf[tid];
         setText('street', '[data-street]', (st ? '📍 ' + st : '') + (t && t.name ? '  ·  ' + (t.own ? '🏳️‍🌈 ' : G.CREW[t.crew].e + ' ') + t.name : ''));
+        // the borough chip (2026-11-17): name + the borough's colour, so you always know where you are
+        const bd = W.districtAt ? W.districtAt(W.player.pos.x, W.player.pos.z) : null, be = $('[data-boro]'), bk = bd ? bd.n + bd.look.id : '';
+        if (be.dataset.k !== bk) {
+          be.dataset.k = bk; be.hidden = !bd;
+          if (bd) { be.querySelector('b').textContent = bd.n; be.style.setProperty('--boro', bd.look.css); be.style.setProperty('--boro-ink', bd.look.ink); be.classList.remove('cft-boro-new'); void be.offsetWidth; be.classList.add('cft-boro-new'); }
+        }
         // quest card
         const id = s.track && s.m[s.track] && s.m[s.track].s === 'active' ? s.track : null;
         const goal = G.rt.goal;
@@ -821,7 +828,7 @@ function create(G, root) {
   };
   VIEWS.map = function () {
     return '<div class="cft-mapwrap"><canvas class="cft-bigmap" data-bigmap></canvas><div class="cft-mapbtns"><button type="button" class="cft-pbtn" data-act="zin">＋</button><button type="button" class="cft-pbtn" data-act="zout">－</button></div></div>' +
-      '<div class="cft-legend"><span>🏠 home</span><span>❗ missions</span><span>💼 your businesses</span><span>🟪 your blocks</span><span>🧡 street folk</span><span>💕 sweethearts</span><span>💢 banned</span><span>⭐ goal</span></div>';
+      '<div class="cft-legend"><span>🚩 borough names, coloured</span><span>🏠 home</span><span>❗ missions</span><span>💼 your businesses</span><span>🟪 your blocks</span><span>🧡 street folk</span><span>💕 sweethearts</span><span>💢 banned</span><span>⭐ goal</span></div>';
   };
   let mapScale = 0.5;
   function drawBigMap() {

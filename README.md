@@ -91,6 +91,12 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
 - **Made-up shops and signs:** besides the real places from the map, about one building in four along the streets holds a
   made-up shop (26 kinds, generated names, always the same shop in the same building). Every place, real or made-up, has a
   sign on its wall in its kind's colour, a striped awning and a round blade sign.
+- **Boroughs look different** (2026-11-17): every borough (Montréal's boroughs, New York's five, Paris's arrondissements,
+  any town) gets its own colours: tinted walls and roofs, pavements, painted kerb stripes, its own centre-line colour and
+  pattern (dashes, long dashes, dots or double lines), tree colours (autumn orange, cherry blossom, golden...) and banners on
+  every lamp post. The HUD shows the borough's name in its colour under the clock; walking into a new one shows a welcome
+  banner and pays discovery XP (achievements for 3 and 8 boroughs); the minimap and map colour buildings by borough and
+  the map names them. Names come from the same OpenStreetMap tiles (no new service).
 - **Faster:** walking 8.4 m/s, sprinting 15.5 m/s (since 2026-11-17; was 6.2 / 12.5), every ride about 12% quicker, a double
   jump (Space twice), the view widens with speed.
 - **Monsters and silly weapons:** after 21:30 sidewalk slimes, cone gremlins, trash goblins and lost-sock ghosts come out,

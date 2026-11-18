@@ -69,6 +69,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Phone apps | "Street life card wrong" | cft-ui `render` + `VIEWS.<app>` (e.g. `VIEWS.street`) | | --heroshots |
 | Buildings, roads, pavements | "pavement over the road", "roof ledge odd" | cft-world `buildSub` `addWalls` `cornice` `gable` `roofClutter`; constants `KERB_Y` `paveCol` | | --heroshots |
 | Ground textures (road, pavement, grass, plaza look) | "grass too yellow", "tiles too big", "cracks too strong" | cft-world `TEX` (m = size, k = detail, real = photo colour), `TL`, `groundify` (shader), `loadGround`; which surface gets which photo: `AREA[k][3]`, `ROAD_STYLE.*.l`, `TERRAIN_COL`; photos: `tools/ground_textures.py` | | --ground |
+| Boroughs (names, colours, banners, HUD chip) | "wrong borough", "two boroughs look alike", "banner too small", "chip covers the clock" | cft-world `LOOKS` `districtAt` `assignLooks` `pumpBoroughs` `PROP.banner` `dashes` (`DASH`), cft-tiles `places`, cft-rpg `boroughTick`, cft-ui hud tick (`[data-boro]`), CSS `.cft-boro` `.cft-banner.boro` | `BORO_MIX`, `BORO_R`, `LOOK_GAP` | --boro --boroshots |
 | Trees, bushes, lamps, halos, street furniture | "too many spruces", "bushes everywhere" | cft-world `TREE` / `TREE_LO` `treeKind` `leafShell`, `BUSH` (placed in `plantTrees`), tree colours in `buildSub`, `PROP`, `layProps`, halos in `W.setClock` | | --models --heroshots |
 | Sky, day/night, lighting, shadows | "night too dark" | cft-world `W.setClock` (`SKY`, `SKY_TOP`), lights at the top of `create` | | --shots |
 | Performance | "laggy" | cft-world `LOD_R` (full models only near you), `layProps` (density), bushes in `plantTrees`, `SHADOW`, `D.TUNE.world`; `W.renderInfo()` | | real device |
@@ -84,6 +85,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | `node tools/live/content_check.mjs` | every mission, item, kind, counter reference in cft-content.js | 1 s |
 | `python tools/check.py` | Anvil validate, JS syntax, asset hashes, server tests, design check | ~1 min |
 | `python -I tools/live/game_test.py --hero` | speed, combat, smashing, cars, outposts, hype, blips, shields | ~2 min |
+| `python -I tools/live/game_test.py --boro` | borough names, looks, HUD chip, banners, discovery | ~1 min |
 | `... --fun` / `--combat` / `--rpg` | street life / monsters, health, guardians / loot, talents | 2-3 min each |
 | `... ` (no flag) | everything (gametest + fun + rpg + combat + hero) | 5-7 min |
 | `... --heroshots DIR` / `--shots` / `--monsters` / `--people` / `--models` | screenshots to look at (no checks) | 2-3 min |
