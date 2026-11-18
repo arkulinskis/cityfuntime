@@ -76,6 +76,17 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Music, sounds | | cft-game `music` / `MUSIC`, `G.sfx` | | |
 | Saving | "progress lost" | cft-game `doSave`, cft-kit `persist` `loadSave`, server `server_code/Game.py` `put_save` | | ui_test |
 | Pages outside the game (Life, Quests, Album, Ranks, Landing) | | `client_code/Pages/<Name>/` (template + Python), data from cft-kit `VIEWS` | | ui_test |
+| Decor (gnomes, planters, mushrooms, ducks, flags...) | "too many gnomes", "a couch on the road", "parks still empty" | cft-world `DECOR` (shapes) `layDecor` (`PAVE_MIX`, `AREA_DECOR`, the `d +=` step) `decorInst` | `DECOR_HP` (hits), `DECOR_TINTS`, `DECOR_HI` | --chaosshots |
+| Mayhem meter, aura | "meter cashes in too fast", "aura spam" | cft-chaos `C.add` `rankUp` `bank` `drawMeter` `C.aura`, CSS `.cft-mayhem` | `D.TUNE.chaos.comboT`, `D.CHAOS.RANKS/POINTS/AURA` | --chaos |
+| Ranged weapons (yours) | "balloon misses", "boomerang never comes back", "aim jumps" | cft-chaos `C.fire` `aimShot` `updateShots` `impact`, cft-fun `F.attack` (proj branch) | weapons in `D.ITEMS` (rate, speed, splash, pellets) | --chaos |
+| Ranged / flying figments | "tomato guy too accurate", "gull too high", "can't parry shots" | cft-chaos `C.rangedAI` `enemyShot` `flyTick` `shotHitsPlayer`, cft-fun updateMonsters (rangedAI call) | `D.MONSTERS` spitter/tomato/gull/wifi (`ranged`, `fly`), `D.TUNE.chaos.enemyShots` | --chaos |
+| Jetpack, glide-brella, hoops | "fuel runs out too fast", "glide too slow" | cft-chaos `W.flyHook` `flightTick` `hoopTick`, cft-world updatePlayer (gravity) | `D.TUNE.chaos.jet*`, `glide*` | --chaos |
+| Toys (piñatas, balls, manholes, cushions, tube men) | "ball too bouncy", "manhole too strong" | cft-chaos `pinataHit` `ballTick` `holeTick` `cushionTick` `tubeTick` `toyTick` `C.meleeHit` | `D.TUNE.chaos` counts | --chaos |
+| Critters, brainrot, the Dex | "snail too fast", "never see brainrot" | cft-chaos `critterModel` `critterTick` `snap` `C.interaction`, cft-ui `VIEWS.chaos` | `D.CHAOS.CRITTERS/BRAINROT`, `D.TUNE.chaos.brainrot` | --chaos |
+| Fart, porta-potty, meme chatter | "fart too loud", "chatter too often" | cft-chaos `C.fart` `fartSound` `hide` `stinkBomb` `chatterTick` | `D.CHAOS.CHATTER/KIDS/FART`, `D.TUNE.chaos.chatter` | --chaos |
+| Chaos street events (Ohio, glitch, cats & dogs, cheese, 6-7, balloons) | "glitch too long" | cft-chaos `C.startEvent` `C.updateEvent` `C.endEvent` (via cft-fun startEvent) | `D.EVENTS` (chaos: true) | --chaos |
+| Sky (blimps, balloons, whale) | "blimp text" | cft-chaos `skyTick` `blimpModel` | `D.CHAOS.BLIMPS` | --chaosshots |
+| Hit-stop | "game freezes on hits" | cft-game `frame` (`rt.hitstop`), cft-chaos `hitstop` | `D.TUNE.chaos.hitstop` | --chaos |
 | Play-test panel | | cft-debug.js (`?debug=1`) | | |
 
 ## Tests (pick the narrowest)
@@ -85,6 +96,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | `node tools/live/content_check.mjs` | every mission, item, kind, counter reference in cft-content.js | 1 s |
 | `python tools/check.py` | Anvil validate, JS syntax, asset hashes, server tests, design check | ~1 min |
 | `python -I tools/live/game_test.py --hero` | speed, combat, smashing, cars, outposts, hype, blips, shields | ~2 min |
+| `python -I tools/live/game_test.py --chaos` | decor, mayhem, ranged weapons + figments, flying, Dex, toys, chaos events | ~2 min |
 | `python -I tools/live/game_test.py --boro` | borough names, looks, HUD chip, banners, discovery | ~1 min |
 | `... --fun` / `--combat` / `--rpg` | street life / monsters, health, guardians / loot, talents | 2-3 min each |
 | `... ` (no flag) | everything (gametest + fun + rpg + combat + hero) | 5-7 min |

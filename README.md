@@ -16,7 +16,7 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
 - **Landing page** (`#landing`): the promise, how it works, everything in the game, the cast, FAQ.
 - **The game** (`#play`, full screen): a move-in screen (name, skin/hair/shirt, then an address search, "use where I am", or six
   featured neighbourhoods in Montréal and New York), then the 3D city. Guests save in the browser.
-- **Quests** (`#quests`): all 173 missions by chapter with status, story, steps and rewards. **Album** (`#album`): 84 stickers in 14
+- **Quests** (`#quests`): all 178 missions by chapter with status, story, steps and rewards. **Album** (`#album`): 84 stickers in 14
   sets plus the photos from photo missions. **Leaderboard** (`#ranks`): net worth, level, blocks, missions.
 
 **In the game:**
@@ -164,6 +164,43 @@ or a camera (smarter, cooler); sneakers for speed or loot boots for armour. Tap 
 green/red numbers for what a swap changes; a pink number on a slot means a choice is waiting. Spare loot (wear, sell, sell
 junk) is one tap away. New shop pieces: snapback cap and sunglasses (clothes shops), fitness band (tech shops). Old saves move
 over by themselves; where a shop piece and a loot piece shared a slot, the loot stays on and the shop piece waits in the wardrobe.
+
+**The chaos update (2026-11-18):** "more unhinged, more colours, creatures, objects everywhere, ranged weapons, ranged enemies,
+flying". Built on game-feel research (screenshake + hit-stop "juice", toy-first sandboxes like Goat Simulator and Untitled
+Goose Game, combo ranks like Tony Hawk and Devil May Cry):
+- **Objects everywhere:** a decor layer on every street and park: flower planters, café tables with striped umbrellas, traffic
+  cone piles, garden gnomes (and gnome gangs), pink lawn flamingos, glowing vending machines, balloon bunches, abandoned couches
+  ("FREE"), porta-potties, shopping carts, fairy rings of giant googly-eyed mushrooms, giant rubber ducks, a pigeon monument,
+  giant donut sculptures, glowing crystals, sunflowers, picnic blankets, chalk drawings (hopscotch, a smiley, "67"), rainbow
+  bunting strung across side streets, rubber ducks and pool rings floating on the water. Most of it can be smashed (couches
+  and vending machines drop coins, porta-potties... let out what was inside).
+- **The sky:** blimps with silly banners ("TOUCH GRASS", "6 7", "THIS BLIMP HAS NO PURPOSE"), hot-air balloons, the odd sky whale.
+- **Mayhem meter:** chain chaos (bonks, smashes, stunts, piñatas, launches, photos) without stopping and climb D → C → B → A →
+  S (Sigma Mayhem) → SS (Certified Brainrot) → SSS (OHIO FINAL BOSS); stop and it cashes in for coins and XP. **Aura**: a meme
+  number that goes up for cool things and down when a seagull gets you.
+- **Ranged weapons** with real projectiles: spitball straw, water balloon launcher (splash), confetti cannon (spread), banana
+  boomerang (comes back), whoopee grenades (stink cloud), T-shirt cannon (people love free merch), rubber chicken launcher
+  (bounces), mustard sniper (pierces), potato cannon, gnome bazooka. Aim helps itself to the figment in front of you.
+- **Ranged and flying figments:** the Spitball gremlin, the Tomato tosser (splat on your screen), the Seagull sniper (flies over
+  you, drops "presents", swoops for your coins) and the Wi-Fi wraith (night; its lag spike makes you buffer). Their shots show a
+  🎯 first; dodge, block, or block right as it lands to send it **back** at them (RETURN TO SENDER).
+- **Flying:** the Bean jetpack (hardware stores; hold Space in the air, fart-powered, refills on the ground) or the Glide-brella
+  (clothes shops), then golden sky hoops to fly through.
+- **Toys:** piñatas (three whacks: candy, coins, sometimes a mimic), giant beach balls to kick and run into, sewer manholes that
+  launch you sky-high, whoopee cushions on the pavement, wacky waving inflatable tube men outside the made-up shops.
+- **Creatures and the Dex:** animal neighbours wander about (squirrels, frogs, an unbothered capybara with an orange on its
+  head, crabs, a duck family that follows you, a cow, a possum that plays dead, and The Snail, who is always slowly coming for
+  you), plus 12 rare "street brainrot" creatures: Sharkini Sneakerini, Bananito Copterino, Frigorifero Camelo, Toastito
+  Flamingo, Croccodilo Croissanto, Gnomo Rocketto, Polpo Cappuccino, Toiletto Turbino, Pizzaro Pigeonelli, Lampo Mothini
+  (night), Sushino Samurino and the legendary golden Capybara Supremo. Snap them with E (❓ on the minimap) to fill the Dex.
+- **12-year-old humour:** B toots (people react, figments get stunned, 67 toots = SIX SEVEN), hide in a porta-potty (figments
+  lose you; you come out with a STINK BOMB), passers-by drop meme lines ("No cap, this street is bussin", "It's giving main
+  character"), kids yell SIX SEVEN.
+- **Six new street events:** Only in Ohio (low gravity), the simulation lags (everyone T-poses), it rains cats and dogs, a
+  cheese meteor shower, the SIX SEVEN crew (E to join), a balloon truck tips over.
+- **Phone → 🤪 Chaos:** aura, best mayhem, the Dex, ranged weapons, flying. Five new missions (Pew Pew Diplomacy, Brainrot
+  Researcher, The Brainrot Thesis, Beans of Glory, Absolutely Unhinged) and twelve achievements (titles: the Aura Farmer,
+  the Unhinged, the Brainrot Professor, the Sixty-Seven).
 
 **For members:** the same game saved to the server (and still in the browser), the **Life** page (`#life`, home after sign-in):
 level, money, net worth, stats, home, love & family, friends, businesses, blocks, stickers, the current mission and the diary.

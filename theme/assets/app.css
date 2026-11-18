@@ -1248,3 +1248,45 @@ anvil-dropzone { display: contents; }
   .ad-players-head { display: none; }
   .ad-player-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
+
+/* ===== the chaos update (cft-chaos.js, 2026-11-18): mayhem meter, jet fuel, splats, lag, the glitch, the Dex ===== */
+.cft-mayhem { display: flex; align-items: center; gap: 8px; background: #1f1a3d; color: #fff; border: 2px solid #1f1a3d; border-radius: 14px; padding: 4px 10px 4px 5px; box-shadow: 3px 3px 0 rgba(0,0,0,.3); max-width: 100%; }
+.cft-mayhem[hidden] { display: none; }
+.cft-mayhem > b { flex: none; min-width: 34px; height: 34px; padding: 0 5px; display: grid; place-items: center; border-radius: 10px; background: #8a86a8; color: #1f1a3d; font: 800 1.15rem/1 var(--font-display); }
+.cft-mayhem > div { display: grid; gap: 3px; min-width: 0; }
+.cft-mayhem span { font: 800 .74rem/1 var(--font-body); letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cft-mayhem em { font: 800 .8rem/1 var(--font-body); font-style: normal; color: #ffc21f; white-space: nowrap; }
+.cft-bar.mh { width: 92px; height: 6px; background: #3a3354; border-color: #000; } .cft-bar.mh > i { background: #ffc21f; transition: width var(--dur-fast) linear; }
+.cft-mayhem[data-r="1"] > b { background: #38bdf8; } .cft-mayhem[data-r="2"] > b { background: #35e06a; } .cft-mayhem[data-r="3"] > b { background: #ffc21f; }
+.cft-mayhem[data-r="4"] > b { background: #ff5c8a; color: #fff; } .cft-mayhem[data-r="5"] > b { background: #9b5cf6; color: #fff; }
+.cft-mayhem[data-r="6"] > b { background: #ff3b30; color: #fff; animation: cft-glow .6s var(--ease-in-out) infinite alternate; }
+.cft-mayhem.up > b { animation: cft-rank var(--dur-slow) var(--ease-out); }
+@keyframes cft-rank { 0% { transform: scale(.5) rotate(-12deg); } 60% { transform: scale(1.3) rotate(6deg); } 100% { transform: scale(1) rotate(0); } }
+.cft-fuel { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.92); border: 2px solid #1f1a3d; border-radius: 999px; padding: 3px 10px 3px 6px; }
+.cft-fuel[hidden] { display: none; }
+.cft-bar.fu { width: 70px; } .cft-bar.fu > i { background: #ff8a3d; transition: width var(--dur-fast) linear; }
+.cft-fuel.low .cft-bar.fu > i { background: #ff3b30; }
+.cft-btns [data-fart] { background: #eaffdf; }
+.cft-chaosfx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.cft-splat { position: absolute; inset: 0; opacity: 0; }
+.cft-splat.tomato { background: radial-gradient(circle at 38% 42%, rgba(232,69,60,.85) 0 9%, transparent 10%), radial-gradient(circle at 60% 55%, rgba(232,69,60,.8) 0 6%, transparent 7%), radial-gradient(circle at 45% 64%, rgba(255,92,80,.75) 0 4%, transparent 5%), radial-gradient(circle at 30% 30%, rgba(232,69,60,.7) 0 3%, transparent 4%); }  /* design-ok: radial-glow (hard-edged tomato drops on the screen, not a glow) */
+.cft-splat.poop { background: radial-gradient(circle at 55% 35%, rgba(240,236,220,.92) 0 8%, transparent 9%), radial-gradient(circle at 62% 42%, rgba(240,236,220,.85) 0 4%, transparent 5%), radial-gradient(circle at 50% 44%, rgba(138,90,43,.6) 0 2%, transparent 3%); }  /* design-ok: radial-glow (a hard-edged splat, not a glow) */
+.cft-splat.go { animation: cft-splat 1.6s var(--ease-out) both; }
+@keyframes cft-splat { 0% { opacity: 0; transform: scale(.7); } 8% { opacity: 1; transform: scale(1.04); } 14% { transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(40px); } }
+.cft-lag { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 8px; background: rgba(31,26,61,.82); color: #fff; padding: 14px 20px; border-radius: 16px; font: 800 1rem var(--font-body); }
+.cft-lag[hidden] { display: none; }
+.cft-lag i { width: 34px; height: 34px; border-radius: 50%; border: 4px solid rgba(255,255,255,.25); border-top-color: #b48cff; animation: cft-spin .7s linear infinite; }
+@keyframes cft-spin { to { transform: rotate(360deg); } }
+.cft-glitch .cft-canvas { animation: cft-glitch .45s steps(3) infinite; }
+@keyframes cft-glitch { 0% { filter: hue-rotate(0deg) saturate(1.4); transform: translateX(0); } 33% { filter: hue-rotate(90deg) saturate(2) contrast(1.2); transform: translateX(-3px); } 66% { filter: hue-rotate(-60deg) saturate(1.6); transform: translateX(3px); } 100% { filter: hue-rotate(0deg); transform: translateX(0); } }
+.cft-dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.cft-dexc { display: grid; justify-items: center; text-align: center; gap: 2px; padding: 8px 6px; border: 2px dashed #b9b2cf; border-radius: 12px; background: #f6f3ff; color: #8a86a8; min-width: 0; }
+.cft-dexc span { font-size: 1.7rem; line-height: 1.1; }
+.cft-dexc b { font: 700 .74rem/1.15 var(--font-body); overflow-wrap: anywhere; }
+.cft-dexc small { font-size: .75rem; }
+.cft-dexc.got { border-style: solid; border-color: #1f1a3d; background: #fff; color: #1f1a3d; }
+.cft-dexc.got.rare { border-color: #38bdf8; box-shadow: 2px 2px 0 #38bdf8; }
+.cft-dexc.got.legendary { border-color: #e8a317; background: #fff7d6; box-shadow: 2px 2px 0 #e8a317; }
+.cft-aura b { font-size: 1.15rem; }
+@media (max-width: 720px) { .cft-mayhem { padding: 3px 8px 3px 4px; } .cft-mayhem > b { min-width: 28px; height: 28px; font-size: .95rem; } .cft-bar.mh { width: 70px; } .cft-fuel .cft-bar.fu { width: 56px; } }
+@media (prefers-reduced-motion: reduce) { .cft-mayhem.up > b, .cft-mayhem[data-r="6"] > b, .cft-glitch .cft-canvas, .cft-lag i { animation: none; } .cft-splat.go { animation-duration: 1.2s; } }

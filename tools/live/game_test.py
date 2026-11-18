@@ -5,6 +5,8 @@
     python -I tools/live/game_test.py --combat [OUTDIR]   only combattest.js (monsters, health, guardians, gear you wear)
     python -I tools/live/game_test.py --hero [OUTDIR]     only herotest.js (speed, block/parry, smashing, borrowed cars, outposts, hype, blips)
     python -I tools/live/game_test.py --heroshots [OUTDIR] no tests: the main character update (graphics, a parry, the hype, an outpost, a wreck, blips, night)
+    python -I tools/live/game_test.py --chaos [OUTDIR]    only chaostest.js (decor, mayhem, ranged weapons + figments, flying, the Dex, toys, events)
+    python -I tools/live/game_test.py --chaosshots [OUTDIR] no tests: the chaos update (decor, critters, brainrot, toys, the sky, a jetpack, ranged fights)
     python -I tools/live/game_test.py --boro [OUTDIR]     only borotest.js (borough names, looks, HUD chip, banners, discovery)
     python -I tools/live/game_test.py --boroshots [OUTDIR] no tests: two boroughs side by side, the chip + banner, the big map with names
     python -I tools/live/game_test.py --rpg [OUTDIR]      only rpgtest.js (loot, talents, rested XP, discovery, reputation, achievements, rares)
@@ -209,8 +211,32 @@ BOROSHOTS = BORO_WAIT + (
     + scene("b5-map", "G.ui.phone('map');", 5, 2000)
 )
 
+# The chaos update (2026-11-18): decor, the Dex line-up, toys, the sky, a jetpack, a ranged fight, the HUD, the phone, night
+CHAOS_PRE = "const C = G.chaos; s.m['c1-couch'] = { s: 'done', done: 1 }; s.money = 5000; s.clock = 11.5; window.CFT_TEST.calm = true;"
+CHAOS = (
+    scene("c1-street", CHAOS_PRE + "const q = W.randomWalkSpot(0, 0, 40, 260, (x, z, sg) => sg.t === 'residential' && sg.w >= 7) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 13;", 300)
+    + scene("c2-park", CHAOS_PRE + "const a = W.findArea(['park', 'grass', 'playground', 'plaza'], 1500) || { x: 0, z: 0 }; W.teleport(a.x, a.z); W.cam.pitch = 0.5; W.cam.dist = W.cam.cur = 24;", 300)
+    + scene("c3-dex", CHAOS_PRE + "const q = W.randomWalkSpot(0, 0, 40, 260, (x, z, sg) => sg.car && sg.w >= 10) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); const fx = -Math.sin(q.yaw), fz = -Math.cos(q.yaw), sx = -fz, sz = fx;"
+          "CFT_DATA.CHAOS.BRAINROT.forEach((b, i) => { const r = C.spawnRot(b.id, p.x + fx * 9 + sx * (i - 5.5) * 2.4, p.z + fz * 9 + sz * (i - 5.5) * 2.4); r.wait = 99; r.life = 999; r.tx = r.x; r.tz = r.z; r.obj.rotation.y = q.yaw + Math.PI; });"
+          "CFT_DATA.CHAOS.CRITTERS.forEach((b, i) => { const c = C.spawnCritter(b.id, p.x + fx * 5 + sx * (i - 3.5) * 1.8, p.z + fz * 5 + sz * (i - 3.5) * 1.8); c.d = Object.assign({}, c.d, { speed: 0, flee: 0, follow: false }); c.obj.rotation.y = q.yaw + Math.PI; });"
+          "W.cam.pitch = 0.18; W.cam.dist = W.cam.cur = 6;", 20)
+    + scene("c4-toys", CHAOS_PRE + "for (const r of C.rot.slice()) { r.life = 0; } for (const c of C.critters.slice()) c.x += 500; const q = W.randomWalkSpot(0, 0, 60, 300, (x, z, sg) => sg.car && sg.w >= 10) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); const fx = -Math.sin(q.yaw), fz = -Math.cos(q.yaw), sx = -fz, sz = fx;"
+          "C.spawnPinata(p.x + fx * 8 - sx * 4, p.z + fz * 8 - sz * 4, q.yaw + 1.2); C.spawnBall(p.x + fx * 5 + sx * 2, p.z + fz * 5 + sz * 2); C.spawnHole(p.x + fx * 6, p.z + fz * 6); C.spawnCushion(p.x + fx * 3 - sx * 1.5, p.z + fz * 3 - sz * 1.5); C.spawnTube(p.x + fx * 9 + sx * 5, p.z + fz * 9 + sz * 5); C.spawnTube(p.x + fx * 12 - sx * 6, p.z + fz * 12 - sz * 6);"
+          "W.cam.pitch = 0.2; W.cam.dist = W.cam.cur = 7;", 30)
+    + scene("c5-sky", CHAOS_PRE + "const fx = -Math.sin(W.player.face), fz = -Math.cos(W.player.face), sx = -fz, sz = fx, g = W.groundAt(p.x, p.z); C.spawnSky('blimp', p.x + fx * 70 - sx * 25, g + 34, p.z + fz * 70 - sz * 25); C.spawnSky('balloon', p.x + fx * 45 + sx * 22, g + 26, p.z + fz * 45 + sz * 22); C.spawnSky('whale', p.x + fx * 110 + sx * 10, g + 48, p.z + fz * 110 + sz * 10); C.spawnSky('balloon', p.x + fx * 60 + sx * 45, g + 38, p.z + fz * 60 + sz * 45);"
+          "W.cam.pitch = -0.12; W.cam.dist = W.cam.cur = 6;", 10)
+    + scene("c6-jetpack", CHAOS_PRE + "s.owned.jetpack = true; G.wearShop('jetpack'); W.input.jump = true; W.input.hold = true; G.stepSim(40); W.input.hold = false; W.cam.pitch = 0.1; W.cam.dist = W.cam.cur = 7;", 4)
+    + scene("c7-fight", CHAOS_PRE + "W.input.hold = false; for (let i = 0; i < 120 && !W.player.grounded; i++) G.stepSim(1); s.owned.w_tshirt = true; s.equip.weapon = 'w_tshirt'; G.rpg.unequip('weapon'); const fx = -Math.sin(W.player.face), fz = -Math.cos(W.player.face), sx = -fz, sz = fx;"
+          "const a = G.fun.spawnMonster('tomato', p.x + fx * 9 - sx * 3, p.z + fz * 9 - sz * 3, { event: 300 }), b = G.fun.spawnMonster('gull', p.x + fx * 6 + sx * 3, p.z + fz * 6 + sz * 3, { event: 300 }), c = G.fun.spawnMonster('spitter', p.x + fx * 12 + sx * 1, p.z + fz * 12 + sz * 1, { event: 300 }), d = G.fun.spawnMonster('wifi', p.x + fx * 10 + sx * 6, p.z + fz * 10 + sz * 6, { event: 300 });"
+          "for (const m of [a, b, c, d]) m.stun = 2; G.stepSim(12); for (let i = 0; i < 9; i++) C.add('smash'); G.attack(); G.stepSim(4); c.rcd = 0; W.cam.pitch = 0.22; W.cam.dist = W.cam.cur = 9;", 8)
+    + scene("c8-phone", CHAOS_PRE + "s.chaos.dex.sharkini = 1; s.chaos.dex.capy = 1; s.chaos.dex.frog = 2; s.chaos.dex.toiletto = 1; G.ui.phone('chaos');", 3, 2000)
+    + scene("c9-night", CHAOS_PRE + "G.ui.closeAll(); s.clock = 23; const a = W.findArea(['park', 'grass', 'plaza'], 800) || { x: 0, z: 0 }; W.teleport(a.x, a.z); G.fun.spawnMonster('wifi', a.x + 5, a.z - 6, { event: 300 }); C.spawnRot('lampo', a.x - 3, a.z - 7); W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 14;", 60)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
+elif "--chaosshots" in flags:
+    steps = START + CHAOS
 elif "--boroshots" in flags:
     steps = START + BOROSHOTS
 elif "--shots" in flags:
@@ -237,6 +263,8 @@ else:
         steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
     elif "--boro" in flags:
         steps += script("borotest.js", "__boroDone", "__boroOut", 300000)
+    elif "--chaos" in flags:
+        steps += script("chaostest.js", "__chaosDone", "__chaosOut", 600000)
     else:
         if "--fun" not in flags:
             steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
@@ -246,6 +274,7 @@ else:
             steps += script("combattest.js", "__cmbDone", "__cmbOut", 500000)
             steps += script("herotest.js", "__heroDone", "__heroOut", 600000)
             steps += script("borotest.js", "__boroDone", "__boroOut", 300000)
+            steps += script("chaostest.js", "__chaosDone", "__chaosOut", 600000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"
@@ -262,13 +291,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

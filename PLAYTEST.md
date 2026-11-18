@@ -16,7 +16,8 @@ many compliments").
 Areas: movement · camera · rides/cars · smashing · combat · blocking/parry · monsters · health · guardians · outposts ·
 hype/compliments · swagger · mission letters/arrow · minimap · missions/story · dialog · sweethearts · street folk ·
 pranks · events · loot/gear · talents/rep · your look · people/traffic · shops · business/turf/homes · HUD/buttons ·
-phone · buildings/graphics · day/night · performance · sound · saving · pages (Life, Quests...)
+phone · buildings/graphics · day/night · performance · sound · saving · pages (Life, Quests...) · decor · mayhem/aura ·
+ranged weapons · shooters/flyers · jetpack/glide · toys · critters/Dex · fart/potty · chaos events · sky
 
 ## Open
 

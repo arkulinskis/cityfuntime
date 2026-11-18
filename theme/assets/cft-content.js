@@ -1502,6 +1502,149 @@ S('s-liberator', 'The Liberator', 'bouchard', 'community', { m: ['s-morning-rush
   [{ do: 'count', key: 'liberated', n: 5, text: 'Liberate 5 outposts (🍩 or 🛒)' }],
   ['Bouchard: The mayor wants to give you a medal. I told her you\'d want a double-double instead.'], { money: 300, xp: 700, stats: { cred: 2, charm: 1 }, rel: { bouchard: 15 } });
 
+// ======================================================== the chaos update (2026-11-18): cft-chaos.js
+// The user: "more unhinged, more colours, creatures, objects everywhere... weird, cool, surprising, dank, meme worthy...
+// 12 year old humour is on the table. Ranged weapons, ranged enemies, flying." Tone rules still hold: cartoon, never cruel,
+// nobody is mocked for who they are, the jokes are farts, gnomes, geese and seagulls.
+
+// Ranged weapons: weapon.ranged = 'proj' fires a real projectile (cft-chaos.js fire): proj = what flies, reach = range for aiming,
+// rate = seconds between shots, speed = m/s, lob = arcs (aims for the target's distance), splash = metres of area damage,
+// pellets + spread = a spread of shots, bounce = bounces, pierce = goes through this many, back = comes back (boomerang).
+Object.assign(D.ITEMS, {
+  w_straw: { n: 'Spitball straw', e: '🥤', p: 15, type: 'gear', slot: 'weapon', weapon: { dmg: 0.8, reach: 16, knock: 2, ranged: 'proj', proj: 'spit', rate: 0.32, speed: 24, mesh: 'straw', word: 'PTOO!', puff: '💦' } },
+  w_balloon: { n: 'Water balloon launcher', e: '🎈', p: 160, type: 'gear', slot: 'weapon', weapon: { dmg: 1.4, reach: 22, knock: 5, stun: 0.8, ranged: 'proj', proj: 'balloon', rate: 0.55, speed: 19, lob: true, splash: 3, mesh: 'launcher', word: 'SPLOOSH!', puff: '💦' } },
+  w_confetti: { n: 'Confetti cannon', e: '🎉', p: 280, type: 'gear', slot: 'weapon', weapon: { dmg: 0.7, reach: 15, knock: 3, ranged: 'proj', proj: 'confetti', pellets: 6, spread: 0.35, rate: 0.7, speed: 26, mesh: 'popper', word: 'PARTY!', puff: '🎊' } },
+  w_boomerang: { n: 'Banana boomerang', e: '🍌', p: 240, type: 'gear', slot: 'weapon', weapon: { dmg: 1.6, reach: 18, knock: 4, ranged: 'proj', proj: 'boomerang', rate: 0.9, speed: 20, back: true, mesh: 'boomer', word: 'BANANA!', puff: '🍌' } },
+  w_whoopee: { n: 'Whoopee grenades', e: '💨', p: 220, type: 'gear', slot: 'weapon', weapon: { dmg: 1.0, reach: 18, knock: 2, stun: 2.5, ranged: 'proj', proj: 'whoopee', rate: 1.0, speed: 15, lob: true, splash: 4.5, mesh: 'grenade', word: 'BRAAAP!', puff: '💨' } },
+  w_tshirt: { n: 'T-shirt cannon', e: '👕', p: 420, type: 'gear', slot: 'weapon', weapon: { dmg: 2.2, reach: 26, knock: 14, ranged: 'proj', proj: 'tshirt', rate: 0.8, speed: 28, mesh: 'cannon', word: 'FREE MERCH!', puff: '👕' } },
+  w_chickenl: { n: 'Rubber chicken launcher', e: '🐔', p: 520, type: 'gear', slot: 'weapon', req: { lvl: 3 }, weapon: { dmg: 1.8, reach: 20, knock: 6, stun: 1.5, ranged: 'proj', proj: 'chicken', bounce: 3, rate: 0.75, speed: 20, lob: true, mesh: 'chickenl', word: 'BAWK!', puff: '🪶' } },
+  w_mustard: { n: 'Mustard sniper', e: '🌭', p: 700, type: 'gear', slot: 'weapon', req: { lvl: 4 }, weapon: { dmg: 4.5, reach: 45, knock: 6, ranged: 'proj', proj: 'mustard', rate: 1.1, speed: 60, pierce: 3, mesh: 'sniper', word: 'MUSTARD!', puff: '🌭' } },
+  w_potato: { n: 'Potato cannon', e: '🥔', p: 600, type: 'gear', slot: 'weapon', weapon: { dmg: 3, reach: 30, knock: 12, stun: 1, ranged: 'proj', proj: 'potato', rate: 1.1, speed: 24, lob: true, splash: 3.5, mesh: 'potato', word: 'KA-SPUD!', puff: '🥔' } },
+  w_gnome: { n: 'Gnome bazooka', e: '🍄', p: 1500, type: 'gear', slot: 'weapon', req: { lvl: 8 }, weapon: { dmg: 6, reach: 35, knock: 16, stun: 1.5, ranged: 'proj', proj: 'gnome', rate: 1.6, speed: 22, lob: true, splash: 5.5, mesh: 'gnomezooka', word: 'GNOMED!', puff: '🍄' } },
+  // flying (back slot, so it's a choice against a backpack or a lucky sock): hold Space in the air
+  jetpack: { n: 'Bean jetpack', e: '🫘', p: 900, type: 'gear', slot: 'back', req: { lvl: 3 }, fly: 'jet', stats: { style: 1 } },
+  glidebrella: { n: 'Glide-brella', e: '☂️', p: 180, type: 'gear', slot: 'back', fly: 'glide', stats: { style: 1 } },
+});
+D.KINDS.fastfood.sells.push('w_straw', 'w_mustard');
+D.KINDS.toys.sells.push('w_balloon', 'w_chickenl');
+D.KINDS.gift.sells.push('w_confetti', 'w_whoopee');
+D.KINDS.grocery.sells.push('w_boomerang');
+D.KINDS.clothes.sells.push('w_tshirt', 'glidebrella');
+D.KINDS.hardware.sells.push('w_potato', 'w_gnome', 'jetpack');
+
+// Ranged and flying figments. ranged: {r range, cd [min, max] seconds between shots, proj, dmg, speed, lob (arcs), drop (falls
+// from above), slow (seconds of "buffering")}; fly = metres above the street (you need something ranged, or a jetpack, to reach it).
+Object.assign(D.MONSTERS, {
+  spitter: { n: 'Spitball gremlin', e: '🤢', hp: 2.5, speed: 3.6, atk: 4, steal: [0, 0], coins: [4, 7], xp: 20, w: 6, ranged: { r: 15, cd: [1.8, 2.8], proj: 'spit', dmg: 5, speed: 17 } },
+  tomato: { n: 'Tomato tosser', e: '🍅', hp: 3, speed: 3.2, atk: 5, steal: [0, 0], coins: [5, 8], xp: 24, w: 5, ranged: { r: 18, cd: [2.2, 3.2], proj: 'tomato', dmg: 6, speed: 14, lob: true } },
+  gull: { n: 'Seagull sniper', e: '🕊️', hp: 2, speed: 6.2, atk: 4, steal: [1, 3], coins: [4, 7], xp: 22, w: 5, fly: 5.5, ranged: { r: 14, cd: [2.0, 3.0], proj: 'poop', dmg: 3, drop: true } },
+  wifi: { n: 'Wi-Fi wraith', e: '📶', hp: 3.5, speed: 3.4, atk: 5, steal: [0, 0], coins: [6, 9], xp: 28, w: 3, night: true, fly: 3.2, ranged: { r: 20, cd: [2.5, 3.5], proj: 'lag', dmg: 5, speed: 22, slow: 2.5 } },
+});
+Object.assign(D.CITY_MONSTERS.montreal, { spitter: 'Slush Spitter', tomato: 'Marché Tomato', gull: 'Old Port Gull', wifi: 'Dépanneur Wi-Fi Wraith' });
+Object.assign(D.CITY_MONSTERS.newyork, { spitter: 'Hot-Dog Cart Spitter', tomato: 'Broadway Tomato', gull: 'Coney Island Gull', wifi: 'Free-Wi-Fi Wraith' });
+Object.assign(D.CITY_MONSTERS.paris, { spitter: 'Gargouille Spitter', tomato: 'Tomate du Marché', gull: 'Seine Gull', wifi: 'Café Wi-Fi Wraith' });
+Object.assign(D.CITY_MONSTERS.london, { spitter: 'Puddle Spitter', tomato: 'Market Tomato', gull: 'Chip-Thief Gull', wifi: 'Pub Wi-Fi Wraith' });
+Object.assign(D.CITY_MONSTERS.riga, { spitter: 'Kvass Spitter', tomato: 'Central Market Tomato', gull: 'Daugava Gull', wifi: 'Old Town Wi-Fi Wraith' });
+Object.assign(D.CITY_MONSTERS.tokyo, { spitter: 'Ramune Spitter', tomato: 'Konbini Tomato', gull: 'Harbour Gull', wifi: 'Pocket Wi-Fi Wraith' });
+Object.assign(D.MONSTER_LOCAL, {
+  spitter: ['Spitball Gremlin', 'Goo Gobbler', 'Loogie Goblin', 'Puddle Spitter'], tomato: ['Tomato Tosser', 'Splat Goblin', 'Ketchup Imp', 'Saucy Gremlin'],
+  gull: ['Seagull Sniper', 'Chip Thief', 'Sky Bomber', 'Gull of Grudges'], wifi: ['Wi-Fi Wraith', 'Router Ghost', 'Buffering Phantom', 'Lag Spectre'],
+});
+D.MONSTER_LINES.push('Ptoo!', 'Incoming!', 'One bar of signal...', 'SKRAAA!', 'Catch!');
+
+D.EVENTS.push(
+  { id: 'ohio', n: '🌀 Only in Ohio...', sub: 'Gravity just clocked out for a bit. Jump!', w: 3, chaos: true },
+  { id: 'glitch', n: '🖥️ The simulation is lagging', sub: 'Everyone froze in a T-pose. Reality.exe has stopped responding.', w: 3, chaos: true },
+  { id: 'catsdogs', n: '🐈 It\'s raining cats and dogs!', sub: 'Literally. Walk into them for a mood boost.', w: 3, chaos: true, day: true },
+  { id: 'cheese', n: '🧀 Cheese meteor shower!', sub: 'Big wedges falling from the sky. Grab them for coins. Mind your head.', w: 3, chaos: true },
+  { id: 'sixseven', n: '🖐️ SIX SEVEN!', sub: 'The kids of the block found you. Press E to join in.', w: 3, chaos: true, day: true },
+  { id: 'balloons', n: '🎈 A balloon truck tipped over!', sub: 'Balloons drifting up everywhere. Pop them (F, or shoot them) for coins.', w: 3, chaos: true },
+);
+
+// Everything else the chaos update needs (cft-chaos.js)
+D.CHAOS = {
+  // the mayhem meter: chain chaos without stopping; [points, letter, name]
+  RANKS: [[0, 'D', 'Dull'], [150, 'C', 'Chaotic'], [400, 'B', 'Bonkers'], [900, 'A', 'Absolutely Unhinged'], [1800, 'S', 'Sigma Mayhem'], [3200, 'SS', 'Certified Brainrot'], [5500, 'SSS', 'OHIO FINAL BOSS']],
+  POINTS: { kill: 60, bigKill: 200, parry: 120, dodge: 30, block: 10, smash: 40, wreck: 150, combo: 25, hit: 15, pinata: 120, ball: 40, launch: 80, hoop: 70, photo: 150, fart: 30, stink: 90, peel: 50, bounce: 40, reflect: 200, air: 12, cushion: 45 },
+  // aura: a number that only goes up for cool things (and down for very uncool ones). Purely for the meme.
+  AURA: { kill: 10, bigKill: 100, parry: 50, reflect: 150, photo: 100, legendary: 1000, mission: 500, level: 250, hoop: 30, rankS: 670, rankSSS: 6700, stink: 67,
+    poop: -100, blackout: -1000, tomato: -50, lag: -25, peel: 20 },
+  CHATTER: ['No cap, this street is bussin.', 'It\'s giving main character.', 'Sheeeesh.', 'W neighbourhood.', 'The rizz on this city is unreal.', 'POV: you walk past an NPC. I\'m the NPC.',
+    'Ate and left no crumbs.', 'Sigma grindset: buy one (1) baguette.', 'This is lowkey peak.', 'Who put a duck on that car?', 'The gnomes are watching. Always.', 'I sold my couch to a raccoon.',
+    '+1000 aura for that outfit.', 'My Wi-Fi is haunted again.', 'Did that seagull just aim at me?', 'Ohio vibes today.', 'Mewing. Do not disturb.', 'Why is the sky full of blimps?',
+    'That porta-potty has been occupied since Tuesday.', 'Touch grass? I AM the grass.', 'That pigeon has more aura than me.', 'Bro just spawned in.', 'I saw a shark wearing sneakers. I\'m fine.',
+    'Somebody fired a T-shirt at me. Free shirt though.', 'The capybara in the park is my therapist.', 'My mushroom friend has googly eyes now.', 'Skill issue. Mine, not yours.', 'This city is unhinged and I love it.'],
+  KIDS: ['SIX SEVEN!', '6 7!!', 'SIX... SEVEEEN!', 'six seven six seven', '67!!!', 'Six seven? SIX SEVEN!'],
+  FART: ['EW!', 'Who did that?!', 'Bro...', 'My eyes are watering!', 'Was that a duck?', 'Respectfully: no.', 'I can taste it.', '10/10, no notes.', 'The audacity!', 'Sir, this is a sidewalk.', 'Biohazard!'],
+  FART_WORDS: ['*PFFFRT*', 'BRAAAP!', '*toot*', 'THHHPPPT!', 'PRRRRP!', '*squeak*'],
+  BLIMPS: ['BUY MORE BANANAS', 'YOU ARE THE MAIN CHARACTER', 'TOUCH GRASS', '6 7', 'STAY HYDRATED', 'THIS BLIMP HAS NO PURPOSE', 'HONK IF YOU LOVE GEESE', 'NO CAP', 'SEND SNACKS', 'AURA +1000', 'BEWARE OF GULLS', 'MOM, I\'M ON A BLIMP'],
+  POTTY: ['*grunting noises*', 'OCCUPIED!!', 'Five more minutes!', 'Who\'s there?', 'I live here now.', '*flush* ...*flush*'],
+  // Street brainrot: rare made-up creatures to photograph (📸 E). rar: common | rare | legendary; fly: hovers; night: only after dark
+  BRAINROT: [
+    { id: 'sharkini', n: 'Sharkini Sneakerini', e: '🦈', rar: 'common', line: 'A shark that bought sneakers and never looked back.', say: ['Sneakerini!', '*squeak squeak*', 'Chomp-chomp, fresh kicks.'] },
+    { id: 'bananito', n: 'Bananito Copterino', e: '🍌', rar: 'common', fly: true, line: 'A banana with a propeller. Nobody asked how.', say: ['Wop-wop-wop!', 'Banana in the sky!', 'Potassium AIRLINES!'] },
+    { id: 'frigo', n: 'Frigorifero Camelo', e: '🐪', rar: 'common', line: 'Half fridge, half camel. Keeps your drinks cold across the desert.', say: ['Brrr-ummm.', '*hum of a fridge*', 'Got milk?'] },
+    { id: 'toastito', n: 'Toastito Flamingo', e: '🦩', rar: 'common', line: 'A flamingo with a toaster for a body. Pops toast when startled.', say: ['*POP*', 'Toast?', 'Crispy on one leg.'] },
+    { id: 'croissanto', n: 'Croccodilo Croissanto', e: '🥐', rar: 'rare', line: 'A crocodile, but laminated. 27 buttery layers of danger.', say: ['Flaky!', 'Snap... crunch.', 'Bonjour, snack.'] },
+    { id: 'gnomo', n: 'Gnomo Rocketto', e: '🚀', rar: 'rare', fly: true, line: 'A garden gnome who quit the garden. Now he does loops.', say: ['WHEEEE!', 'Off to space!', 'The garden can\'t hold me!'] },
+    { id: 'polpo', n: 'Polpo Cappuccino', e: '🐙', rar: 'common', line: 'An octopus living in a giant coffee cup. Eight arms, zero sleep.', say: ['Extra shot?', '*slurp*', 'I have 8 arms and 0 chill.'] },
+    { id: 'toiletto', n: 'Toiletto Turbino', e: '🚽', rar: 'rare', fly: true, line: 'A toilet with two rocket boosters. Flushes at Mach 2.', say: ['*FLUSHHH*', 'VROOOM-gurgle!', 'Sky plumbing!'] },
+    { id: 'pizzaro', n: 'Pizzaro Pigeonelli', e: '🍕', rar: 'common', fly: true, line: 'A pigeon whose wings are two slices of pizza. Extra cheese, extra coo.', say: ['Coo-capricciosa!', 'Pepperoni coo!', '*flap flap drip*'] },
+    { id: 'lampo', n: 'Lampo Mothini', e: '💡', rar: 'rare', fly: true, night: true, line: 'A moth that finally caught a lamp. Do not separate them.', say: ['LAMP.', 'Bright... so bright...', 'Mine. Forever.'] },
+    { id: 'sushi', n: 'Sushino Samurino', e: '🍣', rar: 'common', line: 'A sushi roll with a headband and an unshakeable sense of honour.', say: ['Hai!', 'Wasabi strike!', 'Rolling!'] },
+    { id: 'capy', n: 'Capybara Supremo', e: '👑', rar: 'legendary', line: 'The golden capybara. Unbothered. Moisturised. In its lane.', say: ['...', '*vibes*', '*chews grass with authority*'] },
+  ],
+  // ordinary neighbours who happen to be animals: they wander about, some follow you; they're in the Dex too
+  CRITTERS: [
+    { id: 'squirrel', n: 'Squirrel', e: '🐿️', speed: 5.5, flee: 6, say: ['*chitter*', 'NUT?', 'Not now, I\'m busy!'] },
+    { id: 'frog', n: 'Frog', e: '🐸', speed: 2.5, hop: true, flee: 4, say: ['Ribbit.', 'Ribbit?', '*judges you*'] },
+    { id: 'capybara', n: 'Capybara', e: '🦫', speed: 0.6, flee: 0, say: ['*unbothered*', 'Chillin\'.', '*vibes*'] },
+    { id: 'crab', n: 'Crab', e: '🦀', speed: 2.2, sideways: true, flee: 3, say: ['🦀 🦀 🦀', '*clack clack*', 'Crab rave time.'] },
+    { id: 'snail', n: 'The Snail', e: '🐌', speed: 0.35, follow: true, flee: 0, say: ['I\'m coming for you.', '...slowly.', 'You can\'t outrun me forever.'] },
+    { id: 'duck', n: 'Duck family', e: '🦆', speed: 2.6, follow: true, flee: 0, say: ['Quack!', 'Quack quack!', '*waddle waddle*'] },
+    { id: 'cow', n: 'A cow? Here?', e: '🐄', speed: 0.9, flee: 0, say: ['Moo?', 'Moooo.', 'I live here, actually.'] },
+    { id: 'possum', n: 'Possum', e: '🐀', speed: 2.8, flee: 5, dead: true, say: ['*plays dead*', 'Hiss!', 'I\'m not here.'] },
+  ],
+  TUBE_COLS: [0xff5c8a, 0xffc21f, 0x35e06a, 0x38bdf8, 0x9b5cf6, 0xff8a3d, 0xe8453c],
+  PINATA_COLS: [0xff5c8a, 0xffc21f, 0x35e06a, 0x38bdf8, 0x9b5cf6],
+};
+
+// Missions for the chaos update (givers who already know you, at their usual spots)
+S('s-pew', 'Pew Pew Diplomacy', 'bouchard', 'community', { m: ['s-morning-rush'] }, ['Bouchard: Citizen. Figments have started throwing things. Tomatoes. Goo. And the seagulls... I won\'t say what the seagulls throw.',
+  'Bouchard: Time to fight fire with water balloons. Get something that shoots and show them.'],
+  [{ do: 'count', key: 'shots', n: 20, text: 'Fire a ranged weapon 20 times (toy shops sell water balloon launchers 🎈, fast food places sell spitball straws 🥤)' }, { do: 'count', key: 'bonk_gull', n: 3, text: 'Bonk 3 seagull snipers out of the sky 🕊️' }],
+  ['Bouchard: The skies are safe. My hat is not. Never mind my hat.'], { money: 220, xp: 450, stats: { cred: 1 }, rel: { bouchard: 10 } });
+S('s-brainrot', 'Brainrot Researcher', 'okafor', 'library', { lvl: 3 }, ['Okafor: I have a paper to write and I need data. There are... creatures. A shark in sneakers. A banana with a propeller. I am not making this up.',
+  'Okafor: Photograph them for me. When one is close, press E. Science thanks you.'],
+  [{ do: 'count', key: 'dex', abs: true, n: 4, text: 'Photograph 4 different creatures for the Dex (📸 E when one is close; the ❓ on the minimap)' }],
+  ['Okafor: Fascinating. Deeply upsetting, but fascinating. Keep going if you like: the Dex is on your phone.'], { money: 200, xp: 500, stats: { smarts: 2 }, rel: { okafor: 12 } });
+S('s-brainrot2', 'The Brainrot Thesis', 'okafor', 'library', { m: ['s-brainrot'] }, ['Okafor: The faculty laughed at me. They will not laugh at ten creatures. Find me more. The golden capybara is said to exist...'],
+  [{ do: 'count', key: 'dex', abs: true, n: 10, text: 'Fill the Dex with 10 creatures (rare ones fly, some only come out at night)' }],
+  ['Okafor: Published. Peer-reviewed by a frog. I owe you a footnote.'], { money: 500, xp: 1200, stats: { smarts: 3 }, rel: { okafor: 15 } });
+S('s-beans', 'Beans of Glory', 'max', 'home', { m: ['s-hold-line'] }, ['Max: So a guy at the hardware store built a jetpack that runs on beans. Just beans. I need someone brave. Or someone who likes beans.',
+  'Max: Or a glide-brella from a clothes shop, if you\'re a coward. A stylish coward.'],
+  [{ do: 'count', key: 'airtime', n: 30, text: 'Spend 30 seconds flying: a Bean jetpack 🫘 (hardware) or a Glide-brella ☂️ (clothes), hold Space in the air' }, { do: 'count', key: 'hoops', n: 5, text: 'Fly through 5 golden sky hoops ⭕ (they appear once you can fly)' }],
+  ['Max: You smell like a burrito and you look like a legend. Respect.'], { money: 300, xp: 600, stats: { fit: 1, style: 1 }, rel: { max: 10 } });
+S('s-unhinged', 'Absolutely Unhinged', 'kai', 'park', { m: ['s-wrecking-ball'] }, ['Kai: Okay. Smashing one thing is cute. Smashing EVERYTHING in one go? That\'s art. Watch the meter at the top.',
+  'Kai: Keep the chaos going without stopping: bonk, smash, fly, launch, pop. Hit rank A. Then S.'],
+  [{ do: 'count', key: 'rankA', n: 1, text: 'Reach mayhem rank A (Absolutely Unhinged): chain chaos without a break' }, { do: 'count', key: 'rankS', n: 1, text: 'Now reach rank S (Sigma Mayhem)' }],
+  ['Kai: That was the most beautiful thing I\'ve ever seen. A gnome is still in orbit.'], { money: 350, xp: 700, stats: { cred: 2 }, rel: { kai: 12 } });
+
+D.RPG.ACH.push(
+  { id: 'aura1', cat: 'Chaos', e: '😎', n: 'Aura Farmer', d: 'Collect 1,000 aura', k: 'aura', c: 1000, pts: 10 },
+  { id: 'aura2', cat: 'Chaos', e: '🌌', n: 'Infinite Aura', d: 'Collect 10,000 aura', k: 'aura', c: 10000, pts: 25, title: 'the Aura Farmer' },
+  { id: 'rankS', cat: 'Chaos', e: '🌀', n: 'Sigma Mayhem', d: 'Reach mayhem rank S', k: 'rankS', c: 1, pts: 10 },
+  { id: 'rankSSS', cat: 'Chaos', e: '🤯', n: 'Ohio Final Boss', d: 'Reach mayhem rank SSS', k: 'rankSSS', c: 1, pts: 25, title: 'the Unhinged' },
+  { id: 'dex6', cat: 'Chaos', e: '📸', n: 'Brainrot Scholar', d: 'Photograph 6 creatures', k: 'dex', c: 6, pts: 10 },
+  { id: 'dex20', cat: 'Chaos', e: '🎓', n: 'Gotta Snap Them All', d: 'Photograph all 20 creatures', k: 'dex', c: 20, pts: 50, title: 'the Brainrot Professor' },
+  { id: 'farts', cat: 'Chaos', e: '💨', n: 'Six Seven', d: 'Toot 67 times (B)', k: 'farts', c: 67, pts: 10, title: 'the Sixty-Seven' },
+  { id: 'hoops', cat: 'Chaos', e: '⭕', n: 'Ring Master', d: 'Fly through 25 sky hoops', k: 'hoops', c: 25, pts: 10 },
+  { id: 'shots', cat: 'Chaos', e: '🎯', n: 'Pew Pew Pew', d: 'Fire 500 shots', k: 'shots', c: 500, pts: 10 },
+  { id: 'reflect', cat: 'Chaos', e: '🔁', n: 'Return to Sender', d: 'Parry 10 projectiles back at whoever threw them', k: 'reflects', c: 10, pts: 25 },
+  { id: 'pinatas', cat: 'Chaos', e: '🪅', n: 'Piñata Party', d: 'Pop 20 piñatas', k: 'pinatas', c: 20, pts: 10 },
+  { id: 'gnomes', cat: 'Chaos', e: '🍄', n: 'Gnome Liberation Front', d: 'Smash 25 garden gnomes', k: 'smash_gnome', c: 25, pts: 10 },
+);
+
 // ======================================================== D.TUNE: the knobs (2026-11-17)
 // Every balance number a play-test note is likely to touch lives here: change it here, not in the engine files.
 // (Speeds of you and your rides: D.WALK / D.VEHICLES above. Prices: D.ITEMS. Monster stats: D.MONSTERS.)
@@ -1547,6 +1690,17 @@ D.TUNE = {
   smash: {                        // cft-world.js / cft-fun.js
     hp: { bin: 1, box: 1, hydrant: 2, bench: 2, lamp: 3, tree: 3, car: 4, van: 5 },   // hits (x weapon) to break
     weaponMul: 2.2,               // how hard a swing hits things (x weapon damage)
+  },
+  chaos: {                        // cft-chaos.js (2026-11-18)
+    comboT: 4.5,                  // seconds without new chaos before the mayhem meter cashes in
+    critters: 6, crittersLow: 3,  // animal neighbours around you
+    brainrot: [40, 75],           // seconds between rare creatures (one or two out at a time)
+    pinatas: 4, balls: 3, manholes: 3, cushions: 4, tubes: 5,   // toys around you (within ~150 m)
+    chatter: [5, 9],              // seconds between meme lines from passers-by
+    jetFuel: 7, jetThrust: 40, jetUp: 10, jetRefill: 0.35,      // jetpack: seconds of thrust, push, top climb speed, refill per second on the ground (share)
+    glideFall: 2.2, glideSpeed: 1.25,                           // glide-brella: fall speed, speed boost
+    hitstop: { kill: 0.05, big: 0.12, parry: 0.1 },             // seconds the action freezes on a hit (juice)
+    enemyShots: 1,                // enemy projectile damage multiplier
   },
   world: { peds: 44, pedsLow: 22, cars: 20, carsLow: 9 },   // people and traffic around you (cft-world.js)
 };

@@ -498,6 +498,93 @@ varying float vGL; varying vec2 vGUV;
   const shared = g => { SHARED.add(g); return g; };
   const propGeo = fn => { const m = new Merge(); fn(m); return shared(m.build()); };
 
+  // ---- the decor layer (2026-11-18, "more colours, objects everywhere, fill the empty spaces"): colourful junk, plastic
+  // wildlife and silly monuments on pavements, in parks and plazas, floating on the water, flags strung across side
+  // streets. DECOR[kind] = {a, b, glow}: a = the part tinted per instance (drawn white, MAT.tint), b = the part with its own
+  // colours (MAT.decor), glow = unlit colours (MAT.dglow: crystals, a vending machine's front). Placed by layDecor, drawn
+  // by decorInst in buildSub. Kinds in DECOR_HP can be smashed like street furniture (W.hitProp); small ones only show
+  // within LOD_R (DECOR_HI). Everything faces -z and stands on y = 0.
+  const TORUS = new THREE.TorusGeometry(1, 0.42, 8, 18).toNonIndexed();
+  const TRI = new THREE.CylinderGeometry(0.5, 0.5, 1, 3).toNonIndexed();
+  const DECOR = (() => {
+    const W1 = 0xffffff, out = {}, mk = fn => { const m = new Merge(); fn(m); return m.p.length ? shared(m.build()) : null; };
+    const def = (k, a, b, glow) => { out[k] = { a: a ? mk(a) : null, b: b ? mk(b) : null, glow: glow ? mk(glow) : null }; };
+    const RAIN = [0xff5c8a, 0xffc21f, 0x35e06a, 0x38bdf8, 0x9b5cf6, 0xff8a3d];
+    const eye = (m, x, y, z, r) => { m.add(SPHERE, 0xffffff, x, y, z, 0, 0, 0, r, r, r); m.add(SPHERE, 0x111111, x, y, z - r * 0.36, 0, 0, 0, r * 0.5, r * 0.5, r * 0.4); };  // (the monsters' one is declared later)
+    def('planter', m => { m.add(CYL, W1, 0, 0.36, 0, 0, 0, 0, 1.15, 0.72, 1.15); m.add(CYL, W1, 0, 0.74, 0, 0, 0, 0, 1.25, 0.1, 1.25); },
+      m => { m.add(CYL, 0x5b4030, 0, 0.78, 0, 0, 0, 0, 1.08, 0.04, 1.08);
+        for (let k = 0; k < 8; k++) { const a = k * 0.785 + 0.3, r = k % 2 ? 0.34 : 0.18, x = Math.cos(a) * r, z = Math.sin(a) * r, h = 1.05 + hash(700 + k) * 0.35;
+          m.box(0.03, h - 0.8, 0.03, 0x3f8f3a, x, (h + 0.8) / 2, z); m.add(SPHERE, 0x4f9a3a, x * 1.2, 0.9, z * 1.2, 0, 0, 0, 0.26, 0.16, 0.26); m.add(SPHERE, RAIN[k % 6], x, h, z, 0, 0, 0, 0.2, 0.14, 0.2); m.add(SPHERE, 0xfff3b0, x, h + 0.05, z, 0, 0, 0, 0.07, 0.06, 0.07); } });
+    def('cafe', m => { m.add(CONE, W1, 0, 2.35, 0, 0, 0, 0, 2.7, 0.55, 2.7); },
+      m => { m.add(CYL8, 0xf4f1ea, 0, 1.2, 0, 0, 0, 0, 0.05, 2.4, 0.05); m.add(CYL, 0xf4f1ea, 0, 0.75, 0, 0, 0, 0, 0.8, 0.05, 0.8); m.add(CYL8, 0x33373f, 0, 0.37, 0, 0, 0, 0, 0.06, 0.74, 0.06);
+        for (const s of [-1, 1]) { m.box(0.42, 0.05, 0.42, 0x33373f, s * 0.62, 0.46, 0.1); m.box(0.42, 0.45, 0.05, 0x33373f, s * 0.62, 0.7, 0.3); for (const lx of [-0.18, 0.18]) m.box(0.03, 0.46, 0.03, 0x33373f, s * 0.62 + lx, 0.23, 0.1); }
+        m.add(CYL8, 0xffffff, 0.1, 0.84, 0, 0, 0, 0, 0.12, 0.14, 0.12); m.add(SPHERE, 0xff5c8a, -0.15, 0.82, 0.1, 0, 0, 0, 0.14, 0.12, 0.14); });
+    def('cones', null, m => { for (const [x, z, s] of [[0, 0, 1], [0.55, 0.3, 0.85], [-0.45, 0.35, 0.9], [0.1, 0.7, 0.75]]) { m.box(0.5 * s, 0.06, 0.5 * s, 0xff7a1a, x, 0.03, z); m.add(CONE, 0xff7a1a, x, 0.4 * s, z, 0, 0, 0, 0.42 * s, 0.75 * s, 0.42 * s); m.add(CYL, 0xffffff, x, 0.38 * s, z, 0, 0, 0, 0.28 * s, 0.1 * s, 0.28 * s); } });
+    def('gnome', m => { m.add(CONE, W1, 0, 1.12, 0, -0.15, 0, 0, 0.42, 0.62, 0.42); },
+      m => { m.box(0.16, 0.12, 0.26, 0x3b2a1e, -0.1, 0.06, -0.04); m.box(0.16, 0.12, 0.26, 0x3b2a1e, 0.1, 0.06, -0.04); m.add(CYL, 0x2b6cb0, 0, 0.3, 0, 0, 0, 0, 0.36, 0.36, 0.32);
+        m.add(SPHERE, 0x35a05a, 0, 0.55, 0, 0, 0, 0, 0.46, 0.4, 0.4); m.add(SPHERE, 0xf1c9a5, 0, 0.8, -0.02, 0, 0, 0, 0.34, 0.3, 0.32); m.add(CONE, 0xffffff, 0, 0.62, -0.15, Math.PI, 0, 0, 0.32, 0.36, 0.2);
+        m.add(SPHERE, 0xf2a7b8, 0, 0.8, -0.18, 0, 0, 0, 0.1, 0.09, 0.1); eye(m, -0.07, 0.88, -0.14, 0.05); eye(m, 0.07, 0.88, -0.14, 0.05); m.box(0.07, 0.24, 0.07, 0x9a6a3c, 0.22, 0.45, -0.1, 0.3); });
+    def('flamingo', null, m => { const P = 0xff7ab8, Pd = 0xf25a9a; m.add(SPHERE, P, 0, 0.95, 0.05, 0, 0, 0, 0.42, 0.34, 0.62); m.add(SPHERE, Pd, 0, 1.0, 0.32, -0.4, 0, 0, 0.3, 0.2, 0.34);
+      seg(m, TAPER, P, 0, 1.05, -0.2, 0, 1.45, -0.32, 0.06); seg(m, TAPER, P, 0, 1.45, -0.32, 0, 1.62, -0.18, 0.05); m.add(SPHERE, P, 0, 1.66, -0.2, 0, 0, 0, 0.16, 0.14, 0.18);
+      m.box(0.06, 0.06, 0.16, 0x222222, 0, 1.6, -0.34, 0.5); eye(m, -0.06, 1.7, -0.27, 0.035); eye(m, 0.06, 1.7, -0.27, 0.035);
+      m.box(0.025, 0.8, 0.025, 0x9a9a9a, -0.04, 0.4, 0); m.box(0.025, 0.55, 0.025, 0x9a9a9a, 0.05, 0.28, 0.02); });
+    def('vend', m => { m.box(1.0, 2.0, 0.8, W1, 0, 1.0, 0); m.box(1.04, 0.14, 0.84, W1, 0, 2.04, 0); },
+      m => { m.box(0.2, 0.08, 0.06, 0x222428, 0.3, 0.3, -0.41); m.box(0.6, 0.18, 0.05, 0x222428, -0.1, 0.24, -0.41); m.box(0.14, 0.3, 0.05, 0xc0c4ca, 0.36, 1.1, -0.41); },
+      m => { m.box(0.64, 1.1, 0.02, 0xbfe8ff, -0.1, 1.3, -0.415); for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) m.box(0.1, 0.18, 0.02, RAIN[(r * 4 + c) % 6], -0.34 + c * 0.16, 0.92 + r * 0.26, -0.43); });
+    def('balloons', null, m => { m.box(0.3, 0.2, 0.3, 0x5b5f66, 0, 0.1, 0); for (let k = 0; k < 7; k++) { const a = k * 0.9, r = k ? 0.42 : 0, x = Math.cos(a) * r, z = Math.sin(a) * r, y = 2.7 + (k % 3) * 0.32;
+      seg(m, STICK, 0xf4f1ea, 0, 0.2, 0, x, y - 0.35, z, 0.012); m.add(SPHERE, RAIN[k % 6], x, y, z, 0, 0, 0, 0.62, 0.74, 0.62); m.add(CONE, RAIN[k % 6], x, y - 0.4, z, Math.PI, 0, 0, 0.1, 0.1, 0.1); } });
+    def('couch', m => { m.box(2.0, 0.42, 0.9, W1, 0, 0.4, 0); m.box(2.0, 0.75, 0.25, W1, 0, 0.85, 0.34); m.box(0.25, 0.6, 0.9, W1, -1.0, 0.6, 0); m.box(0.25, 0.6, 0.9, W1, 1.0, 0.6, 0); },
+      m => { for (const x of [-0.5, 0.5]) m.box(0.85, 0.12, 0.7, 0xf4f1ea, x, 0.66, -0.06); m.box(0.5, 0.05, 0.36, 0xc9a26a, 0.6, 1.2, 0.3, -0.3, 0, 0.1); m.box(0.04, 0.4, 0.04, 0x9a6a3c, 0.6, 1.0, 0.35);
+        for (const [x, z] of [[-0.9, -0.35], [0.9, -0.35], [-0.9, 0.35], [0.9, 0.35]]) m.box(0.08, 0.2, 0.08, 0x3b2a1e, x, 0.1, z); });
+    def('potty', m => { m.box(1.15, 2.2, 1.15, W1, 0, 1.1, 0); },
+      m => { m.add(SPHERE, 0xf4f1ea, 0, 2.2, 0, 0, 0, 0, 1.25, 0.3, 1.25); m.box(0.82, 1.9, 0.04, 0xffffff, 0, 1.0, -0.6); m.box(0.12, 0.04, 0.06, 0x33373f, 0.28, 1.05, -0.64);
+        m.add(CYL, 0x33373f, 0, 1.75, -0.63, Math.PI / 2, 0, 0, 0.18, 0.02, 0.18); m.add(SPHERE, 0xffd23f, 0.03, 1.75, -0.64, 0, 0, 0, 0.12, 0.12, 0.02); m.box(0.2, 0.06, 0.03, 0xe8453c, -0.22, 1.3, -0.63); });
+    def('cart', null, m => { m.box(0.7, 0.5, 1.0, 0xb9c0c8, 0, 0.75, 0); m.box(0.62, 0.32, 0.88, 0xff5c8a, 0, 0.82, 0); m.box(0.7, 0.05, 0.05, 0xe8453c, 0, 1.05, 0.6);
+      for (const [x, z] of [[-0.3, -0.4], [0.3, -0.4], [-0.3, 0.4], [0.3, 0.4]]) m.add(CYL8, 0x222428, x, 0.12, z, 0, 0, Math.PI / 2, 0.24, 0.08, 0.24); m.box(0.04, 0.4, 0.04, 0xb9c0c8, -0.3, 0.35, 0); m.box(0.04, 0.4, 0.04, 0xb9c0c8, 0.3, 0.35, 0);
+      m.add(SPHERE, 0xffc21f, 0.1, 1.15, 0, 0, 0, 0, 0.3, 0.3, 0.3); m.box(0.3, 0.2, 0.2, 0x35e06a, -0.15, 1.08, 0.2); });
+    def('mushroom', m => { m.add(SPHERE, W1, 0, 1.55, 0, 0, 0, 0, 2.2, 1.1, 2.2); },
+      m => { m.add(CYL, 0xf4ecd8, 0, 0.7, 0, 0, 0, 0, 0.6, 1.4, 0.6); m.add(CYL, 0xe9dfc6, 0, 1.3, 0, 0, 0, 0, 1.5, 0.12, 1.5); eye(m, -0.13, 0.95, -0.27, 0.09); eye(m, 0.13, 0.95, -0.27, 0.09);
+        for (let k = 0; k < 9; k++) { const a = k * 0.7 + 0.2, e = 0.35 + (k % 3) * 0.33; m.add(SPHERE, 0xffffff, Math.cos(a) * Math.cos(e) * 1.08, 1.55 + Math.sin(e) * 0.56, Math.sin(a) * Math.cos(e) * 1.08, 0, 0, 0, 0.32, 0.18, 0.32); } });
+    def('duckbig', null, m => { const Y = 0xffd23f; m.add(SPHERE, Y, 0, 1.2, 0.3, 0, 0, 0, 3.0, 2.2, 3.9); m.add(SPHERE, Y, 0, 1.6, 1.9, -0.6, 0, 0, 1.2, 0.8, 0.9);
+      m.add(SPHERE, Y, 0, 2.95, -1.0, 0, 0, 0, 1.8, 1.8, 1.8); m.add(SPHERE, 0xff8a1a, 0, 2.75, -1.95, 0, 0, 0, 0.9, 0.36, 0.9); eye(m, -0.45, 3.25, -1.7, 0.26); eye(m, 0.45, 3.25, -1.7, 0.26);
+      m.add(SPHERE, 0xff8fb8, -0.7, 2.75, -1.6, 0, 0, 0, 0.3, 0.2, 0.1); m.add(SPHERE, 0xff8fb8, 0.7, 2.75, -1.6, 0, 0, 0, 0.3, 0.2, 0.1); });
+    def('statue', null, m => { const S = 0xb9b2a4, B = 0x6fae94; m.box(1.6, 1.2, 1.6, S, 0, 0.6, 0); m.box(1.8, 0.18, 1.8, 0xa49c8e, 0, 1.25, 0); m.box(1.3, 0.12, 0.04, 0xd4af37, 0, 0.75, -0.81);
+      m.add(SPHERE, B, 0, 2.2, 0.1, 0, 0, 0, 1.2, 1.05, 1.6); m.add(SPHERE, B, 0, 3.0, -0.55, 0, 0, 0, 0.75, 0.75, 0.75); m.box(0.2, 0.14, 0.4, 0x5e9a82, 0, 2.95, -0.98); m.box(0.08, 0.6, 0.08, B, -0.2, 1.55, 0); m.box(0.08, 0.6, 0.08, B, 0.2, 1.55, 0);
+      m.box(0.9, 0.12, 0.9, B, 0, 2.15, 0.85, 0.4); m.add(SPHERE, 0xd4af37, 0, 3.55, -0.5, 0, 0, 0, 0.18, 0.18, 0.18); m.box(0.18, 0.36, 0.14, 0xd4af37, 0, 3.32, -0.5); m.box(0.5, 0.06, 0.06, 0xd4af37, 0, 3.4, -0.5, 0, 0, 0.5); });
+    def('donut', m => { m.add(TORUS, W1, 0, 2.0, 0, 0, 0, 0, 1.15, 1.15, 0.85); },
+      m => { m.add(TORUS, 0xd9a05b, 0, 2.0, 0.1, 0, 0, 0, 1.1, 1.1, 0.8); m.box(0.5, 0.8, 0.5, 0x8a8f99, 0, 0.4, 0.05); m.box(1.2, 0.1, 1.0, 0x6b7079, 0, 0.05, 0.05);
+        for (let k = 0; k < 16; k++) { const a = k * 0.39, r = 1.12 + (k % 2) * 0.18; m.box(0.2, 0.06, 0.06, RAIN[k % 6], Math.cos(a) * r, 2.0 + Math.sin(a) * r, -0.42, 0, 0, a * 2); } });
+    def('crystal', null, null, m => { const C = [0xff7ad9, 0x7ae8ff, 0xb48cff, 0x9effa8]; for (let k = 0; k < 6; k++) { const a = k * 1.05, r = k ? 0.42 : 0, h = k ? 1.1 + hash(800 + k) * 0.8 : 2.2;
+      m.add(CYL6, C[k % 4], Math.cos(a) * r, h * 0.35, Math.sin(a) * r, Math.cos(a) * 0.3 * (k ? 1 : 0), 0, Math.sin(a) * 0.3 * (k ? 1 : 0), 0.34, h * 0.7, 0.34); m.add(CONE, C[k % 4], Math.cos(a) * r * 1.2, h * 0.7 + h * 0.15, Math.sin(a) * r * 1.2, 0, 0, 0, 0.34, h * 0.3, 0.34); } });
+    def('sunflower', null, m => { for (const [x, z, h] of [[0, 0, 2.4], [0.6, 0.3, 2.0], [-0.5, 0.25, 1.75]]) { m.box(0.07, h, 0.07, 0x3f8f3a, x, h / 2, z); m.add(SPHERE, 0x4f9a3a, x + 0.18, h * 0.45, z, 0, 0, 0.6, 0.34, 0.08, 0.2);
+      for (let k = 0; k < 10; k++) { const a = k * 0.628; m.add(SPHERE, 0xffc21f, x + Math.cos(a) * 0.3, h + Math.sin(a) * 0.3, z - 0.06, 0, 0, a, 0.26, 0.1, 0.06); } m.add(CYL, 0x5b3a1e, x, h, z - 0.08, Math.PI / 2, 0, 0, 0.36, 0.08, 0.36); } });
+    def('picnic', null, m => { for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) m.box(0.5, 0.03, 0.5, (i + j) % 2 ? 0xe8453c : 0xffffff, -0.75 + i * 0.5, 0.02, -0.75 + j * 0.5);
+      m.box(0.5, 0.32, 0.36, 0xc9a26a, 0.3, 0.2, 0.3); m.box(0.5, 0.04, 0.04, 0x9a6a3c, 0.3, 0.42, 0.3); m.add(SPHERE, 0x35a05a, -0.4, 0.14, -0.3, 0, 0, 0, 0.42, 0.28, 0.32); m.add(SPHERE, 0xff5c8a, -0.4, 0.2, -0.3, 0, 0, 0, 0.3, 0.12, 0.2); });
+    // chalk drawings on the pavement: hopscotch, a giant smiley, and "67"
+    def('chalk0', null, m => { const C = [0xffffff, 0xff8fb8, 0x8fd3ff]; const sq = (x, z, c) => { m.box(0.7, 0.012, 0.05, c, x, 0.006, z - 0.33); m.box(0.7, 0.012, 0.05, c, x, 0.006, z + 0.33); m.box(0.05, 0.012, 0.7, c, x - 0.33, 0.006, z); m.box(0.05, 0.012, 0.7, c, x + 0.33, 0.006, z); };
+      sq(0, 1.4, C[0]); sq(0, 0.7, C[1]); sq(-0.35, 0, C[2]); sq(0.35, 0, C[2]); sq(0, -0.7, C[0]); sq(-0.35, -1.4, C[1]); sq(0.35, -1.4, C[1]); sq(0, -2.1, C[0]); });
+    def('chalk1', null, m => { for (let k = 0; k < 24; k++) { const a = k * 0.2618; m.box(0.3, 0.012, 0.08, 0xffe066, Math.cos(a) * 1.0, 0.006, Math.sin(a) * 1.0, 0, -a + Math.PI / 2, 0); }
+      m.add(CYL, 0x222222, -0.32, 0.006, -0.3, 0, 0, 0, 0.18, 0.012, 0.18); m.add(CYL, 0x222222, 0.32, 0.006, -0.3, 0, 0, 0, 0.18, 0.012, 0.18);
+      for (let k = 0; k < 7; k++) { const a = Math.PI * (0.2 + k * 0.1); m.box(0.18, 0.012, 0.06, 0xff8fb8, Math.cos(a) * 0.55, 0.006, Math.sin(a) * 0.55, 0, -a + Math.PI / 2, 0); } });
+    def('chalk2', null, m => { const c = 0x9effa8, d = (x, z, w, h) => m.box(w, 0.012, h, c, x, 0.006, z);
+      d(-0.75, -0.55, 0.6, 0.1); d(-1.0, 0, 0.1, 1.1); d(-0.75, 0, 0.6, 0.1); d(-0.75, 0.55, 0.6, 0.1); d(-0.5, 0.28, 0.1, 0.55);   // 6
+      d(0.65, -0.55, 0.65, 0.1); m.box(0.1, 0.012, 1.15, c, 0.72, 0.006, 0, 0, -0.35, 0); });                                        // 7
+    def('floatduck', null, m => { const Y = 0xffd23f; m.add(SPHERE, Y, 0, 0.45, 0.2, 0, 0, 0, 1.6, 1.0, 2.0); m.add(SPHERE, Y, 0, 1.25, -0.55, 0, 0, 0, 0.95, 0.95, 0.95); m.add(SPHERE, 0xff8a1a, 0, 1.15, -1.05, 0, 0, 0, 0.5, 0.2, 0.5); eye(m, -0.25, 1.4, -0.9, 0.14); eye(m, 0.25, 1.4, -0.9, 0.14); });
+    def('floatring', m => { m.add(TORUS, W1, 0, 0.3, 0, Math.PI / 2, 0, 0, 1.0, 1.0, 0.8); }, m => { for (let k = 0; k < 6; k++) { const a = k * 1.047; m.add(SPHERE, 0xffffff, Math.cos(a) * 1.0, 0.55, Math.sin(a) * 1.0, 0, 0, 0, 0.42, 0.18, 0.42); } });
+    def('flag', m => { m.add(TRI, W1, 0, -0.2, 0, Math.PI / 2, 0, 0, 0.5, 0.03, 0.62); }, m => { m.box(0.62, 0.025, 0.025, 0xf4f1ea, 0, 0, 0); });   // a pennant hanging point-down, and its bit of string
+    return out;
+  })();
+  const DECOR_KINDS = Object.keys(DECOR);
+  // hits to break each (x weapon); kinds not listed can't be smashed (chalk, flags, floats)
+  const DECOR_HP = { planter: 2, cafe: 2, cones: 1, gnome: 1, flamingo: 1, vend: 3, balloons: 1, couch: 2, potty: 3, cart: 1, mushroom: 2, duckbig: 4, statue: 5, donut: 3, crystal: 2, sunflower: 1, picnic: 1 };
+  const DECOR_HI = new Set(['planter', 'cafe', 'cones', 'gnome', 'flamingo', 'cart', 'sunflower', 'picnic', 'chalk0', 'chalk1', 'chalk2', 'couch']);  // only near you
+  const DECOR_TINTS = { planter: [0xe8453c, 0x2b6cb0, 0xffc21f, 0x9b5cf6, 0x35a05a, 0xff8a3d], cafe: [0xe8453c, 0x35a05a, 0x2b6cb0, 0xff5c8a, 0xffc21f], gnome: [0xe8453c, 0x2b6cb0, 0x9b5cf6, 0xffc21f],
+    vend: [0xe8453c, 0x2b6cb0, 0x35a05a, 0x9b5cf6, 0xff8a3d], couch: [0xc9a227, 0x6b8e23, 0xd98fb0, 0x8b4513, 0x5f9ea0], potty: [0x2b6cb0, 0x35a05a, 0xff8a3d, 0x9b5cf6],
+    mushroom: [0xe8453c, 0x9b5cf6, 0x38bdf8, 0xff5c8a, 0xff8a3d], donut: [0xff8fb8, 0x7a4a2a, 0xb48cff, 0x9effa8], floatring: [0xff5c8a, 0x38bdf8, 0xffc21f, 0x35e06a],
+    flag: [0xff5c8a, 0xffc21f, 0x35e06a, 0x38bdf8, 0x9b5cf6, 0xff8a3d, 0xffffff] };
+  MAT.decor = new THREE.MeshLambertMaterial({ vertexColors: true });   // decor's own colours, instanced, never tinted
+  MAT.dglow = new THREE.MeshBasicMaterial({ vertexColors: true });
+
   // ---- cars (realism pass, 2026-11-17): a real side profile (bonnet, windscreen rake, roof, boot or hatch, wheel arches)
   // extruded with rounded edges, then narrowed towards the roof (tumblehome) and rounded at the corners in plan; a glass
   // greenhouse with pillars, tyres with rims and spokes, wheel wells, lights, grille, plates, mirrors and door handles.
@@ -745,7 +832,7 @@ varying float vGL; varying vec2 vGUV;
   const buckets = new Map(), nameBuckets = new Map(), hchunks = new Map(), rchunks = new Map(), segBuckets = new Map(), bridgeBuckets = new Map();
   const player = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), vy: 0, grounded: true, face: 0, phase: 0, speed: 0, heading: 0, moved: 0, footMoved: 0, slope: 0, pitch: 0 };
   const cam = { yaw: 0, pitch: 0.32, dist: 7.5, cur: 7.5, lookT: 0, shake: 0 };
-  const input = { f: 0, b: 0, l: 0, r: 0, sprint: false, jump: false, jx: 0, jy: 0 };
+  const input = { f: 0, b: 0, l: 0, r: 0, sprint: false, jump: false, hold: false, jx: 0, jy: 0 };  // hold = Space (or the jump button) held down: jetpacks, gliding
   let ride = { mode: 'foot', walk: 6.2, run: 12.5, jump: 8.5, radius: 0.4, kind: null };
   W.player = player; W.cam = cam; W.input = input; W.controls = { enabled: true, look: true };
   W.TOUCH = matchMedia('(pointer: coarse)').matches;
@@ -1345,6 +1432,7 @@ varying float vGL; varying vec2 vGUV;
     s.reg = true;
     for (const sg of s.walk) if (sg.car) { sg.n1 = nodeAt(sg.x1, sg.z1, sg, 1); sg.n2 = nodeAt(sg.x2, sg.z2, sg, 2); }
     s.props = layProps(s);
+    s.decor = layDecor(s);
     // Named places: pin each to the nearest street point so people stand outside, not inside the walls
     const po = r.po || [];
     for (let i = 0; i < po.length; i += 4) {
@@ -1480,6 +1568,90 @@ varying float vGL; varying vec2 vGUV;
     }
     return P;
   }
+  // The decor layer for one sub-tile (see DECOR): lists [x, z, yaw, tint, scale, ...] per kind ('flag': the 5th value is
+  // the height above the ground). Same seed, same spots: a street always has the same gnomes.
+  const PAVE_MIX = [['planter', 26], ['cafe', 10], ['cones', 7], ['gnome', 9], ['vend', 7], ['balloons', 9], ['couch', 4], ['potty', 3], ['cart', 5], ['flamingo', 6], ['chalk0', 5], ['chalk1', 4], ['chalk2', 3]];
+  const AREA_DECOR = {   // [kind, weight, group]; rate = one per this many m²
+    park: { rate: 380, mix: [['mushroom', 16, 'ring'], ['duckbig', 5], ['statue', 6], ['sunflower', 12], ['crystal', 8], ['picnic', 12], ['flamingo', 8, 'flock'], ['gnome', 9, 'gang'], ['balloons', 8], ['potty', 4], ['donut', 4]] },
+    grass: { rate: 520, mix: [['mushroom', 14, 'ring'], ['sunflower', 16], ['flamingo', 12, 'flock'], ['gnome', 12, 'gang'], ['crystal', 6], ['picnic', 8], ['balloons', 5]] },
+    plaza: { rate: 300, mix: [['statue', 12], ['donut', 10], ['duckbig', 6], ['balloons', 14], ['cafe', 16], ['planter', 18], ['vend', 8], ['potty', 3], ['chalk1', 6], ['chalk2', 4]] },
+    playground: { rate: 240, mix: [['duckbig', 10], ['balloons', 14], ['mushroom', 10], ['chalk0', 12], ['gnome', 8, 'gang'], ['donut', 5]] },
+    pitch: { rate: 2400, mix: [['balloons', 6], ['potty', 6], ['flamingo', 6, 'flock']] },
+    wood: { rate: 1100, mix: [['mushroom', 20, 'ring'], ['crystal', 14], ['gnome', 8, 'gang']] },
+    sand: { rate: 900, mix: [['duckbig', 8], ['crystal', 6], ['balloons', 4]] },
+  };
+  function layDecor(s) {
+    const P = {};
+    for (const k of DECOR_KINDS) P[k] = [];
+    let seed = (s.tile.x * 389 + s.tile.y * 733 + s.idx * 59 + 7) | 0;
+    const rnd = () => hash(seed++);
+    const dens = LOW ? 0.45 : 1;
+    const free = (x, z, r) => !heightAt(x, z) && !heightAt(x + r, z) && !heightAt(x - r, z) && !heightAt(x, z + r) && !heightAt(x, z - r) && !roadAt(x, z) && !roadAt(x + r * 0.7, z) && !roadAt(x - r * 0.7, z) && !roadAt(x, z + r * 0.7) && !roadAt(x, z - r * 0.7);
+    const pickW = mix => { let t = 0; for (const e of mix) t += e[1]; let r = rnd() * t; for (const e of mix) { if (r < e[1]) return e; r -= e[1]; } return mix[0]; };
+    const tintOf = k => { const l = DECOR_TINTS[k]; return l ? l[Math.floor(rnd() * l.length)] : 0xffffff; };
+    let total = 0;
+    const put = (k, x, z, yaw, sc) => {
+      if (total++ > 900) return;
+      if (DECOR_HP[k]) indexProp(s, k, P[k].length / 5, x, z);
+      P[k].push(x, z, yaw, tintOf(k), sc || 1);
+    };
+    // 1. pavements: along residential and bigger streets, a little further from the kerb than the benches; flags across side streets
+    for (const rd of s.roads) {
+      if (rd.br || !(rd.t === 'residential' || BIG.has(rd.t))) continue;
+      const p = rd.p, hw = rd.w / 2;
+      for (let i = 0; i + 3 < p.length; i += 2) {
+        const x1 = p[i], z1 = p[i + 1], x2 = p[i + 2], z2 = p[i + 3], L = Math.hypot(x2 - x1, z2 - z1);
+        if (L < 6) continue;
+        const ux = (x2 - x1) / L, uz = (z2 - z1) / L;
+        for (let d = 3 + rnd() * 7; d < L - 3; d += (8 + rnd() * 13) / dens) {
+          const sd = rnd() < 0.5 ? 1 : -1, e = pickW(PAVE_MIX), k = e[0], chalk = k.startsWith('chalk'), off = hw + (chalk ? 1.25 : 1.85 + rnd() * 0.7);
+          const x = x1 + ux * d - uz * off * sd, z = z1 + uz * d + ux * off * sd;
+          // buildings only: OSM sidewalks are footways, so the road grid covers most pavements (and the spot is already clear of this street's lanes)
+          const r0 = chalk ? 1 : k === 'couch' || k === 'potty' || k === 'cafe' ? 1.0 : 0.55;
+          if (heightAt(x, z) || heightAt(x + r0, z) || heightAt(x - r0, z) || heightAt(x, z + r0) || heightAt(x, z - r0)) continue;
+          put(k, x, z, Math.atan2(-uz * sd, ux * sd) + (k === 'gnome' || k === 'flamingo' ? (rnd() - 0.5) * 1.5 : 0), k === 'gnome' ? 0.9 + rnd() * 0.5 : 1);
+        }
+        if (rd.t === 'residential' && rd.w >= 6 && L > 18 && rnd() < 0.45 * dens) { // bunting: a line of little flags from kerb to kerb, sagging in the middle
+          const d = L * (0.3 + rnd() * 0.4), cx = x1 + ux * d, cz = z1 + uz * d, nx = -uz, nz = ux, half = hw + 1.2, n = Math.max(6, Math.round(half * 2 / 0.6));
+          const yaw = Math.atan2(-ux, -uz), base = 5.4 + rnd() * 0.8;
+          for (let j = 0; j < n; j++) { const t = j / (n - 1), fx = cx + nx * (t * 2 - 1) * half, fz = cz + nz * (t * 2 - 1) * half; P.flag.push(fx, fz, yaw, DECOR_TINTS.flag[(j + i) % 7], base - 1.1 * 4 * t * (1 - t)); }
+        }
+      }
+    }
+    // 2. parks, lawns, plazas, playgrounds, woods: scattered, some in groups (a fairy ring of mushrooms, a gnome gang, a flock of flamingos)
+    for (const a of s.areas) {
+      const cfg = AREA_DECOR[a.k];
+      if (!cfg) continue;
+      const p = a.p, rings = [p].concat(a.hs || []);
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (let i = 0; i < p.length; i += 2) { x0 = Math.min(x0, p[i]); x1 = Math.max(x1, p[i]); z0 = Math.min(z0, p[i + 1]); z1 = Math.max(z1, p[i + 1]); }
+      const n = Math.min(45, Math.abs(signedArea(p)) / cfg.rate * dens);
+      let placed = 0;
+      for (let t = 0; t < n * 3 && placed < n; t++) {
+        const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0);
+        if (!inRings(rings, x, z) || !free(x, z, 1.4)) continue;
+        const e = pickW(cfg.mix), k = e[0], yaw = rnd() * 6.283;
+        placed++;
+        if (e[2] === 'ring') { const cnt = 5 + Math.floor(rnd() * 3), R = 2.6 + rnd(); for (let j = 0; j < cnt; j++) { const q = j / cnt * 6.283, mx = x + Math.cos(q) * R, mz = z + Math.sin(q) * R; if (free(mx, mz, 0.6)) put(k, mx, mz, rnd() * 6.283, 0.45 + rnd() * 0.5); } put(k, x, z, yaw, 1.1 + rnd() * 0.5); }
+        else if (e[2] === 'gang' || e[2] === 'flock') { const cnt = 3 + Math.floor(rnd() * 4); for (let j = 0; j < cnt; j++) { const mx = x + (rnd() - 0.5) * 5, mz = z + (rnd() - 0.5) * 5; if (free(mx, mz, 0.5) && inRings(rings, mx, mz)) put(k, mx, mz, yaw + (rnd() - 0.5) * 0.8, e[2] === 'gang' ? 0.9 + rnd() * 0.7 : 1); } }
+        else put(k, x, z, yaw, k === 'duckbig' || k === 'statue' ? 0.85 + rnd() * 0.4 : 0.85 + rnd() * 0.35);
+      }
+    }
+    // 3. the water: giant rubber ducks and pool rings bobbing about
+    for (const a of s.water) {
+      const p = a.p, rings = [p].concat(a.hs || []), area = Math.abs(signedArea(p));
+      if (area < 400) continue;
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (let i = 0; i < p.length; i += 2) { x0 = Math.min(x0, p[i]); x1 = Math.max(x1, p[i]); z0 = Math.min(z0, p[i + 1]); z1 = Math.max(z1, p[i + 1]); }
+      const n = Math.min(18, area / 1600 * dens);
+      for (let t = 0, got = 0; t < n * 3 && got < n; t++) {
+        const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0);
+        if (!inRings(rings, x, z) || heightAt(x, z)) continue;
+        got++; put(rnd() < 0.5 ? 'floatduck' : 'floatring', x, z, rnd() * 6.283, rnd() < 0.15 ? 2.6 : 0.9 + rnd() * 0.6);
+      }
+    }
+    return P;
+  }
   // A parked car at (x, z)? (within its footprint, with a margin R)
   function carAt(x, z, R) {
     const list = carBuckets.get(bkey(x, z));
@@ -1494,10 +1666,16 @@ varying float vGL; varying vec2 vGUV;
   W.carAt = carAt;
 
   // ---------------------------------------------------------------- smashing things (session only) + borrowed cars
-  const PROP_HP = (opts.tune && opts.tune.smash && opts.tune.smash.hp) || { bin: 1, box: 1, hydrant: 2, bench: 2, lamp: 3, tree: 3, car: 4, van: 5 };  // D.TUNE.smash.hp
+  const PROP_HP = Object.assign({}, DECOR_HP, (opts.tune && opts.tune.smash && opts.tune.smash.hp) || { bin: 1, box: 1, hydrant: 2, bench: 2, lamp: 3, tree: 3, car: 4, van: 5 });  // D.TUNE.smash.hp (+ the decor layer's)
   const DEBRIS_COL = { bin: [0x2f8f5b, 0x226b44, 0xf4f1ea], box: [0x2b6cb0, 0xf4f1ea], hydrant: [0xe23b2e, 0xf2b134], bench: [0x9a6a3c, 0xa8774a, 0x33373f],
-    lamp: [0x3a3f4a, 0x2a2e37, 0xfff0b8], tree: [0x6b4f37, 0x4f8a3a, 0x6c9a4e], car: [0x2b2a2e, 0x9fc3dd, 0x3a3d44], van: [0x2b2a2e, 0x9fc3dd, 0x3a3d44] };
-  const SMASH_FX = { bin: ['🗑️', '📰', '🍌'], box: ['✉️', '📨'], hydrant: ['💦', '💧'], bench: ['🪵'], lamp: ['⚡', '✨'], tree: ['🍃', '🍂'], car: ['💥', '🔥'], van: ['💥', '🔥'] };
+    lamp: [0x3a3f4a, 0x2a2e37, 0xfff0b8], tree: [0x6b4f37, 0x4f8a3a, 0x6c9a4e], car: [0x2b2a2e, 0x9fc3dd, 0x3a3d44], van: [0x2b2a2e, 0x9fc3dd, 0x3a3d44],
+    planter: [0xe8453c, 0x5b4030, 0xff5c8a], cafe: [0xf4f1ea, 0x33373f, 0x35a05a], cones: [0xff7a1a, 0xffffff], gnome: [0xe8453c, 0x2b6cb0, 0xffffff], flamingo: [0xff7ab8, 0xf25a9a], vend: [0xe8453c, 0xbfe8ff, 0xffc21f],
+    balloons: [0xff5c8a, 0xffc21f, 0x38bdf8], couch: [0xc9a227, 0xf4f1ea], potty: [0x2b6cb0, 0x6b4f37, 0xf4f1ea], cart: [0xb9c0c8, 0xff5c8a], mushroom: [0xe8453c, 0xffffff, 0xf4ecd8], duckbig: [0xffd23f, 0xff8a1a],
+    statue: [0xb9b2a4, 0x6fae94, 0xd4af37], donut: [0xd9a05b, 0xff8fb8, 0x35e06a], crystal: [0xff7ad9, 0x7ae8ff, 0xb48cff], sunflower: [0xffc21f, 0x3f8f3a], picnic: [0xe8453c, 0xffffff, 0xc9a26a] };
+  const SMASH_FX = { bin: ['🗑️', '📰', '🍌'], box: ['✉️', '📨'], hydrant: ['💦', '💧'], bench: ['🪵'], lamp: ['⚡', '✨'], tree: ['🍃', '🍂'], car: ['💥', '🔥'], van: ['💥', '🔥'],
+    planter: ['🌸', '🌼'], cafe: ['☕', '🥐'], cones: ['🚧'], gnome: ['🍄', '✨'], flamingo: ['🦩', '🪶'], vend: ['🥤', '🪙'], balloons: ['🎈', '🎉'], couch: ['🛋️', '🪙'], potty: ['💩', '🧻'],
+    cart: ['🛒', '🥫'], mushroom: ['🍄', '✨'], duckbig: ['🦆', '💦'], statue: ['🪨', '🐦'], donut: ['🍩', '✨'], crystal: ['💎', '✨'], sunflower: ['🌻', '🌱'], picnic: ['🍉', '🥪'] };
+  const SMASH_Y = { lamp: 2.6, tree: 2.2, balloons: 2.8, duckbig: 2.2, statue: 2.4, donut: 2.0, mushroom: 1.4, potty: 1.4, vend: 1.2, sunflower: 1.8, crystal: 1.0 };
   const propHp = new Map();
   // the nearest thing you can smash within r of (x, z): {k, x, z, key, ...} or null. opts.cars: include parked cars
   W.propNear = function (x, z, r, opts) {
@@ -1508,6 +1686,7 @@ varying float vGL; varying vec2 vGUV;
       const st = smashed.get(e.key);
       if (st === true || st === 'gone' || (st === 'wreck')) continue;
       if (e.car && !(opts && opts.cars)) continue;
+      if (opts && opts.kind && e.k !== opts.kind) continue;
       const d = Math.hypot(e.x - x, e.z - z) - (e.car ? 1.2 : e.k === 'tree' ? 0.3 : 0);
       if (d < bd) { bd = d; best = e; }
     }
@@ -1533,7 +1712,7 @@ varying float vGL; varying vec2 vGUV;
     const y = groundAt(e.x, e.z);
     if (left > 0) { // a dent: it wobbles and sheds a chip or two
       propHp.set(e.key, left);
-      debris(e.x, y + (e.k === 'lamp' ? 2.5 : e.k === 'tree' ? 1.6 : 0.6), e.z, e.k, 3, dir);
+      debris(e.x, y + (SMASH_Y[e.k] ? SMASH_Y[e.k] * 0.8 : 0.6), e.z, e.k, 3, dir);
       return 'hit';
     }
     propHp.delete(e.key);
@@ -1546,7 +1725,7 @@ varying float vGL; varying vec2 vGUV;
       debris(e.x, y + 1.2, e.z, e.k, 14, dir);
     } else {
       setInstance(e, im => { im.getMatrixAt(e.i, _sm); _sm.decompose(_sp, _sq, _ss); _sm.compose(_sp, _sq, ZERO3); im.setMatrixAt(e.i, _sm); });
-      debris(e.x, y + (e.k === 'lamp' ? 2.6 : e.k === 'tree' ? 2.2 : 0.6), e.z, e.k, e.k === 'tree' ? 14 : e.k === 'lamp' ? 10 : 8, dir);
+      debris(e.x, y + (SMASH_Y[e.k] || 0.6), e.z, e.k, e.k === 'tree' || e.k === 'duckbig' || e.k === 'statue' ? 14 : e.k === 'lamp' ? 10 : 8, dir);
       if (e.k === 'hydrant') geysers.push({ x: e.x, z: e.z, t: 0, life: 7 });
       if (e.k === 'tree') fallTree(e, dir);
     }
@@ -1956,6 +2135,33 @@ varying float vGL; varying vec2 vGUV;
       const lo = !LOW && inst('car', PROP.carLo[v], MAT.tint, pr['car' + v], 4, true); if (lo) { lo.userData.sp = v; lo.userData.lod = 'lo'; }
     }
     if (pr.van) { const im = inst('van', PROP.van, MAT.tint, pr.van, 4, true); if (im && !LOW) { im.userData.lod = 'hi'; const lo = inst('van', PROP.vanLo, MAT.tint, pr.van, 4, true); if (lo) lo.userData.lod = 'lo'; } }
+    // the decor layer (layDecor): x, z, yaw, tint, scale per instance; smashed ones are drawn at scale 0
+    const dc = s.decor || {}, dm = new THREE.Matrix4(), dq = new THREE.Quaternion(), de = new THREE.Euler(), dv = new THREE.Vector3(), ds = new THREE.Vector3(), dcol = new THREE.Color();
+    const decorInst = (kind, geo, mat, list, tinted) => {
+      const cnt = list.length / 5;
+      const im = new THREE.InstancedMesh(cullGeo(geo), mat, cnt), flag = kind === 'flag', water = kind === 'floatduck' || kind === 'floatring';
+      for (let i = 0; i < cnt; i++) {
+        const x = list[i * 5], z = list[i * 5 + 1], sc = list[i * 5 + 4], st = DECOR_HP[kind] && smashed.get(propKey(kind, x, z));
+        de.set(0, list[i * 5 + 2], 0); dq.setFromEuler(de);
+        dv.set(x - ccx, groundAt(x, z) - ccy + (flag ? sc : water ? 0.1 : 0), z - ccz);
+        if (st) ds.set(0, 0, 0); else if (flag) ds.set(1, 1, 1); else ds.set(sc, sc, sc);
+        dm.compose(dv, dq, ds); im.setMatrixAt(i, dm);
+        if (tinted) im.setColorAt(i, dcol.setHex(list[i * 5 + 3]));
+      }
+      im.castShadow = !LOW && !flag && !kind.startsWith('chalk'); im.receiveShadow = false;
+      if (DECOR_HI.has(kind) && !LOW) im.userData.lod = 'hi';
+      culled(im);
+      if (DECOR_HP[kind]) keep(kind, im);
+      return im;
+    };
+    for (const k of DECOR_KINDS) {
+      const list = dc[k];
+      if (!list || !list.length) continue;
+      const d = DECOR[k];
+      if (d.a) decorInst(k, d.a, MAT.tint, list, true);
+      if (d.b) decorInst(k, d.b, MAT.decor, list, false);
+      if (d.glow) decorInst(k, d.glow, MAT.dglow, list, false);
+    }
     s.near = null;
     worldGroup.add(group);
     s.group = group;
@@ -2661,7 +2867,7 @@ varying float vGL; varying vec2 vGUV;
   W.monster = function (kind) {
     const g = new THREE.Group(), body = new THREE.Group(), m = new Merge();
     g.add(body);
-    let mat = MAT.vc, h = 1, lid = null;
+    let mat = MAT.vc, h = 1, lid = null, wings = null;
     if (kind === 'slime' || kind === 'blob') {
       const c = kind === 'blob' ? 0x9b5cf6 : [0x4ade80, 0x38bdf8, 0xf472b6, 0xfacc15][Math.random() * 4 | 0];
       m.add(SPHERE, c, 0, 0.5, 0, 0, 0, 0, 1.3, 1.0, 1.3);
@@ -2779,6 +2985,39 @@ varying float vGL; varying vec2 vGUV;
       m.box(0.46, 0.36, 0.46, dark, -0.8, 0.56, -0.02); m.box(0.46, 0.36, 0.46, dark, 0.8, 0.56, -0.02);
       m.box(0.42, 0.78, 0.42, dark, -0.28, 0.39, 0); m.box(0.42, 0.78, 0.42, dark, 0.28, 0.39, 0);
       h = 2.3;
+    } else if (kind === 'spitter') { // the Spitball Gremlin: big ears, puffed cheeks, spits green goo from a distance
+      const c = 0x5fd068, d = 0x3f9a4a;
+      m.add(SPHERE, c, 0, 0.55, 0.05, 0, 0, 0, 0.8, 0.82, 0.72); m.add(SPHERE, c, 0, 1.15, -0.05, 0, 0, 0, 0.82, 0.74, 0.78);
+      m.add(CONE, c, -0.48, 1.32, 0, 0, 0, 1.25, 0.26, 0.6, 0.14); m.add(CONE, c, 0.48, 1.32, 0, 0, 0, -1.25, 0.26, 0.6, 0.14);
+      m.add(SPHERE, 0x8ff09a, -0.24, 1.02, -0.32, 0, 0, 0, 0.3, 0.26, 0.24); m.add(SPHERE, 0x8ff09a, 0.24, 1.02, -0.32, 0, 0, 0, 0.3, 0.26, 0.24);
+      m.add(CYL, 0x2a1b2e, 0, 1.0, -0.4, Math.PI / 2, 0, 0, 0.16, 0.1, 0.16); eye(m, -0.15, 1.32, -0.34, 0.15); eye(m, 0.15, 1.32, -0.34, 0.15);
+      m.box(0.34, 0.05, 0.05, 0x1f1a3d, -0.15, 1.48, -0.36, 0, 0, -0.35); m.box(0.34, 0.05, 0.05, 0x1f1a3d, 0.15, 1.48, -0.36, 0, 0, 0.35);
+      m.box(0.16, 0.38, 0.16, d, -0.18, 0.18, 0); m.box(0.16, 0.38, 0.16, d, 0.18, 0.18, 0); m.box(0.14, 0.38, 0.14, d, -0.42, 0.62, -0.05, 0, 0, 0.5); m.box(0.14, 0.38, 0.14, d, 0.42, 0.62, -0.05, 0, 0, -0.5);
+      h = 1.6;
+    } else if (kind === 'tomato') { // the Tomato Tosser: a grumpy tomato with a crate of ammunition
+      const r = 0xe8453c;
+      m.add(SPHERE, r, 0, 0.75, 0, 0, 0, 0, 1.2, 1.05, 1.2); m.add(SPHERE, 0xff7a6e, -0.2, 0.95, -0.42, 0, 0, 0, 0.3, 0.24, 0.12);
+      for (let k = 0; k < 5; k++) { const a = k * 1.257; m.add(CONE, 0x35a05a, Math.cos(a) * 0.2, 1.3, Math.sin(a) * 0.2, Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2, 0.16, 0.42, 0.06); }
+      m.box(0.06, 0.22, 0.06, 0x2f7a3a, 0, 1.4, 0); eye(m, -0.18, 0.92, -0.5, 0.13); eye(m, 0.18, 0.92, -0.5, 0.13);
+      m.box(0.26, 0.05, 0.05, 0x1f1a3d, -0.18, 1.08, -0.53, 0, 0, -0.4); m.box(0.26, 0.05, 0.05, 0x1f1a3d, 0.18, 1.08, -0.53, 0, 0, 0.4); m.box(0.3, 0.05, 0.05, 0x1f1a3d, 0, 0.62, -0.58);
+      m.box(0.6, 0.34, 0.4, 0xc9a26a, 0.62, 0.42, 0.1); for (const [x, z] of [[0.5, 0.02], [0.72, 0.18], [0.6, 0.2]]) m.add(SPHERE, r, x, 0.66, z, 0, 0, 0, 0.24, 0.22, 0.24);
+      m.box(0.12, 0.3, 0.12, 0x2f7a3a, -0.22, 0.15, 0); m.box(0.12, 0.3, 0.12, 0x2f7a3a, 0.22, 0.15, 0);
+      h = 1.5;
+    } else if (kind === 'gull') { // the Seagull Sniper: flies over you, drops "presents". Wings flap (userData.wings)
+      m.add(SPHERE, 0xffffff, 0, 0, 0.05, 0, 0, 0, 0.62, 0.55, 1.15); m.add(SPHERE, 0xffffff, 0, 0.22, -0.55, 0, 0, 0, 0.5, 0.48, 0.52);
+      m.box(0.12, 0.1, 0.36, 0xffc21f, 0, 0.16, -0.92); m.add(SPHERE, 0xe8453c, 0, 0.11, -0.98, 0, 0, 0, 0.06, 0.06, 0.06);
+      eye(m, -0.15, 0.32, -0.74, 0.08); eye(m, 0.15, 0.32, -0.74, 0.08); m.box(0.2, 0.04, 0.04, 0x1f1a3d, -0.14, 0.42, -0.76, 0, 0, -0.4); m.box(0.2, 0.04, 0.04, 0x1f1a3d, 0.14, 0.42, -0.76, 0, 0, 0.4);
+      m.box(0.36, 0.08, 0.36, 0xb9c0c8, 0, 0.02, 0.62, 0.2); m.box(0.05, 0.3, 0.05, 0xff8a1a, -0.12, -0.38, 0.05); m.box(0.05, 0.3, 0.05, 0xff8a1a, 0.12, -0.38, 0.05);
+      wings = {};
+      for (const sx of [-1, 1]) { const wm = new Merge(); wm.box(1.1, 0.06, 0.55, 0xd6dbe3, sx * 0.55, 0, 0); wm.box(0.35, 0.065, 0.45, 0x5b5f66, sx * 1.0, 0, 0.05); const wg = new THREE.Group(); wg.position.set(sx * 0.28, 0.12, 0.05); wg.add(wm.mesh()); body.add(wg); wings[sx < 0 ? 'wl' : 'wr'] = wg; }
+      h = 0.9;
+    } else if (kind === 'wifi') { // the Wi-Fi Wraith: a haunted router that fires lag at you. Getting hit = buffering
+      m.box(1.0, 0.28, 0.66, 0x2b2b33, 0, 1.0, 0); m.box(1.02, 0.04, 0.68, 0x6b4eff, 0, 0.87, 0);
+      for (const x of [-0.36, 0, 0.36]) { m.box(0.06, 0.62, 0.06, 0x2b2b33, x, 1.44, 0.22); m.add(SPHERE, 0x35e06a, x, 1.78, 0.22, 0, 0, 0, 0.1, 0.1, 0.1); }
+      for (let k = 0; k < 4; k++) m.add(SPHERE, k % 2 ? 0x35e06a : 0xffc21f, -0.3 + k * 0.2, 1.0, -0.34, 0, 0, 0, 0.06, 0.06, 0.04);
+      eye(m, 0, 1.06, -0.3, 0.2); m.add(CONE, 0x6b4eff, 0, 0.6, 0, Math.PI, 0, 0, 0.75, 0.6, 0.5);
+      for (const sx of [-1, 1]) m.box(0.1, 0.36, 0.1, 0x2b2b33, sx * 0.6, 0.88, 0, 0, 0, sx * 0.6);
+      h = 1.9;
     } else { // pigeon (a very large one) and goose (a very angry one)
       const goose = kind === 'goose', c = goose ? 0xf4f1ea : 0x8b8f9c;
       m.add(SPHERE, c, 0, 0.75, 0.05, 0, 0, 0, 0.9, 0.8, 1.3);
@@ -2790,7 +3029,7 @@ varying float vGL; varying vec2 vGUV;
     }
     const mesh = m.mesh(mat);
     body.add(mesh);
-    g.userData = { kind: 'monster', mkind: kind, body, lid, phase: Math.random() * 6, h, hurt: 0 };
+    g.userData = { kind: 'monster', mkind: kind, body, lid, wings, phase: Math.random() * 6, h, hurt: 0 };
     return g;
   };
   W.animateMonster = function (g, dt, speed) {
@@ -2803,6 +3042,8 @@ varying float vGL; varying vec2 vGUV;
     else if (k === 'worm') { b.rotation.z = s * 0.16; b.rotation.x = Math.cos(u.phase * 0.7) * 0.1; b.scale.y = 1 + s * 0.05; }
     else if (k === 'spider') { b.position.y = Math.abs(s) * 0.12 * Math.min(1, speed + 0.3); b.rotation.y = Math.sin(u.phase * 2) * 0.08; }
     else if (k === 'brute' || k === 'gargoyle') { b.rotation.z = s * 0.06 * Math.min(1, speed + 0.2); b.position.y = Math.abs(s) * 0.05; b.rotation.y = s * 0.05; }
+    else if (k === 'gull') { const f = Math.sin(u.phase * 2.6) * 0.75; if (u.wings) { u.wings.wl.rotation.z = f; u.wings.wr.rotation.z = -f; } b.position.y = Math.sin(u.phase) * 0.15; b.rotation.z = Math.sin(u.phase * 0.5) * 0.15; }
+    else if (k === 'wifi') { b.position.y = Math.sin(u.phase * 0.8) * 0.2; b.rotation.y = Math.sin(u.phase * 0.4) * 0.3; b.rotation.z = Math.sin(u.phase * 1.7) * 0.05; }
     else if (k === 'bin') { b.rotation.z = s * 0.1 * Math.min(1, speed); b.position.y = Math.abs(s) * 0.08 * Math.min(1, speed); if (u.lid) u.lid.rotation.x = -Math.max(0, Math.sin(u.phase * 0.7)) * 0.7; }
     else { b.rotation.z = s * 0.12 * Math.min(1, speed + 0.2); b.position.y = Math.abs(s) * 0.1 * Math.min(1, speed + 0.2); }
     if (u.hurt > 0) { u.hurt -= dt; const f = 1 + Math.sin(u.hurt * 40) * 0.12; g.scale.setScalar((u.size || 1) * f); } else g.scale.setScalar(u.size || 1);
@@ -2831,6 +3072,17 @@ varying float vGL; varying vec2 vGUV;
       case 'guitar': m.box(0.36, 0.08, 0.5, 0xe8453c, 0, 0, -0.75); m.box(0.08, 0.05, 0.75, 0x5b4636, 0, 0, -0.22); m.box(0.14, 0.06, 0.16, 0x1f1a3d, 0, 0, 0.18); break;
       case 'blower': m.box(0.24, 0.26, 0.4, 0xf2b134, 0, 0, -0.15); m.add(CYL, 0x33373f, 0, -0.02, -0.7, Math.PI / 2, 0, 0, 0.16, 0.8, 0.16); m.box(0.06, 0.16, 0.2, 0x1f1a3d, 0, 0.2, -0.1); break;
       case 'bubble': m.box(0.12, 0.2, 0.34, 0xff5c8a, 0, 0, -0.18); m.add(CYL, 0x9fe3d0, 0, 0.04, -0.46, Math.PI / 2, 0, 0, 0.2, 0.24, 0.2); m.box(0.08, 0.2, 0.1, 0xff5c8a, 0, -0.14, -0.06); break;
+      // ranged weapons (2026-11-18)
+      case 'straw': m.add(CYL8, 0xffffff, 0, 0.02, -0.3, Math.PI / 2, 0, 0, 0.05, 0.6, 0.05); for (const z of [-0.1, -0.3, -0.5]) m.add(CYL8, 0xe8453c, 0, 0.02, z, Math.PI / 2, 0, 0, 0.055, 0.06, 0.055); break;
+      case 'launcher': m.add(CYL, 0x35e06a, 0, 0.05, -0.35, Math.PI / 2, 0, 0, 0.2, 0.8, 0.2); m.add(SPHERE, 0x38bdf8, 0, 0.05, -0.78, 0, 0, 0, 0.26, 0.26, 0.26); m.box(0.08, 0.22, 0.12, 0x1f1a3d, 0, -0.12, -0.1); m.add(CYL, 0xffc21f, 0, 0.05, -0.05, Math.PI / 2, 0, 0, 0.24, 0.12, 0.24); break;
+      case 'cannon': m.add(CYL, 0xe8453c, 0, 0.06, -0.4, Math.PI / 2, 0, 0, 0.3, 1.0, 0.3); m.add(CYL, 0xffc21f, 0, 0.06, -0.9, Math.PI / 2, 0, 0, 0.34, 0.08, 0.34); m.box(0.1, 0.24, 0.14, 0x1f1a3d, 0, -0.14, -0.15); m.add(CYL8, 0x9fc3dd, 0, 0.28, -0.2, 0, 0, 0, 0.16, 0.2, 0.16); break;
+      case 'boomer': m.box(0.1, 0.07, 0.45, 0xf7d94c, 0, 0, -0.2, 0, 0.4); m.box(0.1, 0.07, 0.45, 0xf7d94c, 0.12, 0, -0.55, 0, -0.4); m.box(0.06, 0.08, 0.06, 0x6b4f37, 0.2, 0, -0.75); break;
+      case 'sniper': m.add(CYL, 0xffc21f, 0, 0.04, -0.5, Math.PI / 2, 0, 0, 0.12, 1.3, 0.12); m.add(CONE, 0xe8a317, 0, 0.04, -1.2, -Math.PI / 2, 0, 0, 0.12, 0.16, 0.12); m.box(0.08, 0.2, 0.3, 0xe8453c, 0, -0.1, -0.05); m.add(CYL8, 0x1f1a3d, 0, 0.17, -0.45, Math.PI / 2, 0, 0, 0.07, 0.3, 0.07); break;
+      case 'popper': m.add(CONE, 0xff5c8a, 0, 0.05, -0.35, -Math.PI / 2, 0, 0, 0.3, 0.6, 0.3); for (let k = 0; k < 4; k++) m.box(0.31, 0.04, 0.04, [0xffc21f, 0x38bdf8, 0x35e06a, 0x9b5cf6][k], 0, 0.05, -0.15 - k * 0.12, 0, 0, k); m.box(0.08, 0.18, 0.1, 0x1f1a3d, 0, -0.1, -0.05); break;
+      case 'grenade': m.add(SPHERE, 0xff8fb8, 0, 0.05, -0.2, 0, 0, 0, 0.32, 0.22, 0.32); m.add(CYL8, 0xe8453c, 0, 0.05, -0.38, Math.PI / 2, 0, 0, 0.06, 0.12, 0.06); break;
+      case 'potato': m.add(CYL, 0x8a8f99, 0, 0.06, -0.45, Math.PI / 2, 0, 0, 0.22, 1.1, 0.22); m.add(CYL, 0x5b5f66, 0, 0.06, 0.05, Math.PI / 2, 0, 0, 0.34, 0.3, 0.34); m.add(SPHERE, 0xc8a165, 0, 0.06, -1.0, 0, 0, 0, 0.2, 0.18, 0.24); break;
+      case 'chickenl': m.add(CYL, 0xffc21f, 0, 0.06, -0.38, Math.PI / 2, 0, 0, 0.26, 0.9, 0.26); m.box(0.16, 0.2, 0.3, 0xf7d94c, 0, 0.06, -0.92); m.box(0.05, 0.1, 0.1, 0xe8453c, 0, 0.18, -0.95); m.box(0.08, 0.22, 0.12, 0x1f1a3d, 0, -0.12, -0.1); break;
+      case 'gnomezooka': m.add(CYL, 0x35a05a, 0, 0.12, -0.3, Math.PI / 2, 0, 0, 0.32, 1.3, 0.32); m.add(CONE, 0xe8453c, 0, 0.12, -1.1, -Math.PI / 2, 0, 0, 0.3, 0.4, 0.3); m.add(SPHERE, 0xffffff, 0, 0.12, -0.92, 0, 0, 0, 0.26, 0.26, 0.2); m.box(0.1, 0.26, 0.14, 0x1f1a3d, 0, -0.1, -0.1); break;
       case 'sign': m.box(0.05, 0.9, 0.05, 0x9a6a3c, 0, 0.3, 0); m.box(0.7, 0.45, 0.04, 0xc9a26a, 0, 0.9, 0); break;
       case 'cup': m.add(CYL, 0xf4f1ea, 0, 0.09, 0, 0, 0, 0, 0.16, 0.18, 0.16); break;
       case 'blanket': m.box(0.9, 0.06, 1.3, 0x7b52c7, 0, 0.03, 0); m.box(0.9, 0.065, 0.2, 0xf2b134, 0, 0.03, -0.3); m.box(0.9, 0.065, 0.2, 0xf2b134, 0, 0.03, 0.3); break;
@@ -2845,6 +3097,18 @@ varying float vGL; varying vec2 vGUV;
     }
     return m.mesh();
   };
+  // For cft-chaos.js and screenshots: the geometry helpers and one decor piece as a plain mesh
+  W.Merge = Merge; W.GEO = { CYL, CYL8, SPHERE, CONE, BOX: UNIT_BOX, TORUS };
+  W.DECOR_KINDS = DECOR_KINDS;
+  W.decorMesh = function (kind, tint) {
+    const d = DECOR[kind], g = new THREE.Group(); if (!d) return g;
+    if (d.a) { const m = new THREE.Mesh(d.a, new THREE.MeshLambertMaterial({ vertexColors: true, color: tint || (DECOR_TINTS[kind] || [0xffffff])[0] })); m.castShadow = !LOW; g.add(m); }
+    if (d.b) { const m = new THREE.Mesh(d.b, MAT.vc); m.castShadow = !LOW; g.add(m); }
+    if (d.glow) g.add(new THREE.Mesh(d.glow, MAT.glow));
+    return g;
+  };
+  W.decorStats = () => { const o = {}; for (const s of allSubs) if (s.decor) for (const k of DECOR_KINDS) o[k] = (o[k] || 0) + (s.decor[k] || []).length / 5; return o; };
+  W.decorCount = () => { let n = 0; for (const s of allSubs) if (s.decor) for (const k of DECOR_KINDS) n += (s.decor[k] || []).length / 5; return n; };
   // Off-hand shields (loot slot "hand", 2026-11-17): facing -z, centred on the forearm. col = the rarity colour.
   W.shieldMesh = function (kind, col) {
     const m = new Merge(), c = col || 0x9aa3ad, dark = 0x33373f;
@@ -3135,7 +3399,10 @@ varying float vGL; varying vec2 vGUV;
           if (W.onJump2) W.onJump2();
         }
       }
-      player.vy -= GRAV * dt;
+      // gravity: W.gravMul (a low-gravity street event), W.flyHook (cft-chaos.js: jetpack thrust, gliding) may change it
+      let grav = GRAV * (W.gravMul || 1);
+      if (W.flyHook) grav = W.flyHook(dt, player, input, grav, ctl);
+      player.vy -= grav * dt;
       player.pos.y += player.vy * dt;
       // stay on the ground going downhill (instead of hopping), land when falling onto it
       const gy = surfaceAt(player.pos.x, player.pos.z, player.pos.y + 0.6), hs0 = Math.hypot(player.vel.x, player.vel.z);
@@ -3676,13 +3943,14 @@ varying float vGL; varying vec2 vGUV;
     if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (KEYS[e.code]) { input[KEYS[e.code]] = 1; if (W.controls.enabled) e.preventDefault(); }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = true;
-    if (e.code === 'Space' && W.controls.enabled) { if (!e.repeat) input.jump = true; e.preventDefault(); }
+    if (e.code === 'Space' && W.controls.enabled) { if (!e.repeat) input.jump = true; input.hold = true; e.preventDefault(); }
   });
   on(window, 'keyup', e => {
     if (KEYS[e.code]) input[KEYS[e.code]] = 0;
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = false;
+    if (e.code === 'Space') input.hold = false;
   });
-  on(window, 'blur', () => { input.f = input.b = input.l = input.r = 0; input.sprint = false; });
+  on(window, 'blur', () => { input.f = input.b = input.l = input.r = 0; input.sprint = false; input.hold = false; });
   function look(dx, dy, s) { cam.yaw -= dx * s; cam.pitch = Math.max(-0.15, Math.min(1.35, cam.pitch + dy * s)); cam.lookT = performance.now(); }
   let drag = null;
   const lockSupported = 'requestPointerLock' in canvas && !W.TOUCH;

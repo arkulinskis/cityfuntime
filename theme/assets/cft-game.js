@@ -208,6 +208,7 @@ function mount(root, opts) {
     if (G.fun) m *= G.fun.speedMul();
     if (G.rpg) m *= 1 + G.rpg.bonus('speed');
     if (G.hero) m *= G.hero.speedMul();  // main character mode
+    if (G.chaos) m *= G.chaos.speedMul();  // lag spikes, gliding
     return m;
   }
   G.happyTarget = function () {
@@ -1992,6 +1993,10 @@ function mount(root, opts) {
     if (pcar2) return { t: '🚗 Borrow this car', fn: () => G.hero.borrow(pcar2) };
     // followers you can talk to
     for (const f of rt.followers) { if (D.CAST[f.who] && !D.CAST[f.who].animal && Math.hypot(f.obj.position.x - p.x, f.obj.position.z - p.z) < 2.6) { const fw = f.who; return { t: '💬 Talk to ' + D.CAST[fw].n, fn: () => talkTo({ who: fw, open: G.openMissions().filter(id => getM(id).giver === fw), active: G.activeMissions().filter(id => { const s = curStep(id); return s && s.who === fw && s.do === 'talk'; }) }) }; } }
+    // a creature to photograph, a porta-potty to hide in, the six-seven crew (cft-chaos.js): after shops, people with
+    // missions and cars, so a passing crab never steals E from a shop door
+    const ci = G.chaos && G.chaos.interaction(p);
+    if (ci) return ci;
     // people on the street
     const ped = W.nearestPed(p.x, p.z, 2.6);
     if (ped && rt.chatCooldown <= 0) {
@@ -2118,6 +2123,7 @@ function mount(root, opts) {
     if (G.fun) G.fun.tick(dt, paused || rt.busy);
     if (G.rpg) G.rpg.tick(dt, paused || rt.busy);
     if (G.hero) G.hero.tick(dt, paused || rt.busy);
+    if (G.chaos) G.chaos.tick(dt, paused || rt.busy);
     rt.promptTimer -= dt;
     if (rt.promptTimer <= 0) { rt.promptTimer = 0.15; rt.interact = (paused || rt.busy) ? null : findInteraction(); U.prompt(rt.interact ? rt.interact.t : null); }
     // goal beam + arrow
@@ -2134,8 +2140,9 @@ function mount(root, opts) {
   function frame(now) {
     if (!alive) return;
     raf = requestAnimationFrame(frame);
-    const dt = Math.min(0.05, (now - rt.last) / 1000);
+    let dt = Math.min(0.05, (now - rt.last) / 1000);
     rt.last = now;
+    if (rt.hitstop > 0) { rt.hitstop -= dt; dt *= 0.06; }  // hit-stop: the action freezes for a blink on a big hit (cft-chaos.js sets it)
     if (!W || state === 'start') return;
     if (state === 'loading') { W.render(); return; }
     const paused = U.isOpen();
@@ -2200,6 +2207,7 @@ function mount(root, opts) {
     if (window.CFTFun) G.fun = window.CFTFun.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, chatPed, setBusy: v => { rt.busy = !!v; } });
     if (window.CFTRpg) G.rpg = window.CFTRpg.attach(G, { spawnPickup });
     if (window.CFTHero) G.hero = window.CFTHero.attach(G, { bump, spawnPickup });
+    if (window.CFTChaos && G.fun) G.chaos = window.CFTChaos.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the chaos update (cft-chaos.js)
     if (window.CFTDebug) G.debug = window.CFTDebug.attach(G);  // the play-test panel: only with ?debug=1
     // driving into things smashes them (borrowed cars and your own rides alike)
     W.onDriveHit = (e, speed, dir) => { if (G.fun) G.fun.smashProp(e, speed > 9 ? 99 : speed * 0.5, dir, true); };
@@ -2248,6 +2256,7 @@ function mount(root, opts) {
       if (G.fun) G.fun.destroy();
       if (G.rpg) G.rpg.destroy();
       if (G.hero) G.hero.destroy();
+      if (G.chaos) G.chaos.destroy();
       if (G.debug) G.debug.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();

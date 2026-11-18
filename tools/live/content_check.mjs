@@ -16,7 +16,8 @@ const TARGETS = ['giver', 'who', 'home', 'here', 'addr', 'tall', 'water', 'spot'
 const STICKER_IDS = new Set();
 for (const s of D.STICKER_SETS) for (const [id] of s.items) { if (STICKER_IDS.has(id)) bad.push('duplicate sticker id ' + id); STICKER_IDS.add(id); }
 const DOS = new Set(['go', 'talk', 'collect', 'deliver', 'buy', 'have', 'stat', 'level', 'own', 'pay', 'escort', 'chase', 'race', 'photo', 'visit', 'dance', 'quiz', 'sleep', 'walk', 'chat', 'tag', 'defend', 'rush', 'count']);
-const COUNTERS = new Set(['bonks', 'helped', 'flirts', 'escapes', 'slides', 'bounces', 'ufos', 'boss', 'sweet', 'crowned', 'weapons', 'pranks', 'dates', 'jokes',
+const COUNTERS = new Set(['shots', 'bonk_gull', 'dex', 'airtime', 'hoops', 'rankA', 'rankS', 'rankSS', 'rankSSS', 'farts', 'pinatas', 'launches', 'reflects', 'cushions', 'aura',  // the chaos update
+  'bonks', 'helped', 'flirts', 'escapes', 'slides', 'bounces', 'ufos', 'boss', 'sweet', 'crowned', 'weapons', 'pranks', 'dates', 'jokes',
   'blocks', 'parries', 'lib_hearton', 'lib_grocery', 'liberated', 'smash', 'borrowed', 'carsmash', 'maincharacter']);
 const OWN = new Set(['apt', 'biz', 'bizid', 'turf', 'friends', 'kids', 'managers', 'upgrades', 'stickers', 'sets']);
 const kind = (k, where) => { if (k && !D.KINDS[k] && !TARGETS.includes(k)) bad.push(where + ': unknown place ' + k); };
@@ -53,7 +54,9 @@ for (const m of D.MISSIONS) {
 for (const k of Object.keys(D.KINDS)) for (const it of D.KINDS[k].sells) if (!D.ITEMS[it]) bad.push('KINDS.' + k + ' sells unknown ' + it);
 for (const [id, it] of Object.entries(D.ITEMS)) if (it.type === 'vehicle' && !D.VEHICLES[id]) bad.push('vehicle without speeds: ' + id);
 // the wacky update: weapons, monsters, made-up shops, signs, events, street folk
-const MESHES = new Set(['baguette', 'chicken', 'pillow', 'noodle', 'fish', 'plunger', 'guitar', 'blower', 'bubble']);
+const MESHES = new Set(['baguette', 'chicken', 'pillow', 'noodle', 'fish', 'plunger', 'guitar', 'blower', 'bubble',
+  'straw', 'launcher', 'cannon', 'boomer', 'sniper', 'popper', 'grenade', 'potato', 'chickenl', 'gnomezooka']);  // the chaos update's ranged weapons
+const PROJ = new Set(['spit', 'balloon', 'confetti', 'boomerang', 'whoopee', 'tshirt', 'chicken', 'mustard', 'potato', 'gnome', 'tomato', 'poop', 'lag']);  // cft-chaos.js projMesh
 for (const [id, it] of Object.entries(D.ITEMS)) {
   if (!it.weapon) continue;
   if (it.slot !== 'weapon' || it.type !== 'gear') bad.push(id + ': a weapon must be gear for the weapon slot');
@@ -83,7 +86,11 @@ for (const k of Object.keys(D.KEEPER_LINES)) if (k !== 'any' && !D.KINDS[k]) bad
 if (new Set(D.STREETFOLK.map(f => f.id)).size !== D.STREETFOLK.length) bad.push('duplicate street folk ids');
 for (const f of D.STREETFOLK) if (!(f.n && f.e && f.hi && f.story && f.story.length >= 2)) bad.push('street folk ' + f.id + ': needs n, e, hi and two stories');
 for (const f of D.FORTUNES) if (!['coins', 'goose', 'charm', 'slimes', 'sticker', 'ufo', 'speed', 'peels'].includes(f.do)) bad.push('fortune does unknown ' + f.do);
-for (const e of D.EVENTS) if (!['moneyrain', 'flashmob', 'ufo', 'goose', 'slimes', 'crate', 'dogs', 'pigeonzilla'].includes(e.id)) bad.push('unknown event ' + e.id);
+for (const e of D.EVENTS) if (!['moneyrain', 'flashmob', 'ufo', 'goose', 'slimes', 'crate', 'dogs', 'pigeonzilla'].concat(e.chaos ? ['ohio', 'glitch', 'catsdogs', 'cheese', 'sixseven', 'balloons'] : []).includes(e.id)) bad.push('unknown event ' + e.id);
+// the chaos update: ranged weapons and shooters need a projectile cft-chaos.js can draw; flying gear a known mode; every Dex creature an id, name, emoji
+for (const [id, it] of Object.entries(D.ITEMS)) { if (it.weapon && it.weapon.ranged === 'proj' && !(PROJ.has(it.weapon.proj) && it.weapon.rate > 0 && it.weapon.speed > 0)) bad.push(id + ': ranged weapon needs a known proj, rate, speed'); if (it.fly && !['jet', 'glide'].includes(it.fly)) bad.push(id + ': unknown fly ' + it.fly); }
+for (const [k, m] of Object.entries(D.MONSTERS)) if (m.ranged && !(PROJ.has(m.ranged.proj) && m.ranged.r > 0 && m.ranged.cd && m.ranged.dmg > 0)) bad.push('monster ' + k + ': ranged needs proj, r, cd, dmg');
+if (D.CHAOS) { const ids = new Set(); for (const c of D.CHAOS.BRAINROT.concat(D.CHAOS.CRITTERS)) { if (!c.id || !c.n || !c.e || !(c.say && c.say.length)) bad.push('dex creature needs id, n, e, say: ' + c.id); if (ids.has(c.id)) bad.push('dex id twice: ' + c.id); ids.add(c.id); } }
 for (const s of D.STICKER_SETS) if (s.items.length !== 6) bad.push('sticker set ' + s.id + ' needs 6 stickers');
 // every mission reachable: walk the requirement graph (stats/levels/partner assumed reachable)
 const done = new Set();

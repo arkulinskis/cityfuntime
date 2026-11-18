@@ -125,12 +125,14 @@ function attach(G, api) {
     // aim assist: turn to the nearest figment in front of you (or right next to you), with a little lunge. Never when
     // one is already in reach and in front: that's the one you meant.
     let aim = null, ad = w.reach + 2.6;
-    const lined = F.monsters.some(m => { if (m.dead) return false; const f0 = facing(), dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz); return d < w.reach + m.r && (d < 0.8 || (dx * f0.x + dz * f0.z) / d > 0.5); });
-    if (!lined) { const f0 = facing(); for (const m of F.monsters) { if (m.dead) continue; const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz) - m.r; if (d < ad && (d < w.reach * 0.6 || (dx * f0.x + dz * f0.z) / (d + m.r + 1e-6) > -0.2)) { ad = d; aim = m; } } }
+    const high = m => m.obj.position.y - p.y > 2.6;  // flying figments: out of reach (shoot them, or fly up there)
+    const lined = F.monsters.some(m => { if (m.dead || high(m)) return false; const f0 = facing(), dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz); return d < w.reach + m.r && (d < 0.8 || (dx * f0.x + dz * f0.z) / d > 0.5); });
+    if (!lined) { const f0 = facing(); for (const m of F.monsters) { if (m.dead || high(m)) continue; const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz) - m.r; if (d < ad && (d < w.reach * 0.6 || (dx * f0.x + dz * f0.z) / (d + m.r + 1e-6) > -0.2)) { ad = d; aim = m; } } }
     if (aim) { W.player.face = Math.atan2(-(aim.x - p.x), -(aim.z - p.z)); if (ad > w.reach * 0.8 && ad < w.reach + 2.6) { const L = Math.max(0, ad - w.reach * 0.7), f1 = facing(); p.x += f1.x * Math.min(L, 1.8); p.z += f1.z * Math.min(L, 1.8); W.collide(p, 0.4); } }
     const f = facing();
     w.dmg *= 1 + 0.15 * (G.level() - 1);  // you grow stronger with every level (monsters do too)
     if (G.hero) w.dmg *= G.hero.dmgMul();  // main character mode
+    if (w.ranged === 'proj' && G.chaos) { cool = w.rate || 0.5; return G.chaos.fire(w); }  // real projectiles (cft-chaos.js)
     cool = w.ranged === 'shot' ? 0.32 : 0.42;
     W.swing();
     G.sfx.swing();
@@ -146,7 +148,7 @@ function attach(G, api) {
     const countered = F.counter > G.rt.t;
     for (const m of F.monsters) {
       const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
-      if (d > w.reach + m.r || (d > 0.8 && (dx * f.x + dz * f.z) / d < (cone ? 0.55 : 0.15))) continue;
+      if (d > w.reach + m.r || (d > 0.8 && (dx * f.x + dz * f.z) / d < (cone ? 0.55 : 0.15)) || (!cone && high(m))) continue;
       const hw = Object.assign({}, w);
       if (countered) { hw.dmg *= CB.counter; hw.word = 'COUNTER!'; hw.stun = (hw.stun || 0) + 1; }
       else if (m.recover > 0) { hw.dmg *= CB.opening; hw.word = 'OPENING!'; }
@@ -173,7 +175,8 @@ function attach(G, api) {
       if (Math.random() < 0.2) { const by = W.nearestPed(p.x, p.z, 10); if (by) { W.holdPed(by, 2, null); sayAt(by.obj, pick(D.STATIC_LINES), 2.2); } }  // they can't see what you're fighting
       return true;
     }
-    // nothing monstrous in reach: street furniture to smash, a passer-by, or a parked car (alarm, then a wreck)
+    // nothing monstrous in reach: a piñata, a beach ball, a tube man (cft-chaos.js), street furniture to smash, a passer-by, or a parked car
+    if (G.chaos && G.chaos.meleeHit(p, f, w)) return true;
     const thing = W.propNear && W.propNear(p.x + f.x * 1.3, p.z + f.z * 1.3, w.reach * 0.7 + 0.4);
     if (thing) { smashProp(thing, w.dmg * D.TUNE.smash.weaponMul, f, false); return true; }
     const ped = W.nearestPed(p.x + f.x * 1.2, p.z + f.z * 1.2, 1.9);
@@ -196,7 +199,7 @@ function attach(G, api) {
     const y = W.groundAt(e.x, e.z);
     W.pop(e.x, y + 2.4, e.z, r === 'wreck' ? 'KABOOM!' : pick(D.HYPE ? D.HYPE.smash : ['SMASH!']), r === 'wreck' ? '#ff8a3d' : '#ffc21f', r === 'wreck' ? 1.4 : 1.0);
     // a little something falls out: coins from bins and mailboxes, more from cars
-    const coins = r === 'wreck' ? 4 : e.k === 'bin' || e.k === 'box' ? (Math.random() < 0.5 ? 2 : 0) : Math.random() < 0.3 ? 1 : 0;
+    const coins = r === 'wreck' ? 4 : e.k === 'couch' || e.k === 'vend' ? 3 : e.k === 'bin' || e.k === 'box' ? (Math.random() < 0.5 ? 2 : 0) : Math.random() < 0.3 ? 1 : 0;
     for (let i = 0; i < coins; i++) { const a = Math.random() * 6.28; api.spawnPickup('coin', e.x + Math.cos(a) * 1.6, e.z + Math.sin(a) * 1.6); }
     if (r === 'wreck') { G.addXp(6, 'explore'); const by = W.nearestPed(e.x, e.z, 25); if (by) { W.holdPed(by, 2.2, 'air'); sayAt(by.obj, pick(['WHOA!', 'That was AWESOME!', 'Do it again!', 'Insurance will cover it!']), 2.2); } }
     hype('smash', { kind: e.k, wreck: r === 'wreck', car: byCar });
@@ -264,6 +267,7 @@ function attach(G, api) {
     W.scene.add(obj);
     if (def.boss) { const tag = nameTag(def.e + ' ' + def.n, 3.7); obj.add(tag); }
     if (o.champ) { const tag = W.label('🔵 ' + def.n, { size: 32, height: 0.46, bg: 'rgba(28,80,190,.92)', fg: '#ffffff', border: '#0c2a6b' }); tag.position.y = (def.size ? 2.2 : 2.0) / size + 0.4; obj.add(tag); }
+    if (def.ranged && !o.aggro) m.aggro = def.ranged.r + 4;   // shooters notice you from further away
     F.monsters.push(m);
     W.burst(x, obj.position.y + 0.8, z, '💨', 4, { spread: 1.5, up: 1.5, size: 0.5, life: 0.5 });
     return m;
@@ -377,7 +381,9 @@ function attach(G, api) {
       } else if (m.home && Math.hypot(m.x - m.home.x, m.z - m.home.z) > (m.leash || 30)) { // a guardian never strays far from its station
         sp = def.speed; walk(m, m.home.x, m.home.z, sp, dt, m.r); m.hp = Math.min(m.mhp, m.hp + m.mhp * 0.1 * dt);
       } else if (d < (m.aggro || TM.aggro) && onFoot() && !quiet() && !F.dying && Math.hypot(p.x - home.x, p.z - home.z) > 14 && (!m.home || Math.hypot(p.x - m.home.x, p.z - m.home.z) < (m.leash || 30) + 4)) {
-        if (m.wind > 0) { // winding up: it plants its feet and telegraphs, then strikes
+        const ranged = def.ranged && G.chaos && !(m.wind > 0) ? G.chaos.rangedAI(m, d, dt) : false;   // shooters keep their distance and fire (cft-chaos.js)
+        if (ranged !== false) sp = ranged;
+        else if (m.wind > 0) { // winding up: it plants its feet and telegraphs, then strikes
           m.wind -= dt; sp = 0;
           const want = Math.atan2(-(p.x - m.x), -(p.z - m.z)); m.obj.rotation.y += Math.atan2(Math.sin(want - m.obj.rotation.y), Math.cos(want - m.obj.rotation.y)) * Math.min(1, dt * 10);
           teleTick(m);
@@ -1120,7 +1126,8 @@ function attach(G, api) {
     if (!def || F.event) return false;
     const spot = (a, b) => { for (let i = 0; i < 4; i++) { const q = streetSpot(p.x, p.z, a, b); if (q && Math.hypot(q.x - home.x, q.z - home.z) > 15) return q; } return null; };
     const ev = { id, def, t: 0, secs: 30, objs: [] };
-    if (id === 'moneyrain') {
+    if (def.chaos) { if (!G.chaos || !G.chaos.startEvent(id, ev)) return false; ev.chaos = true; }   // the chaos update's events (cft-chaos.js)
+    else if (id === 'moneyrain') {
       const c = spot(25, 60); if (!c) return false;
       ev.x = c.x; ev.z = c.z; ev.e = '💸'; ev.secs = 40;
       for (let i = 0; i < 16; i++) { const s = W.randomWalkSpot(c.x, c.z, 0, 20) || c; api.spawnPickup(i % 6 === 5 ? 'cash' : 'coin', s.x + rnd(-1, 1), s.z + rnd(-1, 1)); }
@@ -1168,8 +1175,9 @@ function attach(G, api) {
   F.startEvent = startEvent;
   function endEvent() {
     const ev = F.event; if (!ev) return;
-    for (const o of ev.objs) W.removeObj(o);
-    if (ev.peds) for (const q of ev.peds) { q.ctl = false; q.keep = false; const a = W.agentOn(q.obj.position.x, q.obj.position.z, false); if (a) { a.off = q.a.off; q.a = a; } }
+    if (ev.chaos && G.chaos) G.chaos.endEvent(ev);
+    for (const o of ev.objs) if (o.parent) W.removeObj(o);
+    if (ev.peds && !ev.chaos) for (const q of ev.peds) { q.ctl = false; q.keep = false; const a = W.agentOn(q.obj.position.x, q.obj.position.z, false); if (a) { a.off = q.a.off; q.a = a; } }
     F.event = null;
     eventT = 55 + Math.random() * 45;
   }
@@ -1183,7 +1191,7 @@ function attach(G, api) {
       const night = isNight(), lv = G.level();
       const wantUfo = s.m['s-ufo'] && s.m['s-ufo'].s === 'active' && !(s.counters.ufos > (s.m['s-ufo'].b || 0));
       if (wantUfo && startEvent('ufo')) return;
-      const pool = D.EVENTS.filter(e => (!e.day || !night) && (!e.lvl || lv >= e.lvl));
+      const pool = D.EVENTS.filter(e => (!e.day || !night) && (!e.lvl || lv >= e.lvl) && (!e.chaos || G.chaos));
       let tot = 0; for (const e of pool) tot += e.w;
       let r = Math.random() * tot;
       for (const e of pool) { if (r < e.w) { startEvent(e.id); return; } r -= e.w; }
@@ -1191,6 +1199,7 @@ function attach(G, api) {
     }
     const ev = F.event;
     ev.t += dt;
+    if (ev.chaos) { if ((G.chaos && G.chaos.updateEvent(ev, dt)) || ev.t >= ev.secs) endEvent(); return; }
     if (ev.id === 'flashmob') {
       for (const q of ev.peds) {
         if (!q.obj.parent) continue;

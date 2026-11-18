@@ -36,6 +36,8 @@ window.__boroOut = []; window.__boroDone = false;
     const xp0 = s.xp, n0 = (s.rpg.boros || []).length;
     const spot = W.nearestWalk(other.x, other.z, 400) || other;
     W.teleport(spot.x, spot.z);
+    if (U.clearBanners) U.clearBanners();  // earlier suites may have queued achievement banners (the full run)
+    for (let i = 0; i < 40 && document.querySelector('.cft-banner'); i++) await sleep(100);
     let banner = null;
     for (let i = 0; i < 200 && !banner; i++) { sim(10); await sleep(100); banner = [...document.querySelectorAll('.cft-banner.boro')].find(b => b.textContent.includes(other.n)); }
     const here = W.districtAt(W.player.pos.x, W.player.pos.z);

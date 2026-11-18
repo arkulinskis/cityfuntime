@@ -108,6 +108,7 @@ function create(G, root) {
   };
   const bannerQ = [];
   let bannerBusy = false;
+  U.clearBanners = () => { bannerQ.length = 0; };  // tests: start from an empty queue
   U.banner = function (title, sub, kind, color) { bannerQ.push({ title, sub, kind, color }); if (!bannerBusy) nextBanner(); };
   function nextBanner() {
     const b = bannerQ.shift();
@@ -412,7 +413,7 @@ function create(G, root) {
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
       '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone (👕 Wardrobe: what you wear)</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things)</div><div><kbd>G</kbd> or right mouse, held: block (time it for a PERFECT PARRY)</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things)</div><div><kbd>G</kbd> or right mouse, held: block (time it for a PERFECT PARRY)</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>B</kbd> toot (yes, really)</div><div><kbd>Space</kbd> held in the air: jetpack / glide</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
       '</div><p class="muted">Watch for the red <b>❗</b> over a figment: it is about to strike. When its ring turns gold, block. Big gold <b>letters</b> on the map are people with missions; E next to a parked car borrows it. The <b>gold arrow</b> over your head always points to your current goal. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
@@ -705,6 +706,7 @@ function create(G, root) {
     const h = G.homeSpot();
     markers.push({ x: h.x, z: h.z, color: '#ff5c8a', r: 8, emoji: '🏠', ring: '#fff', edge: true });
     if (G.fun) G.fun.markers(markers);
+    if (G.chaos) G.chaos.markers(markers);
     const goal = G.rt.goal;
     if (goal) markers.push({ x: goal.x, z: goal.z, color: '#6b4eff', r: 9, emoji: goal.e || '⭐', ring: '#ffc21f', edge: true });
     return { markers, rects };
@@ -738,6 +740,7 @@ function create(G, root) {
     else if (e.code === 'KeyM') toggleZoom();
     else if (e.code === 'KeyH') U.help();
     else if (e.code === 'KeyI') U.wardrobe();
+    else if (e.code === 'KeyB') { if (!e.repeat && G.chaos) G.chaos.fart(); }
   }
   document.addEventListener('keydown', onKey);
   const unblock = () => { if (G.fun && G.fun.blocking) G.fun.setBlock(false); };
@@ -762,13 +765,14 @@ function create(G, root) {
   U.canvas.addEventListener('mousedown', e => { if (e.button === 0 && G.W && G.W.isLocked() && G.state() === 'play' && !stack.length) G.attack(); });
   $('[data-mmwrap]').addEventListener('click', () => U.phone('map'));
   $('[data-quest]').addEventListener('click', () => U.phone('quests'));
-  $('[data-jump]').addEventListener('touchstart', e => { if (G.W) G.W.input.jump = true; e.preventDefault(); }, { passive: false });
+  $('[data-jump]').addEventListener('touchstart', e => { if (G.W) { G.W.input.jump = true; G.W.input.hold = true; } e.preventDefault(); }, { passive: false });
+  for (const ev of ['touchend', 'touchcancel']) $('[data-jump]').addEventListener(ev, () => { if (G.W) G.W.input.hold = false; });  // held: jetpack thrust, gliding
   document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && G.W && G.state() === 'play' && !stack.length && U.wasLocked) U.phone(); U.wasLocked = !!document.pointerLockElement; });
 
   // ------------------------------------------------------------------ the phone
   const APPS = [
     ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['wardrobe', '👕', 'Wardrobe'], ['hero', '🧙', 'Character'], ['rep', '🤝', 'Reputation'], ['ach', '🏆', 'Achievements'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
-    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
+    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['chaos', '🤪', 'Chaos'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
   ];
   let phoneOv = null, phoneApp = null;
   U.phone = function (app) {
@@ -955,6 +959,21 @@ function create(G, root) {
       (v.grudges.length ? '<div class="cft-sec"><h4>💢 Shops that banned you</h4>' + v.grudges.map(g => '<div class="cft-li"><span>💢</span><div><b>' + esc(g.name) + '</b><small>' + g.days + ' more day' + (g.days > 1 ? 's' : '') + ', or go and say sorry</small></div></div>').join('') + '</div>' : '') +
       '<div class="cft-sec"><h4>Shenanigans so far</h4><div class="cft-grid2">' + [['👾 Monsters bonked', v.bonks], ['🤡 Pranks', v.pranks], ['🏃 Escapes', v.escapes], ['😘 Hearts won', v.flirts], ['💕 Dates', v.dates], ['🧡 Kind acts', v.helped],
         ['🍌 Banana slides', v.slides], ['🤸 Bounces', v.bounces], ['😂 Jokes told', v.jokes], ['🎪 Street events', v.events]].map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
+  };
+  // ---- the chaos update (cft-chaos.js): aura, mayhem, the Dex, ranged weapons, flying
+  VIEWS.chaos = function () {
+    if (!G.chaos) return '<div class="cft-empty">🤪<p>The chaos is still loading.</p></div>';
+    const v = G.chaos.summary(), s = save(), RAR = { legendary: '👑 Legendary', rare: '💎 Rare', common: 'Common', neighbour: 'Neighbour' };
+    const fly = v.fly === 'jet' ? '🫘 Bean jetpack: hold Space in the air (refills on the ground). Golden ⭕ sky hoops pay out.' : v.fly === 'glide' ? '☂️ Glide-brella: hold Space while falling. Golden ⭕ sky hoops pay out.' : 'Nothing yet. Hardware stores sell the 🫘 Bean jetpack, clothes shops the ☂️ Glide-brella (back slot).';
+    return '<div class="cft-pcard cft-aura"><b>😎 ' + v.aura.toLocaleString() + ' aura</b><span>Best mayhem: ' + (v.best ? v.best.toLocaleString() + ' pts (rank ' + esc(v.bestRank) + ')' : 'none yet') + '</span>' +
+      '<small>Chain chaos without stopping (bonks, smashes, stunts, piñatas, launches, photos) and watch the meter at the top climb D → SSS. Stop for a few seconds and it cashes in. Getting pooped on by a seagull costs aura. Such is life.</small></div>' +
+      '<div class="cft-sec"><h4>📸 The Dex · ' + v.dexGot + ' / ' + v.dexAll + '</h4><p class="muted small">Snap creatures with E when one is close. Weird ones show as ❓ on the minimap; some fly, some only come out at night.</p><div class="cft-dex">' +
+      v.dex.map(d => '<div class="cft-dexc ' + (d.got ? 'got ' : '') + d.rar + '" title="' + esc(d.got ? d.line || d.n : '???') + '"><span>' + (d.got ? d.e : '❓') + '</span><b>' + esc(d.got ? d.n : '???') + '</b><small>' + esc(RAR[d.rar] || '') + (d.got > 1 ? ' · ×' + d.got : '') + '</small></div>').join('') + '</div></div>' +
+      '<div class="cft-sec"><h4>🎯 Ranged weapons</h4>' + (v.ranged.length ? '<div class="cft-chips">' + v.ranged.map(k => '<button type="button" class="cft-chipb ' + (s.equip.weapon === k ? 'on' : '') + '" data-act="weapon" data-id="' + k + '">' + D.ITEMS[k].e + ' ' + esc(D.ITEMS[k].n) + '</button>').join('') + '</div>' : '') +
+      '<p class="muted small">' + (v.ranged.length ? 'F (or click with the mouse captured) fires. Aim helps itself to the nearest figment in front of you.' : 'Toy shops 🎈, fast food 🥤🌭, gift shops 🎉💨, groceries 🍌, clothes 👕 and hardware stores 🥔🍄 sell things that shoot.') +
+      ' Figments throw things too: dodge, block, or block right as it lands to send it back. 🔁</p></div>' +
+      '<div class="cft-sec"><h4>🛩️ Flying</h4><p class="muted small">' + fly + '</p></div>' +
+      '<div class="cft-sec"><h4>Chaos so far</h4><div class="cft-grid2">' + v.stats.map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
   };
   // ---- the long game (cft-rpg.js): Character, Reputation, Achievements
   const lootRow = (v, it, btns, label) => '<div class="cft-li cft-loot q' + it.q + '"><span>' + it.e + '</span><div><b>' + esc(it.n) + (it.fresh ? ' <i class="cft-new">new</i>' : '') + '</b><small>' + (label || (it.slot && it.slot !== 'charm' ? v.slotNames[it.slot] : 'Charm')) + ' · ' +

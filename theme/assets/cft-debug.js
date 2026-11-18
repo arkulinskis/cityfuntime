@@ -53,6 +53,15 @@ function attach(G) {
       ['🎁 Gift', () => { story(); G.hero.test.fan(true); }],
       ['🔊 Hype Max/Some/Off', () => { const v = s().settings.hype || 'max'; s().settings.hype = v === 'max' ? 'some' : v === 'some' ? 'off' : 'max'; U.toast('🐞 Hype: ' + s().settings.hype); }],
     ]],
+    ['Chaos', [   // the chaos update (cft-chaos.js)
+      ['🎯 Ranged weapons', () => { story(); for (const k of Object.keys(D.ITEMS)) if (D.ITEMS[k].weapon && D.ITEMS[k].weapon.ranged === 'proj') s().owned[k] = true; s().equip.weapon = 'w_balloon'; if (G.rpg) G.rpg.unequip('weapon'); U.toast('🐞 All ranged weapons: swap them in phone → Chaos'); }],
+      ['🫘 Jetpack', () => { story(); s().owned.jetpack = true; G.wearShop('jetpack'); }],
+      ['☂️ Glide-brella', () => { story(); s().owned.glidebrella = true; G.wearShop('glidebrella'); }],
+      ['🍅 Shooters', () => { story(); const p = P(), f = facing(); ['tomato', 'spitter', 'gull', 'wifi'].forEach((k, i) => G.fun.spawnMonster(k, p.x + f.x * (9 + i * 2) + f.z * (i - 1.5) * 4, p.z + f.z * (9 + i * 2) - f.x * (i - 1.5) * 4)); }],
+      ['❓ Brainrot', () => { story(); if (!G.chaos) return; const p = P(), f = facing(), b = D.CHAOS.BRAINROT[Math.floor(Math.random() * D.CHAOS.BRAINROT.length)]; G.chaos.spawnRot(b.id, p.x + f.x * 7, p.z + f.z * 7); U.toast('🐞 ' + b.n); }],
+      ['🪅 Toys', () => { story(); if (!G.chaos) return; const p = P(), f = facing(); G.chaos.spawnPinata(p.x + f.x * 5 + f.z * 3, p.z + f.z * 5 - f.x * 3); G.chaos.spawnBall(p.x + f.x * 4 - f.z * 2, p.z + f.z * 4 + f.x * 2); G.chaos.spawnHole(p.x + f.x * 8, p.z + f.z * 8); G.chaos.spawnCushion(p.x + f.x * 2.5, p.z + f.z * 2.5); }],
+      ['🌀 Chaos event', () => { story(); const ids = D.EVENTS.filter(e => e.chaos).map(e => e.id); if (G.fun.event) { G.fun.event.t = 1e9; } setTimeout(() => { const id = ids[Math.floor(Math.random() * ids.length)]; U.toast('🐞 ' + (G.fun.startEvent(id) ? id : id + ' could not start here')); }, 300); }],
+    ]],
     ['Go to', [
       ['🍩 Tom Hearton\'s', () => { const pl = near(W.places.filter(q => q.kind === 'hearton'), q => q.pin); if (pl) goTo(pl.pin.x, pl.pin.z, pl.name); else U.toast('🐞 None loaded here'); }],
       ['🛒 Grocery', () => { const pl = near(W.places.filter(q => q.kind === 'grocery' && !(s().hero.out || {})[q.id]), q => q.pin); if (pl) goTo(pl.pin.x, pl.pin.z, pl.name); }],
@@ -77,6 +86,7 @@ function attach(G) {
       'ride: ' + (W.ride().kind || 'on foot') + (G.hero && G.hero.borrowed ? ' (borrowed)' : '') + ' · quality ' + (W.renderer.shadowMap.enabled ? 'high' : 'low') + ' · hype ' + (sv.settings.hype || 'max') + ' · swagger ' + hv.swag + (hv.main ? ' (MAIN)' : ''),
       'missions: ' + (act.join(', ') || 'none active') + (sv.track ? ' · tracking ' + sv.track : ''),
       'figments near: ' + (mons.join(', ') || 'none') + ' · smashed this visit: ' + W.smashCount() + ' · outposts freed: ' + Object.keys((sv.hero || {}).out || {}).length,
+      'chaos: ' + (G.chaos ? 'mayhem ' + G.chaos.mayhem().rank + ' ' + G.chaos.mayhem().pts + ' · aura ' + ((sv.chaos || {}).aura || 0) + ' · flying ' + (G.chaos.flying() || 'no') + ' · fuel ' + Math.round(G.chaos.fuel() * 100) + '% · event ' + (G.fun.event ? G.fun.event.id : 'none') + ' · critters ' + G.chaos.critters.length + ' · brainrot ' + G.chaos.rot.map(r => r.id).join('/') : 'off'),
       'screen: ' + innerWidth + 'x' + innerHeight + (matchMedia('(pointer: coarse)').matches ? ' touch' : '') + ' · ' + navigator.userAgent.replace(/^.*?\) /, '').slice(0, 60)].join('\n');
   }
 

@@ -1,6 +1,6 @@
 ---
 name: cityfuntime
-description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 173 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events) and the main character update (blocks and parries, compliments and hype, Tom Hearton's and grocery outposts, smashing things, borrowed cars, GTA mission letters). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
+description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 178 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events) and the main character update (blocks and parries, compliments and hype, Tom Hearton's and grocery outposts, smashing things, borrowed cars, GTA mission letters) and the chaos update (decor everywhere, mayhem meter, ranged weapons and shooters, flying, the Dex, toys, meme humour). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
 ---
 
 # City Fun Time: working on the app
@@ -391,6 +391,68 @@ vehicle, silly roof loads, the four trees and the bushes, animals, a street). Fr
   first visit ever = discovery XP (60 + 10/level) and `save.rpg.boros`; achievements `bo3` Borough Hopper, `bo8` Every Colour
   of the City (title "the Local Everywhere"). Home borough on day one counts quietly.
 - **Tests:** `game_test.py --boro` (borotest.js, also last in the full run); pictures `--boroshots DIR`.
+
+## The chaos update (cft-chaos.js + the decor layer in cft-world.js, 2026-11-18)
+
+The user: "Make it more unhinged, more colours, creatures, objects everywhere. There are some empty spaces, fill them.
+Understand what weird, unhinged, cool, surprising, dank, meme worthy is... 12 year old humour is on the table too. Ranged
+weapons, ranged enemies, flying. Research what makes games fun and add that." What the research turned into (game feel:
+Vlambeer's "Art of Screenshake", "Juice it or lose it", Dead Cells' hit-stop; toy-first chaos: Goat Simulator, Untitled
+Goose Game; combo ranks: Tony Hawk, Devil May Cry): juice (hit-stop, shake, words, sounds), a mayhem combo meter with
+letter ranks, toys before rules, a skill moment (parrying shots back), discovery + collection (the Dex), surprise (events,
+the sky), and silly-but-kind humour.
+- **Tone (keep it):** farts, gnomes, geese, seagulls and memes, never at anyone's expense. A seagull hit gets sympathy from
+  passers-by ("That's good luck, actually!"). Meme words are the kids' own (6-7, aura, rizz, sigma, Ohio, no cap); no
+  real-world characters or brands (the brainrot creatures are original; other people's meme characters stay out).
+- **The decor layer (cft-world.js):** `DECOR[kind]` = {a tinted part (MAT.tint, `DECOR_TINTS`), b own colours (MAT.decor),
+  glow unlit (MAT.dglow)}; `layDecor(s)` (from registerSub) fills `s.decor[kind]` = [x, z, yaw, tint, scale...]: pavements
+  along residential/bigger streets (`PAVE_MIX`; checks buildings only: OSM sidewalks are footways, so the road grid covers
+  pavements), parks/lawns/plazas/playgrounds/woods/sand (`AREA_DECOR`, groups: ring / gang / flock), floats on water, and
+  bunting (`flag`, the 5th value = height) across residential streets. Drawn by `decorInst` in buildSub. `DECOR_HP` kinds are
+  smashable (indexProp, `PROP_HP`, `DEBRIS_COL`, `SMASH_FX`, `SMASH_Y`); `DECOR_HI` kinds only show within LOD_R. A new kind:
+  a `def(...)` in DECOR, an entry in a mix, optionally DECOR_HP/TINTS/HI + DEBRIS_COL/SMASH_FX. `W.decorStats()`,
+  `W.decorCount()`, `W.decorMesh(kind)`; `W.propNear(x, z, r, { kind })` filters by kind (porta-potties).
+- **cft-chaos.js** (`G.chaos`, attached after G.hero; api {bump, bumpTo, spawnPickup, setBusy}); data `D.CHAOS`, knobs
+  `D.TUNE.chaos`; state `save.chaos` {aura, dex{id: n}, best, bestRank}.
+  - **Mayhem:** `C.add(kind)` (points in `D.CHAOS.POINTS` x chain bonus) on every hype event (it wraps `G.hero.event`) and
+    on its own toys; ranks `D.CHAOS.RANKS`; `comboT` s without chaos = `bank()` (coins, XP, aura). Counters rankA/rankS/rankSS/rankSSS.
+  - **Aura:** `C.aura(n, quietly)` (`D.CHAOS.AURA`); positive aura also bumps counter `aura` (achievements).
+  - **Hit-stop:** `G.rt.hitstop` seconds; cft-game.js `frame` slows dt to 6% while it lasts (stepSim ignores it).
+  - **Projectiles:** `C.shots` [{kind, owner 'you'|'foe', obj, v, g, bounce, pierce, back, w | dmg, src}]. Yours: `C.fire(w)`
+    from `F.attack` when `weapon.ranged === 'proj'` (aim: camera direction with the mouse captured, else facing; nudged onto
+    the best target within ~37 degrees; lobbed shots solve the arc). They hit figments in 3D (flying ones too), piñatas, event
+    balloons, balls, people (comic reactions, T-shirts make them happy), props (`F.smashProp`); lobbed shots only on the way
+    down. `impact` = splash + effects per kind. **Weapon field `pellets`, never `n`** (n is the item's name in `weapon()`).
+  - **Ranged / flying figments:** `def.ranged` {r, cd, proj, dmg, speed, lob, drop, slow}, `def.fly` metres. cft-fun.js
+    updateMonsters calls `C.rangedAI(m, d, dt)` in the chase branch (keep distance, strafe, 🎯 aim tag, `enemyShot` leads you);
+    false = the usual melee. Gulls swoop (`m.swoop`) for coins, then the melee rules apply. `flyTick` sets their height after
+    cft-fun moved them. Melee can't reach anything > 2.6 m above you (`high(m)` in F.attack). A shot at you: `shotHitsPlayer`
+    = parry window (`F.parryWindow() + 0.15`) -> reflected (counter `reflects`), block -> reduced, else hit + tomato/poop splat
+    (DOM `.cft-splat`) or lag (`C.speedMul` 0.55 + "Buffering...").
+  - **Flying:** `W.flyHook(dt, player, input, grav, ctl)` (cft-world.js updatePlayer asks it for gravity; `W.gravMul` too).
+    `input.hold` = Space / the jump button held. Jet: thrust while fuel (`jetFuel` s, refills on the ground), fart puffs;
+    glide: caps the fall, `glideSpeed` boost. Gear = back-slot items with `fly: 'jet'|'glide'`; meshes on `W.avatar`
+    (jetMesh, brella). Hoops (`hoopTick`) only while you own flying gear. Counters `airtime` (seconds), `hoops`.
+  - **Toys:** piñatas (`spawnPinata`, 3 hits, 12% mimic), beach balls (`spawnBall`, simple physics, kick = `C.meleeHit`),
+    manholes (`spawnHole`, launch vy 25), whoopee cushions, tube men by made-up shops (`spawnTube`). `toyTick` keeps the counts
+    (`D.TUNE.chaos`) within ~150 m. `C.meleeHit(p, f, w)` is called by F.attack when no figment was hit.
+  - **Creatures:** `critterModel(id)` builds every critter and brainrot model; `critterTick` spawns critters (25-80 m) and a
+    brainrot every `brainrot` s (rarity weights; `night` ones after 21:00); the snail follows you forever, ducks follow when
+    close, the possum plays dead. `snap(c)` (E via `C.interaction`) fills `save.chaos.dex`, counter `dex` (absolute).
+  - **Fart (B, the 💨 button):** `C.fart()`: synth (`fartSound`), peds react, figments within 3.5 m stunned, jet boost in the
+    air. **Porta-potty:** `hide(e)` 4 s invisible (avatar scaled to 0.001), figments confused, then `stinkBomb`.
+  - **Events:** D.EVENTS with `chaos: true` go through cft-fun.js `startEvent` -> `C.startEvent(id, ev)`, `updateEvent` ->
+    `C.updateEvent(ev, dt)` (true = done), `endEvent` -> `C.endEvent(ev)` (restores gravity, peds, the glitch class).
+  - **Sky:** `skyTick` keeps blimps (banner text `D.CHAOS.BLIMPS`), hot-air balloons and a rare whale 160-360 m out.
+  - **Meme chatter:** `chatterTick` every `chatter` s: a passer-by within 20 m says a `D.CHAOS.CHATTER` line (kids: `KIDS`).
+  - **HUD:** `.cft-mayhem` and `.cft-fuel` inside `.cft-tc`, the 💨 button in `.cft-btns`, `.cft-chaosfx` (splat, lag);
+    phone app 🤪 Chaos (`VIEWS.chaos` in cft-ui.js, `C.summary()`); minimap `C.markers` (❓ brainrot, 🪅, hoops).
+  - **Play-test panel:** a Chaos row (all ranged weapons, jetpack, glide-brella, shooters, a brainrot, toys, a chaos event).
+- **Tests:** `game_test.py --chaos` (chaostest.js, 48 checks, also last in the full run); pictures `--chaosshots DIR`.
+  Calm mode (`CFT_TEST.calm`) stops critters, brainrot, toys, the sky and chatter.
+- **Not verified on a real GPU/phone:** frame rate with the decor layer (thousands of instanced pieces; small ones only
+  within 140 m), the critters and the sky. If it stutters: raise the `d +=` step in layDecor (pavements), the `AREA_DECOR`
+  rates, lower the `D.TUNE.chaos` counts, or drop bunting (`flag`).
 
 ## Recipes
 
