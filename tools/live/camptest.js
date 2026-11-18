@@ -44,7 +44,7 @@ window.__campOut = []; window.__campDone = false;
     ok(sz1 === 'l' && sz2 === 's' && w1 > w0 && w2 < w0 && s.settings.mapSize === 's', 'map size: small / medium / large changes the minimap (' + Math.round(w2) + ' < ' + Math.round(w0) + ' < ' + Math.round(w1) + ' px) and is saved');
     U.mapSize('m');
     ok(U.mapSize() === 'l' && U.mapSize() === 's' && U.mapSize() === 'm', 'N / the ⤢ button cycles the map size');
-    const hb = document.querySelector('.cft-hotbar').getBoundingClientRect(), br = document.querySelector('.cft-br').getBoundingClientRect();
+    const hb = document.querySelector('.cft-hotbar').getBoundingClientRect(), br = document.querySelector('.cft-btns').getBoundingClientRect();
     ok(hb.right <= br.left + 2 || hb.bottom <= br.top + 2, 'the hotbar does not overlap the action buttons');
 
     // ---------- the crazy list + the mission cap
@@ -91,6 +91,7 @@ window.__campOut = []; window.__campDone = false;
     const hp0 = F.hp(); F.hurt(999); ok(F.hp() === hp0 && !F.dying, 'you can\'t die during the opening');
     ok(K.useAmmo({ ammo: 3 }) && /∞/.test(document.querySelector('[data-pwn="water"]').textContent), 'infinite ammo and powers during the opening');
     // things you 'get' in the dream: money, XP (levels), a weapon, loot, a sticker, a counter
+    if (s.rpg && s.rpg.loot && s.rpg.loot.length > 10) { const keep = new Set(Object.values(s.rpg.eq || {})); s.rpg.loot = s.rpg.loot.filter((x, i) => keep.has(x.id) || i < 10); }   // room in the bag (the full run fills it)
     const before = { loot: (s.rpg && s.rpg.loot || []).length, tshirt: !!s.owned.w_tshirt, stickers: JSON.stringify(s.stickers), bonks: c('bonks') };
     s.money += 777; s.xp = G.xpAt(6); s.owned.w_tshirt = true; s.equip.weapon = 'w_tshirt'; if (G.rpg) { G.rpg.drop('boss'); G.rpg.drop('chest'); } G.addSticker(); s.counters.bonks = (s.counters.bonks || 0) + 50;
     ok(G.level() >= 6 && (s.rpg.loot || []).length > before.loot, 'in the dream you level up and find things (level ' + G.level() + ', ' + (s.rpg.loot || []).length + ' loot)');
@@ -246,9 +247,10 @@ window.__campOut = []; window.__campDone = false;
         pp.set(wall.x, W.groundAt(wall.x, wall.z) + 1, wall.z); W.player.vy = 2; W.player.grounded = false;
         W.cam.yaw = Math.atan2(wall.ux, wall.uz);   // walk back towards the building
         W.input.f = 1; const wj0 = c('walljumps'), mt0 = c('mantles');
-        for (let i = 0; i < 40 && c('walljumps') === wj0 && c('mantles') === mt0; i++) { W.input.jump = true; if (W.player.grounded || W.player.vy < 0) { W.player.vy = 2; W.player.grounded = false; } G.stepSim(1); }
-        W.input.f = 0;
-        ok(c('walljumps') > wj0 || c('mantles') > mt0, 'jumping at a wall in the air kicks off it (wall jump' + (c('mantles') > mt0 ? ', or a mantle onto a low roof' : '') + ')');
+        let grabbed = false;
+        for (let i = 0; i < 40 && c('walljumps') === wj0 && c('mantles') === mt0 && !grabbed; i++) { W.input.jump = true; if (W.player.climb) grabbed = true; if (W.player.grounded || W.player.vy < 0) { W.player.vy = 2; W.player.grounded = false; } G.stepSim(1); }
+        W.input.f = 0; W.player.climb = null;
+        ok(c('walljumps') > wj0 || c('mantles') > mt0 || grabbed, 'meeting a wall in the air: ' + (grabbed ? 'you grab it and climb' : c('mantles') > mt0 ? 'a mantle onto a low roof' : 'a wall jump'));
       } else info('no wall found next to the roof for the wall-jump check');
       void g;
     } else info('no building found for the roof check');

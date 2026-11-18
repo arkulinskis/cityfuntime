@@ -829,7 +829,7 @@ varying float vGL; varying vec2 vGUV;
   let origin = null, gen = 0;
   const tiles = new Map();
   let allSubs = [], inflight = 0;
-  const buckets = new Map(), nameBuckets = new Map(), hchunks = new Map(), rchunks = new Map(), segBuckets = new Map(), bridgeBuckets = new Map();
+  const buckets = new Map(), nameBuckets = new Map(), hchunks = new Map(), rchunks = new Map(), pchunks = new Map(), segBuckets = new Map(), bridgeBuckets = new Map();
   const player = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), vy: 0, grounded: true, face: 0, phase: 0, speed: 0, heading: 0, moved: 0, footMoved: 0, slope: 0, pitch: 0 };
   const cam = { yaw: 0, pitch: 0.32, dist: 7.5, cur: 7.5, lookT: 0, shake: 0 };
   const input = { f: 0, b: 0, l: 0, r: 0, sprint: false, jump: false, hold: false, jx: 0, jy: 0 };  // hold = Space (or the jump button) held down: jetpacks, gliding
@@ -1206,7 +1206,7 @@ varying float vGL; varying vec2 vGUV;
   }
   // The ground, or a bridge deck when you're on it (y = your height: under a bridge you stay on the ground).
   function surfaceAt(x, z, y) {
-    const g = groundAt(x, z);
+    const g = standAt(x, z);
     if (!bridgeBuckets.size) return g;
     const d = deckAt(x, z);
     return d > g + 0.25 && (y == null || y > d - 1.6) ? d : g;
@@ -1334,6 +1334,11 @@ varying float vGL; varying vec2 vGUV;
   }
   const heightAt = (x, z) => gridGet(hchunks, x, z);
   const roadAt = (x, z) => gridGet(rchunks, x, z);
+  // pavements (the raised strips with a kerb along streets with cars, drawn KERB_Y above the ground in buildSub): people
+  // standing on them stand on top, not 13 cm into them (2026-11-18, "legs in the ground")
+  const paveAt = (x, z) => !LOW && gridGet(pchunks, x, z) && !roadAt(x, z);
+  const standAt = (x, z) => groundAt(x, z) + (paveAt(x, z) ? 0.13 : 0);
+  W.standAt = standAt; W.paveAt = paveAt;
   function rasterize(rings, fn) {
     let zmin = Infinity, zmax = -Infinity;
     for (const p of rings) for (let i = 1; i < p.length; i += 2) { zmin = Math.min(zmin, p[i]); zmax = Math.max(zmax, p[i]); }
@@ -1413,6 +1418,11 @@ varying float vGL; varying vec2 vGUV;
         const nx = -(z2 - z1) / L, nz = (x2 - x1) / L;
         rasterize([[x1 + nx * hw, z1 + nz * hw, x2 + nx * hw, z2 + nz * hw, x2 - nx * hw, z2 - nz * hw, x1 - nx * hw, z1 - nz * hw]],
           (i, j) => gridSet(rchunks, Uint8Array, i, j, 1));
+        if (!LOW && !rd.br && CAR.has(rd.t) && rd.t !== 'service' && rd.t !== 'track') { // the same pavement bands buildSub draws
+          const a = rd.w / 2, b = a + (rd.t === 'residential' ? 2.0 : 2.6);
+          for (const sd of [1, -1]) rasterize([[x1 + nx * a * sd, z1 + nz * a * sd, x2 + nx * a * sd, z2 + nz * a * sd, x2 + nx * b * sd, z2 + nz * b * sd, x1 + nx * b * sd, z1 + nz * b * sd]],
+            (i, j) => gridSet(pchunks, Uint8Array, i, j, 1));
+        }
       }
     }
     for (const nm of r.nm) {
@@ -3405,6 +3415,10 @@ varying float vGL; varying vec2 vGUV;
       const tx = dirX * speed, tz = dirZ * speed;
       const k = 1 - Math.exp(-(player.grounded ? (ride.mode === 'ride' ? 5.5 : 15) : 3.5) * dt);
       player.vel.x += (tx - player.vel.x) * k; player.vel.z += (tz - player.vel.z) * k;
+      // climbing (2026-11-18, Breath of the Wild-style): hold forward against a building and you go up it, paying stamina
+      // (W.stam, set by cft-wild.js). The wall normal comes from collide's push-back each frame.
+      const cl = player.climb;
+      if (cl) { const tgx = -cl.nz, tgz = cl.nx, sd = ctl ? sideIn : 0; player.vel.x = -cl.nx * 2.5 + tgx * sd * 1.5; player.vel.z = -cl.nz * 2.5 + tgz * sd * 1.5; }
       player.pos.x += player.vel.x * dt; player.pos.z += player.vel.z * dt;
       const preX = player.pos.x, preZ = player.pos.z;
       const wallHit = collide(player.pos, ride.radius, player.pos.y);
@@ -3412,8 +3426,40 @@ varying float vGL; varying vec2 vGUV;
       // edge within reach pulls you up (mantle). Roofs are walkable (roofAt below).
       let wnx = player.pos.x - preX, wnz = player.pos.z - preZ;
       const wnl = Math.hypot(wnx, wnz);
-      if (wallHit && wnl > 1e-4 && !player.grounded) {
-        wnx /= wnl; wnz /= wnl;
+      if (wnl > 1e-4) { wnx /= wnl; wnz /= wnl; }
+      const into = wnl > 1e-4 ? -(dirX * wnx + dirZ * wnz) : 0;   // how hard you push into the wall (1 = straight at it)
+      const stam = W.stam;
+      if (cl) {
+        cl.t += dt;
+        if (wallHit && wnl > 1e-4) { cl.nx = wnx; cl.nz = wnz; cl.lost = 0; } else cl.lost += dt;
+        const rf = roofAt(player.pos.x - cl.nx * 0.7, player.pos.z - cl.nz * 0.7);
+        const up = ctl ? fwdIn : 0;
+        if (rf != null && rf - player.pos.y < 1.1 && up > 0) { // over the top
+          player.pos.x -= cl.nx * 0.75; player.pos.z -= cl.nz * 0.75; player.pos.y = rf + 0.05; player.vy = 2; player.jumps = 1; player.climb = null;
+          if (W.onMantle) W.onMantle();
+        } else if (cl.lost > 0.25 || !ctl || (stam && !stam.can('hang'))) { // let go (or too tired to hold on)
+          player.climb = null; if (stam && !stam.can('hang') && W.onTired) W.onTired();
+        } else if (input.jump && up < -0.3) { // a back flip off the wall: the old wall kick
+          player.climb = null; player.vy = ride.jump * 1.3; player.vel.x = cl.nx * 8; player.vel.z = cl.nz * 8; player.jumps = 1; input.jump = false;
+          if (W.onWallJump) W.onWallJump();
+        } else if (input.jump && (!stam || stam.use('climbjump'))) { // climb-jump: a burst up the wall
+          player.vy = 7.6; input.jump = false; if (W.onClimbJump) W.onClimbJump();
+        } else {
+          if (player.vy > 1.6 || player.vy < -1.6 || !input.jump) player.vy += ((up > 0.2 ? 1.6 : up < -0.2 ? -2.4 : 0) - player.vy) * Math.min(1, dt * 10);
+          if (stam) stam.use(up > 0.2 || Math.abs(sideIn) > 0.2 ? 'climb' : 'hang', dt);
+          player.face = Math.atan2(cl.nx, cl.nz);
+        }
+        input.jump = false;
+      } else if (wallHit && wnl > 1e-4 && ctl && into > 0.55 && fwdIn > 0.3 && stam && stam.can('climb') && ride.mode === 'foot' && !W.blocking) {
+        // grab the wall: straight away in the air, after a short push from the ground (so brushing a wall doesn't stick)
+        player.climbPush = player.grounded ? (player.climbPush || 0) + dt : 1;
+        const rf0 = roofAt(player.pos.x - wnx * 0.7, player.pos.z - wnz * 0.7);
+        if (player.climbPush > 0.22 && !(rf0 != null && rf0 - player.pos.y < 1.7 && !player.grounded)) {
+          player.climb = { nx: wnx, nz: wnz, t: 0, lost: 0 }; player.vy = 0; player.grounded = false; player.pos.y += 0.05; player.climbPush = 0;
+          if (W.onClimb) W.onClimb();
+        }
+      } else player.climbPush = 0;
+      if (!player.climb && wallHit && wnl > 1e-4 && !player.grounded) {
         const rf = roofAt(player.pos.x - wnx * 0.7, player.pos.z - wnz * 0.7);
         if (rf != null && rf - player.pos.y < 1.7 && rf - player.pos.y > -0.5 && player.vy > -6 && ctl && (fwdIn || sideIn)) { // mantle onto the roof
           player.pos.x -= wnx * 0.75; player.pos.z -= wnz * 0.75; player.pos.y = rf + 0.05; player.vy = 2; player.jumps = 1;
@@ -3424,6 +3470,15 @@ varying float vGL; varying vec2 vGUV;
           if (W.onWallJump) W.onWallJump();
         }
       }
+      // a perfect-dodge hop: jump while blocking = a quick hop away (sideways with A/D, else backwards). cft-wild.js times it.
+      if (ctl && input.jump && W.blocking && player.grounded && !player.climb) {
+        let hx = dirX, hz = dirZ;
+        if (Math.hypot(hx, hz) < 0.2 || fwdIn > 0.3) { hx = Math.sin(player.face); hz = Math.cos(player.face); }
+        const hl = Math.hypot(hx, hz) || 1;
+        player.vel.x = hx / hl * 11; player.vel.z = hz / hl * 11; player.vy = 4.8; player.grounded = false; player.jumps = 2; input.jump = false;
+        W.burst(player.pos.x, player.pos.y + 0.3, player.pos.z, '💨', 4, { up: 0.4, spread: 1.6, size: 0.5, life: 0.4 });
+        if (W.onDodge) W.onDodge();
+      }
       if (ctl && input.jump && ride.jump > 0) {
         if (player.grounded) { player.vy = ride.jump; player.grounded = false; player.jumps = 1; }
         else if ((player.jumps || 0) < 2) { // a second jump in the air
@@ -3433,8 +3488,8 @@ varying float vGL; varying vec2 vGUV;
         }
       }
       // gravity: W.gravMul (a low-gravity street event), W.flyHook (cft-chaos.js: jetpack thrust, gliding) may change it
-      let grav = GRAV * (W.gravMul || 1);
-      if (W.flyHook) grav = W.flyHook(dt, player, input, grav, ctl);
+      let grav = player.climb ? 0 : GRAV * (W.gravMul || 1);
+      if (W.flyHook && !player.climb) grav = W.flyHook(dt, player, input, grav, ctl);
       player.vy -= grav * dt;
       player.pos.y += player.vy * dt;
       // stay on the ground going downhill (instead of hopping), land when falling onto it
@@ -3476,6 +3531,7 @@ varying float vGL; varying vec2 vGUV;
       const wasAir = !player.grounded;
       if (player.pos.y <= gy || (player.grounded && player.vy <= 0 && player.pos.y - gy < 0.35 + hs0 * dt * 2)) { player.pos.y = gy; player.vy = 0; player.grounded = true; }
       else player.grounded = false;
+      if (player.climb && player.grounded && player.vy <= 0) player.climb = null;
       if (wasAir && player.grounded) { player.jumps = 0; player.chain = 0; if (player.fell > 0.45) W.burst(player.pos.x, gy + 0.1, player.pos.z, '💨', 3, { up: 0.3, spread: 2, size: 0.45, life: 0.45 }); player.fell = 0; }
       if (!player.grounded) player.fell = (player.fell || 0) + dt;
       const tilt = ride.mode === 'ride' && player.grounded ? Math.atan(slopeAlong(-Math.sin(player.face), -Math.cos(player.face))) : 0;
@@ -3491,7 +3547,12 @@ varying float vGL; varying vec2 vGUV;
     // pose
     if (body) {
       const k = ride.kind;
-      if (!player.grounded) W.animate(body, 0, dt, 'air');
+      if (player.climb) { // hand over hand up the wall
+        W.animate(body, 0, dt, 'air');
+        const u = body.userData, ph = player.climb.t * (Math.abs(player.vy) > 0.3 || Math.abs(sideIn) > 0.2 ? 9 : 0);
+        u.armL.rotation.x = 2.7 + Math.sin(ph) * 0.35; u.armR.rotation.x = 2.7 - Math.sin(ph) * 0.35; u.elbowL.rotation.x = 0.5; u.elbowR.rotation.x = 0.5;
+        u.legL.rotation.x = 0.5 + Math.sin(ph + 1.6) * 0.35; u.legR.rotation.x = 0.5 - Math.sin(ph + 1.6) * 0.35; u.kneeL.rotation.x = -0.9; u.kneeR.rotation.x = -0.9;
+      } else if (!player.grounded) W.animate(body, 0, dt, 'air');
       else if (k === 'bike') W.animate(body, Math.abs(player.speed), dt, 'pedal');
       else if (k === 'moped') W.animate(body, 0, dt, 'sit');
       else if (k === 'skateboard' || k === 'kickscooter') { W.animate(body, 0, dt, 'ride'); body.rotation.y = k === 'skateboard' ? Math.PI / 2 * 0.9 : 0; }
@@ -3648,7 +3709,7 @@ varying float vGL; varying vec2 vGUV;
     const sg = a.sg, ux = (sg.x2 - sg.x1) / sg.L * a.dir, uz = (sg.z2 - sg.z1) / sg.L * a.dir;
     const sx = a.dir > 0 ? sg.x1 : sg.x2, sz = a.dir > 0 ? sg.z1 : sg.z2;
     const x = sx + ux * a.t - uz * a.off, z = sz + uz * a.t + ux * a.off;
-    return { x, z, y: sg.br ? surfaceAt(x, z) : groundAt(x, z), ux, uz };
+    return { x, z, y: sg.br ? surfaceAt(x, z) : standAt(x, z), ux, uz };
   }
   // Moves an agent along the street graph. choose(options) picks the next segment (default random).
   function advance(a, dist, carOnly, choose) {
@@ -4067,7 +4128,7 @@ varying float vGL; varying vec2 vGUV;
     gen++;
     for (const s of allSubs) if (s.group) dropSub(s);
     tiles.clear(); allSubs = []; inflight = 0;
-    buckets.clear(); nameBuckets.clear(); hchunks.clear(); rchunks.clear(); segBuckets.clear(); bridgeBuckets.clear();
+    buckets.clear(); nameBuckets.clear(); hchunks.clear(); rchunks.clear(); pchunks.clear(); segBuckets.clear(); bridgeBuckets.clear();
     terr.tiles.clear(); terr.src.clear(); nodes.clear(); terr.inflight = 0; terr.h0 = null; terr.off = false; terr.minY = 0;
     W.places.length = 0; W.placeIds.clear();
     boro.tiles.clear(); boro.pts.length = 0; boro.stale.clear();

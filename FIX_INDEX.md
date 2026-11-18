@@ -97,6 +97,13 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Secrets in tight gaps | "secret in a wall", "can't reach it", "too few" | cft-camp `K.analyse` `reachable` `enclosure` `secretTick` `openSecret` `K.interaction` | `D.TUNE.camp.secret*`, `D.CAMPAIGN.SECRET_LOOT/NOTES` | --camp |
 | Bouncy world, roofs, wall jumps | "bounce too high", "can't climb", "stuck on a roof" | cft-world `updatePlayer` (wall jump, mantle, prop bounce, roof landing), `collide` (footY), `W.roofAt`; cft-camp `W.stompHook` `W.onPropBounce` | numbers in updatePlayer (×1.55 wall jump, 11.5 bounce) | --camp |
 | The HUD layout, map size | "chip covers the map", "hotbar too big on phone" | cft-ui markup at the top of `create`, `U.hud.frame` `missionList` `U.mapSize`; cft-camp `hud()` (hotbar counts, mission count, boss bar); CSS `/* ===== the HUD redesign` (end of app.css) | `--mm` sizes in the CSS | --camp --campshots |
+| Climbing, stamina donut | "climbing too slow", "drains too fast", "sticks to walls" | cft-world `updatePlayer` (`player.climb`, grab/let go/climb-jump), cft-wild `W.stam` `staminaTick` `drawDonut`, CSS `.cft-donut` | `D.TUNE.wild.climb/hang/climbJump/regen/stamMax/tired*` | --wild |
+| Umbrella glide, updrafts | "falls too fast", "no lift over fire" | cft-wild `W.flyHook` wrapper, `updraftAt` | `D.TUNE.wild.glide/glideSink/draftUp` | --wild |
+| Perfect dodge, flurry, slow motion | "dodge window too tight", "slow-mo too long" | cft-wild `X.perfectDodge` `slowmo` `airAim`, cft-fun `strike` (top) + `F.attack` (flurry), cft-game `frame` (`rt.slowmo`) | `D.TUNE.wild.dodgeWindow/flurry*/slowK/airAim*` | --wild |
+| Chemistry (metal arcs, steam, soaked) | "lightning arcs too far" | cft-wild `X.conduct` `X.steam` `X.soak`; calls in cft-camp `zap` `strikeGround` `waterBlast` `fireTick` `stormTick` | `D.TUNE.wild.arc*/steam*` | --wild |
+| Rooftop antennas, giggles | "antenna floating", "too many antennas" | cft-wild `viewTick` `antenna` `tuneIn` `X.interaction` `X.markers` `giggleTick` | `D.TUNE.wild.viewCell/viewMinH/giggleR` | --wild |
+| Legs in the ground (pavements) | "feet sink into the pavement" | cft-world `pchunks` (registerSub), `paveAt` `standAt` `surfaceAt` `segPoint` | `KERB_Y` | --wild |
+| Four-corner HUD | "something in the middle of the screen" | cft-ui markup (`.cft-tl/.cft-tr/.cft-bl/.cft-br`), CSS "the four corners" block (end of app.css) | 40vw/40vh caps in the CSS | --wild (corner check) |
 | Play-test panel | | cft-debug.js (`?debug=1`) | | |
 
 ## Tests (pick the narrowest)
@@ -107,6 +114,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | `python tools/check.py` | Anvil validate, JS syntax, asset hashes, server tests, design check | ~1 min |
 | `python -I tools/live/game_test.py --hero` | speed, combat, smashing, cars, outposts, hype, blips, shields | ~2 min |
 | `python -I tools/live/game_test.py --chaos` | decor, mayhem, ranged weapons + figments, flying, Dex, toys, chaos events | ~2 min |
+| `python -I tools/live/game_test.py --wild` | four-corner HUD, pavements, climbing + stamina, glide + updrafts, perfect dodge, air slow-mo, chemistry, antennas | ~2 min |
 | `python -I tools/live/game_test.py --camp` | HUD + map size, crazy list + mission cap, the opening, ammo, powers, fire, storms, MEGA figments, secrets, bouncy world | ~2 min |
 | `python -I tools/live/game_test.py --boro` | borough names, looks, HUD chip, banners, discovery | ~1 min |
 | `... --fun` / `--combat` / `--rpg` | street life / monsters, health, guardians / loot, talents | 2-3 min each |

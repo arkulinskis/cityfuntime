@@ -112,7 +112,7 @@ function attach(G, api) {
   const introEl = document.createElement('div');
   introEl.className = 'cft-intro'; introEl.hidden = true;
   introEl.innerHTML = '<b data-ileft>5:00</b><span>You can\'t die. Everything is chasing you. Survive the chaos!</span>';
-  shell.appendChild(introEl);
+  { const tr = shell.querySelector('.cft-tr'); if (tr) tr.insertBefore(introEl, tr.firstChild); else shell.appendChild(introEl); }  // heads the top-right corner
   const $ = sel => shell.querySelector(sel);
   const last = {};
   const setT = (sel, v) => { const el = $(sel); if (el && last[sel] !== v) { last[sel] = v; el.textContent = v; } };
@@ -365,7 +365,7 @@ function attach(G, api) {
       hits++;
     }
     for (const m of K.megas) { if (m.dead) continue; if (inCone(p, f, m.x, m.z, T.waterRange + m.r, 0.5) >= 0) { m.wet = G.rt.t + 10; W.pop(m.x, gy(m.x, m.z) + m.h * 0.5, m.z, 'SOAKED!', '#9fdcff', 2); hits++; } }
-    for (const fi of K.fires.slice()) if (inCone(p, f, fi.x, fi.z, T.waterRange + 1, 0.6) >= 0) douse(fi, 70);
+    for (const fi of K.fires.slice()) if (inCone(p, f, fi.x, fi.z, T.waterRange + 1, 0.6) >= 0) { if (G.wild) G.wild.steam(fi.x, fi.z); douse(fi, 70); }   // steam blinds figments
     for (const ped of W.life.peds) { const o = ped.obj.position; if (!ped.ctl && inCone(p, f, o.x, o.z, 9, 0.7) >= 0) { W.holdPed(ped, 1.4, 'air'); W.say(ped.obj, pick(['Refreshing!', 'MY HAIR!', 'Is it raining?', 'Thanks, it\'s hot out!']), 1.8); } }
     if (hits) mayhem('hit');
     api.bump('splashes');
@@ -428,10 +428,12 @@ function attach(G, api) {
       for (const m of F.monsters) { if (m.dead || hit.has(m)) continue; const d = Math.hypot(m.x - from.x, m.z - from.z); if (d < (m.wet > G.rt.t || wet ? 9 : 6) && d < nd) { nd = d; next = m; } }
       cur = next;
     }
+    if (G.wild) G.wild.conduct(target.x, target.z, T.voltDmg * lvlMul());
     mayhem('hit'); W.shake(0.2);
     if (Math.random() < 0.2) K.spawnFire(target.x + rnd(-1, 1), target.z + rnd(-1, 1), 0.5);
   }
   function strikeGround(x, z, fireChance) {
+    if (G.wild) G.wild.conduct(x, z, T.voltDmg * lvlMul());   // lightning jumps through metal nearby
     const e = W.propNear(x, z, 2.6);
     if (e) { F.smashProp(e, 3, null, false); if (Math.random() < fireChance && ['tree', 'bench', 'bin', 'couch', 'cart', 'picnic', 'cafe'].includes(e.k)) K.spawnFire(e.x, e.z, 0.9); }
     else if (Math.random() < fireChance * 0.4) K.spawnFire(x, z, 0.5);
@@ -522,7 +524,8 @@ function attach(G, api) {
     burnAcc += dt;
     if (burnAcc >= 0.5) {
       burnAcc = 0;
-      for (const f of K.fires) if (Math.hypot(f.x - p.x, f.z - p.z) < 0.8 + f.size * 0.55 && p.y - gy(f.x, f.z) < 1.4) { F.hurt(T.fireHurt * 0.5 * f.size * (1 + 0.1 * (lvl() - 1)), null); W.pop(p.x, p.y + 2.6, p.z, pick(['HOT!', 'OUCH!', 'TOASTY!']), '#ff8a3d', 0.8); break; }
+      for (const f of K.fires) if (Math.hypot(f.x - p.x, f.z - p.z) < 0.8 + f.size * 0.55 && p.y - gy(f.x, f.z) < 1.4) {
+        if (G.wild && G.wild.soaked()) { if (!K._fireproof || G.rt.t - K._fireproof > 4) { K._fireproof = G.rt.t; W.pop(p.x, p.y + 2.6, p.z, 'SOAKED = FIREPROOF!', '#9fdcff', 0.8); } break; } F.hurt(T.fireHurt * 0.5 * f.size * (1 + 0.1 * (lvl() - 1)), null); W.pop(p.x, p.y + 2.6, p.z, pick(['HOT!', 'OUCH!', 'TOASTY!']), '#ff8a3d', 0.8); break; }
     }
     // random fires around town once fires are on (or a mission needs some)
     if (!K.inIntro() && !calm() && !quiet() && G.storyOn() && (K.allow('fire') || wants('fires_out'))) {
@@ -575,7 +578,7 @@ function attach(G, api) {
         bolt(w.x, y + 34, w.z, w.x, y, w.z, 0.55);
         if (U.flash) U.flash();
         sfx('boom'); W.shake(clamp(0.9 - Math.hypot(w.x - p.x, w.z - p.z) / 60, 0.05, 0.9));
-        if (Math.hypot(w.x - p.x, w.z - p.z) < 2.3 && p.y - y < 2) { F.hurt(F.maxHp() * 0.12, null); W.pop(p.x, p.y + 2.6, p.z, 'ZAPPED!', '#fff07a', 1.2); }
+        if (Math.hypot(w.x - p.x, w.z - p.z) < 2.3 && p.y - y < 2) { F.hurt(F.maxHp() * 0.12 * (G.wild && G.wild.soaked() ? 2 : 1), null); W.pop(p.x, p.y + 2.6, p.z, 'ZAPPED!', '#fff07a', 1.2); }
         else if (Math.hypot(w.x - p.x, w.z - p.z) < 5) word('DODGED LIGHTNING!', 'violet');
         strikeGround(w.x, w.z, 0.35);
         if (Math.random() < 0.3) api.spawnPickup('volt', w.x + rnd(-2, 2), w.z + rnd(-2, 2));
@@ -1003,7 +1006,7 @@ function attach(G, api) {
     const c = st();
     if (c.water < T.waterMax && onFoot()) {
       const h = W.propNear(p.x, p.z, 2.2, { kind: 'hydrant' });
-      if (h && !(K._hyd && K._hyd[h.key] > G.rt.t)) return { t: '💧 Fill up your water power at the hydrant', fn: () => { (K._hyd = K._hyd || {})[h.key] = G.rt.t + 90; c.water = Math.min(T.waterMax, c.water + T.hydrant); U.feed('💧', 'Water power ' + c.water + '/' + T.waterMax); W.burst(h.x, gy(h.x, h.z) + 1, h.z, '💧', 8, { spread: 1, up: 4 }); sfx('splash'); G.dirty(); } };
+      if (h && !(K._hyd && K._hyd[h.key] > G.rt.t)) return { t: '💧 Fill up your water power at the hydrant', fn: () => { (K._hyd = K._hyd || {})[h.key] = G.rt.t + 90; c.water = Math.min(T.waterMax, c.water + T.hydrant); if (G.wild) G.wild.soak(10); U.feed('💧', 'Water power ' + c.water + '/' + T.waterMax); W.burst(h.x, gy(h.x, h.z) + 1, h.z, '💧', 8, { spread: 1, up: 4 }); sfx('splash'); G.dirty(); } };
     }
     return null;
   };
@@ -1049,6 +1052,7 @@ function attach(G, api) {
     analyseTick(dt);
     secretTick(dt);
   };
+  K.bolt = bolt;   // lightning bolts for cft-wild.js (metal arcs)
   K.test = { pwCd: () => pwCd, spraying: () => spraying, st, endIntro, introTick, startStorm, stopStorm, crates, orbs, foams, analysed, removeMega, douse };
   K.destroy = function () {
     alive = false;

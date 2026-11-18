@@ -51,26 +51,31 @@ function create(G, root) {
           <button type="button" class="cft-mcount" data-mcount title="Missions on the map, and how weird the city has become (open the Campaign app)"></button>
         </div>
       </div>
-      <div class="cft-tc"><div class="cft-where"><div class="cft-clock" data-clock></div><div class="cft-boro" data-boro hidden title="The borough you're in: each one has its own colours, banners and road lines"><i></i><b></b></div></div><div class="cft-street" data-street></div></div>
+      <!-- the four corners (2026-11-18, the user: "all info in the 4 corners, nothing in the middle column or the middle row";
+           the map back in the bottom left): top right = where/when, mayhem, boss + foe bars, the feed -->
       <div class="cft-tr">
+        <div class="cft-tc"><div class="cft-where"><div class="cft-clock" data-clock></div><div class="cft-boro" data-boro hidden title="The borough you're in: each one has its own colours, banners and road lines"><i></i><b></b></div></div><div class="cft-street" data-street></div></div>
+        <div class="cft-boss" data-boss hidden><b data-bossname></b><div class="cft-bar boss"><i data-bossbar></i></div><small data-bosshint></small></div>
+        <div class="cft-foe" data-foe hidden><b data-foename></b><div class="cft-bar foe"><i data-foebar></i></div></div>
+        <div class="cft-feed" data-feed></div>
+      </div>
+      <div class="cft-bl">
+        <div class="cft-timer" data-timer hidden></div>
         <div class="cft-mmwrap" data-mmwrap data-size="m" title="Minimap: click for the big map">
           <canvas class="cft-mm" data-mm></canvas><span data-mmzoom></span>
           <button type="button" class="cft-mmb cft-mmz" data-mmz title="Zoom the minimap (M)" aria-label="Zoom the minimap">±</button>
           <button type="button" class="cft-mmb cft-mms" data-mms title="Map size: small, medium, large (N)" aria-label="Change the map size">⤢</button>
         </div>
       </div>
-      <div class="cft-foe" data-foe hidden><b data-foename></b><div class="cft-bar foe"><i data-foebar></i></div></div>
-      <div class="cft-boss" data-boss hidden><b data-bossname></b><div class="cft-bar boss"><i data-bossbar></i></div><small data-bosshint></small></div>
-      <div class="cft-feed" data-feed></div>
-      <div class="cft-hotbar" data-hotbar>
-        <button type="button" class="cft-hb main" data-bonk title="Attack (F, or click with the mouse captured)" aria-label="Attack"><span data-bonkicon>🖐️</span><em data-ammo></em><kbd>F</kbd></button>
-        <button type="button" class="cft-hb water" data-pw="water" title="Water power (1): soaks and knocks back figments, puts out fires. Refill: water orbs, hydrants (E)" aria-label="Water power"><span>💧</span><em data-pwn="water"></em><kbd>1</kbd></button>
-        <button type="button" class="cft-hb volt" data-pw="volt" title="Lightning power (2): zaps and chains between figments, double on wet ones. Refill: lightning orbs, storms" aria-label="Lightning power"><span>🌩️</span><em data-pwn="volt"></em><kbd>2</kbd></button>
-        <button type="button" class="cft-hb foam" data-pw="foam" title="Fire extinguisher (hold 3): puts out fires fast. Found near fires" aria-label="Fire extinguisher"><span>🧯</span><em data-pwn="foam"></em><kbd>3</kbd></button>
-        <button type="button" class="cft-hb" data-quaff title="Eat or drink to heal (Q)" aria-label="Heal"><span>🍵</span><kbd>Q</kbd></button>
-      </div>
       <div class="cft-br">
         <button class="cft-act" data-act type="button" hidden><kbd>E</kbd><span data-acttext></span></button>
+        <div class="cft-hotbar" data-hotbar>
+          <button type="button" class="cft-hb main" data-bonk title="Attack (F, or click with the mouse captured)" aria-label="Attack"><span data-bonkicon>🖐️</span><em data-ammo></em><kbd>F</kbd></button>
+          <button type="button" class="cft-hb water" data-pw="water" title="Water power (1): soaks and knocks back figments, puts out fires. Refill: water orbs, hydrants (E)" aria-label="Water power"><span>💧</span><em data-pwn="water"></em><kbd>1</kbd></button>
+          <button type="button" class="cft-hb volt" data-pw="volt" title="Lightning power (2): zaps and chains between figments, double on wet ones. Refill: lightning orbs, storms" aria-label="Lightning power"><span>🌩️</span><em data-pwn="volt"></em><kbd>2</kbd></button>
+          <button type="button" class="cft-hb foam" data-pw="foam" title="Fire extinguisher (hold 3): puts out fires fast. Found near fires" aria-label="Fire extinguisher"><span>🧯</span><em data-pwn="foam"></em><kbd>3</kbd></button>
+          <button type="button" class="cft-hb" data-quaff title="Eat or drink to heal (Q)" aria-label="Heal"><span>🍵</span><kbd>Q</kbd></button>
+        </div>
         <div class="cft-btns">
           <button type="button" data-block title="Block: hold (G or right mouse). Time it just before a hit for a PERFECT PARRY" aria-label="Block">🛡️</button>
           <button type="button" data-ride title="Ride (V)" aria-label="Ride">🛹</button>
@@ -78,7 +83,6 @@ function create(G, root) {
           <button type="button" data-jump class="cft-touch" title="Jump (wall jump off walls, bounce off everything)" aria-label="Jump">⤒</button>
         </div>
       </div>
-      <div class="cft-timer" data-timer hidden></div>
     </div>
     <div class="cft-joy" data-joy><div class="cft-knob" data-knob></div></div>
     <div class="cft-banners" data-banners></div>
@@ -732,6 +736,8 @@ function create(G, root) {
     markers.push({ x: h.x, z: h.z, color: '#ff5c8a', r: 8, emoji: '🏠', ring: '#fff', edge: true });
     if (G.fun) G.fun.markers(markers);
     if (G.chaos) G.chaos.markers(markers);
+    if (G.camp) G.camp.markers(markers);
+    if (G.wild) G.wild.markers(markers);
     const goal = G.rt.goal;
     if (goal) markers.push({ x: goal.x, z: goal.z, color: '#6b4eff', r: 9, emoji: goal.e || '⭐', ring: '#ffc21f', edge: true });
     return { markers, rects };

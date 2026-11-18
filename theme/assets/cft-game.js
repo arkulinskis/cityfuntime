@@ -209,6 +209,7 @@ function mount(root, opts) {
     if (G.rpg) m *= 1 + G.rpg.bonus('speed');
     if (G.hero) m *= G.hero.speedMul();  // main character mode
     if (G.chaos) m *= G.chaos.speedMul();  // lag spikes, gliding
+    if (G.wild) m *= G.wild.speedMul();   // out of stamina: a slow walk
     return m;
   }
   G.happyTarget = function () {
@@ -2001,6 +2002,8 @@ function mount(root, opts) {
     for (const f of rt.followers) { if (D.CAST[f.who] && !D.CAST[f.who].animal && Math.hypot(f.obj.position.x - p.x, f.obj.position.z - p.z) < 2.6) { const fw = f.who; return { t: '💬 Talk to ' + D.CAST[fw].n, fn: () => talkTo({ who: fw, open: G.openMissions().filter(id => getM(id).giver === fw), active: G.activeMissions().filter(id => { const s = curStep(id); return s && s.who === fw && s.do === 'talk'; }) }) }; } }
     // a creature to photograph, a porta-potty to hide in, the six-seven crew (cft-chaos.js): after shops, people with
     // missions and cars, so a passing crab never steals E from a shop door
+    const wi = G.wild && G.wild.interaction(p);  // a rooftop antenna to tune in (cft-wild.js)
+    if (wi) return wi;
     const ki = G.camp && G.camp.interaction(p);  // hydrants (water), secrets (cft-camp.js)
     if (ki) return ki;
     const ci = G.chaos && G.chaos.interaction(p);
@@ -2133,6 +2136,7 @@ function mount(root, opts) {
     if (G.hero) G.hero.tick(dt, paused || rt.busy);
     if (G.chaos) G.chaos.tick(dt, paused || rt.busy);
     if (G.camp) G.camp.tick(dt, paused || rt.busy);
+    if (G.wild) G.wild.tick(dt, paused || rt.busy);
     rt.promptTimer -= dt;
     if (rt.promptTimer <= 0) { rt.promptTimer = 0.15; rt.interact = (paused || rt.busy) ? null : findInteraction(); U.prompt(rt.interact ? rt.interact.t : null); }
     // goal beam + arrow
@@ -2151,7 +2155,8 @@ function mount(root, opts) {
     raf = requestAnimationFrame(frame);
     let dt = Math.min(0.05, (now - rt.last) / 1000);
     rt.last = now;
-    if (rt.hitstop > 0) { rt.hitstop -= dt; dt *= 0.06; }  // hit-stop: the action freezes for a blink on a big hit (cft-chaos.js sets it)
+    if (rt.hitstop > 0) { rt.hitstop -= dt; dt *= 0.06; }
+    if (rt.slowmo > 0) { rt.slowmo -= dt; dt *= rt.slowK || 0.3; }  // slow motion: a perfect dodge, a shot high in the air (cft-wild.js)  // hit-stop: the action freezes for a blink on a big hit (cft-chaos.js sets it)
     if (!W || state === 'start') return;
     if (state === 'loading') { W.render(); return; }
     const paused = U.isOpen();
@@ -2218,6 +2223,7 @@ function mount(root, opts) {
     if (window.CFTHero) G.hero = window.CFTHero.attach(G, { bump, spawnPickup });
     if (window.CFTChaos && G.fun) G.chaos = window.CFTChaos.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the chaos update (cft-chaos.js)
     if (window.CFTCamp && G.fun) G.camp = window.CFTCamp.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; }, travel, setState: v => { state = v; } });  // the campaign update (cft-camp.js)
+    if (window.CFTWild && G.fun) G.wild = window.CFTWild.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the open-air update (cft-wild.js)
     if (window.CFTDebug) G.debug = window.CFTDebug.attach(G);  // the play-test panel: only with ?debug=1
     // driving into things smashes them (borrowed cars and your own rides alike)
     W.onDriveHit = (e, speed, dir) => { if (G.fun) G.fun.smashProp(e, speed > 9 ? 99 : speed * 0.5, dir, true); };
@@ -2272,6 +2278,7 @@ function mount(root, opts) {
       if (G.hero) G.hero.destroy();
       if (G.chaos) G.chaos.destroy();
       if (G.camp) G.camp.destroy();
+      if (G.wild) G.wild.destroy();
       if (G.debug) G.debug.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();

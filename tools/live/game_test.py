@@ -7,6 +7,7 @@
     python -I tools/live/game_test.py --heroshots [OUTDIR] no tests: the main character update (graphics, a parry, the hype, an outpost, a wreck, blips, night)
     python -I tools/live/game_test.py --chaos [OUTDIR]    only chaostest.js (decor, mayhem, ranged weapons + figments, flying, the Dex, toys, events)
     python -I tools/live/game_test.py --camp [OUTDIR]     only camptest.js (HUD + map size, crazy list + mission cap, the opening, ammo, powers, fire, storms, MEGA figments, secrets, bouncy world)
+    python -I tools/live/game_test.py --wild [OUTDIR]     only wildtest.js (four-corner HUD, pavement footing, climbing + stamina, umbrella + updrafts, perfect dodge + flurry, air slow-mo, chemistry, rooftop antennas)
     python -I tools/live/game_test.py --campshots [OUTDIR] no tests: pictures of the campaign update (HUD desktop + phone, the opening, a MEGA figment, fire, a storm, a secret)
     python -I tools/live/game_test.py --chaosshots [OUTDIR] no tests: the chaos update (decor, critters, brainrot, toys, the sky, a jetpack, ranged fights)
     python -I tools/live/game_test.py --boro [OUTDIR]     only borotest.js (borough names, looks, HUD chip, banners, discovery)
@@ -288,6 +289,8 @@ else:
         steps += script("chaostest.js", "__chaosDone", "__chaosOut", 600000)
     elif "--camp" in flags:
         steps += script("camptest.js", "__campDone", "__campOut", 900000)
+    elif "--wild" in flags:
+        steps += script("wildtest.js", "__wildDone", "__wildOut", 900000)
     else:
         if "--fun" not in flags:
             steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
@@ -299,6 +302,7 @@ else:
             steps += script("borotest.js", "__boroDone", "__boroOut", 300000)
             steps += script("chaostest.js", "__chaosDone", "__chaosOut", 600000)
             steps += script("camptest.js", "__campDone", "__campOut", 900000)
+            steps += script("wildtest.js", "__wildDone", "__wildOut", 900000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"

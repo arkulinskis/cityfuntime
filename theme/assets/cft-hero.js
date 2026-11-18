@@ -442,7 +442,7 @@ function attach(G, api) {
     if (now - hudRectT > 500) {
       hudRectT = now;
       const sr = shell.getBoundingClientRect();
-      hudRects = ['.cft-tl', '.cft-mmwrap', '.cft-tc', '.cft-hotbar', '.cft-br', '.cft-boss:not([hidden])'].map(q => shell.querySelector(q)).filter(e => e && e.offsetParent !== null)
+      hudRects = ['.cft-tl', '.cft-tr', '.cft-bl', '.cft-br'].map(q => shell.querySelector(q)).filter(e => e && e.offsetParent !== null)
         .map(e => { const r = e.getBoundingClientRect(); return { l: r.left - sr.left - 24, t: r.top - sr.top - 24, r: r.right - sr.left + 24, b: r.bottom - sr.top + 30 }; }).filter(r => r.r > r.l && r.b > r.t);
     }
     for (let k = 0; k < 2; k++) for (const r of hudRects) {

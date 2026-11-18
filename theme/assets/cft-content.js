@@ -1706,6 +1706,17 @@ D.RPG.ACH.push(
   { id: 'walls', cat: 'Campaign', e: '🧗', n: 'Parkour!', d: 'Wall-jump 25 times', k: 'walljumps', c: 25, pts: 10 },
   { id: 'chain5', cat: 'Campaign', e: '🦘', n: 'Boing Boing Boing', d: 'Bounce 5 times in a row without touching the ground', k: 'bestchain', c: 5, pts: 10 },
 );
+D.RPG.ACH.push(
+  { id: 'climb100', cat: 'Open air', e: '🧗', n: 'Wall Crawler', d: 'Climb 100 metres of buildings', k: 'climbed', c: 100, pts: 10 },
+  { id: 'glide60', cat: 'Open air', e: '☂️', n: 'Mary Poppins Who?', d: 'Glide for 60 seconds with your umbrella', k: 'glided', c: 60, pts: 10 },
+  { id: 'pdodge10', cat: 'Open air', e: '💨', n: 'Too Slow', d: 'Pull off 10 perfect dodges', k: 'perfectdodges', c: 10, pts: 25, title: 'the Untouchable' },
+  { id: 'views5', cat: 'Open air', e: '📡', n: 'Five Bars', d: 'Tune in at 5 rooftop antennas', k: 'views', c: 5, pts: 10, title: 'the Wi-Fi Wizard' },
+  { id: 'arcs10', cat: 'Open air', e: '⚡', n: 'Conductor', d: 'Zap 10 figments through metal', k: 'arcs', c: 10, pts: 10 },
+);
+S('s-signal', 'Signal Boost', 'max', 'home', { m: ['c1-couch'] }, ['Max: See that antenna on the tallest roof around here? The 📡 on your map?',
+  'Max: Climb up there (just keep walking into the wall: yes, really) and tune in. You’ll see the whole neighbourhood. Glide down with your umbrella: hold Space while you fall.'],
+  [{ do: 'count', key: 'views', n: 1, text: 'Climb to a rooftop antenna 📡 (walk into a wall to climb) and press E to tune in' }],
+  ['Max: Five bars! And you didn’t even fall off. Much.'], { money: 100, xp: 240, stats: { fit: 1 }, rel: { max: 6 } });
 S('s-nosy', 'Nosy Parker', 'max', 'home', { m: ['c1-couch'] }, ['Max: Okay, so. Between the buildings there are these tiny gaps. Alleys you can barely fit in.',
   'Max: People hide things there. Notes. Cash. Weird little treasures. Go be nosy. Find three.'],
   [{ do: 'count', key: 'secrets', n: 3, text: 'Find 3 secrets hidden in the tight gaps between buildings (squeeze in and look for a ✨)' }],
@@ -1777,6 +1788,16 @@ D.TUNE = {
     enemyShots: 1,                // enemy projectile damage multiplier
   },
   world: { peds: 44, pedsLow: 22, cars: 20, carsLow: 9 },   // people and traffic around you (cft-world.js)
+  wild: {                         // cft-wild.js (2026-11-18): Breath of the Wild-style movement and chemistry
+    stamMax: 100, regen: 35, regenDelay: 0.5,          // the stamina donut: max, refill per second on the ground, wait after use
+    climb: 9, hang: 1.5, climbJump: 12, glide: 4,      // stamina per second climbing / hanging on a wall / gliding; per climb-jump
+    airAim: 25, airAimCost: 10, airAimHeight: 1.5, airAimSecs: 0.9, airK: 0.3,   // slow motion when you shoot high in the air
+    tiredSpeed: 0.6, tiredUntil: 0.3,                  // out of stamina: walk at 60% until the donut is 30% full
+    glideSink: 2.2, draftUp: 10,                       // umbrella: fall speed, updraft climb speed (fires, manholes)
+    dodgeWindow: 0.38, flurrySecs: 1.6, flurryHits: 6, slowK: 0.25,   // perfect dodge: seconds before a hit, slow motion, free hits
+    arcRange: 4.5, arcHit: 2.6, steamR: 4.5, steamBlind: 3,           // chemistry: metal arcs, steam
+    viewCell: 400, viewMinH: 10, giggleR: 10,                          // rooftop antennas (one per 400 m square), secret giggles
+  },
   camp: {                         // cft-camp.js (2026-11-18): the campaign, secrets, ammo, powers, fire, storms, mega figments
     introFoes: 14, introFoesLow: 8,   // figments chasing you at once in the opening five minutes
     ammoStart: 20, ammoMax: 60, ammoCrate: 12,   // shots for ranged weapons (heavy ones cost more: weapon.ammo)

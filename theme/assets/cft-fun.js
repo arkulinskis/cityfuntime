@@ -137,7 +137,9 @@ function attach(G, api) {
     if (w.ranged === 'proj' && G.chaos) { cool = w.rate || 0.5; return G.chaos.fire(w); }  // real projectiles (cft-chaos.js)
     // a MEGA figment's weak spot (or its huge body) in reach (cft-camp.js)
     if (!w.ranged && G.camp && G.camp.meleeHit(p, f, w, lined)) { cool = 0.42; W.swing(); G.sfx.swing(); return true; }
-    cool = w.ranged === 'shot' ? 0.32 : 0.42;
+    const flurry = !w.ranged && G.wild && G.wild.flurryOn();   // after a perfect dodge: rapid, harder hits
+    if (flurry) { w.dmg *= 1.6; w.word = pick(['FLURRY!', 'HIYAA!', 'ORA!', 'BOP BOP BOP!']); w.reach += 1.2; G.wild.flurryHit(); }
+    cool = (w.ranged === 'shot' ? 0.32 : 0.42) * (flurry ? 0.12 : 1);
     W.swing();
     G.sfx.swing();
     let hits = 0;
@@ -444,6 +446,7 @@ function attach(G, api) {
     const p = P(), d = Math.hypot(m.x - p.x, m.z - p.z), reach = m.r + CB.reach;
     const lx = (p.x - m.x) / (d || 1), lz = (p.z - m.z) / (d || 1); m.kx = lx * 3; m.kz = lz * 3;  // the lunge
     if (F.dying || !onFoot() || quiet()) return 'none';
+    if (G.wild && d < reach + 2.5 && G.wild.perfectDodge(m)) return 'dodge';   // a dodge hop just before the hit: slow motion + flurry
     if (d > reach || Math.abs(p.y - m.obj.position.y) > 2.2) { // stepped out of reach (or jumped over it)
       api.bump('dodges');
       W.pop(m.x, m.obj.position.y + 2.2, m.z, pick(D.HYPE ? D.HYPE.dodge : ['DODGED!']), '#20c997', 0.9);

@@ -237,11 +237,28 @@ extinguishers, water and lightning powers".
   benches, bins, hydrants and decor bounce you higher with every bounce in a row, landing on a figment's head stomps it.
 - **The new HUD:** you top left (level, name, money, XP; health, energy, mood, swagger), then the missions (the tracked one
   with its arrow, up to four more with their letters and distance, "missions on the map · how weird the city is"); clock and
-  borough top centre; the minimap top right with zoom (M) and **map size** (N, the ⤢ button, Settings: small / medium /
+  borough top right; the minimap bottom left with zoom (M) and **map size** (N, the ⤢ button, Settings: small / medium /
   large); a hotbar at the bottom (attack with ammo count, water, lightning, extinguisher, heal); actions bottom right; a boss
   bar for MEGA figments. Phones get the same pieces packed into two columns.
 - Three new missions (Nosy Parker, Smoke Signals, Kaiju Hour) and eight achievements (titles: the Nosy Neighbour, the
   Kaiju Whisperer).
+
+**The open-air update (2026-11-18):** "feel more like Breath of the Wild, with the insanity and 12-year-old humour"
+(research and plan in `docs/open-air-report.md`):
+- **Climb any building:** walk into a wall to grab it, hold forward to go up, Space jumps up the wall, S + Space flips off,
+  a roof edge pulls you over. A **stamina donut** next to you (only when it isn't full) pays for climbing, gliding and
+  slow motion; empty = you let go and walk slowly for a bit.
+- **An umbrella by default:** hold Space while falling to glide; **updrafts** rise from fires and sewer manholes.
+- **Perfect dodge:** block + jump (a hop away) just before a hit: slow motion and a **flurry** of fast, hard, free hits.
+- **Bullet time:** shoot or use a power high in the air and time slows for a moment.
+- **Chemistry:** lightning jumps through metal (lamps, bins, mailboxes, hydrants, cars) to figments next to it; water on
+  fire makes blinding steam; soaked (rain, hydrant) = fireproof, but lightning hits twice as hard.
+- **Rooftop antennas** 📡 on the tallest roof of every 400 m square: climb up, E to tune in, the secrets around it show on
+  your map. Hidden stashes **giggle** when you're within 10 m.
+- **The HUD moved to the four corners** (you top left, where/when + boss bars top right, the minimap bottom left with
+  banners beside it, hotbar + buttons bottom right); nothing sits in the middle column or the middle row except the hype
+  words and compliments, which sit near the top. **No more legs in the ground:** people on pavements stand on them.
+- Mission Signal Boost; achievements Wall Crawler, Mary Poppins Who?, Too Slow, Five Bars, Conductor.
 
 **For members:** the same game saved to the server (and still in the browser), the **Life** page (`#life`, home after sign-in):
 level, money, net worth, stats, home, love & family, friends, businesses, blocks, stickers, the current mission and the diary.

@@ -537,6 +537,41 @@ crazy thing. Everything jumpable and bouncy. Fire and extinguishers. Water power
 - **Not verified on a real device:** frame rate with many fires (each is 5 additive cones) and a MEGA (a 15-27 m model with
   shadows), touch feel of the hotbar, wall jumps on a phone. If fires stutter: lower `fireMax` / `fireMaxLow`.
 
+## The open-air update (cft-wild.js + climbing in cft-world.js + four-corner HUD, 2026-11-18)
+
+The user: "the HUD: map in the bottom left; nothing in the central columns: all info in the 4 corners, not the middle column
+or the horizontal middle row; only temporary emotion text, and higher. Legs in the ground sometimes. Research Breath of the
+Wild's controls and mechanics and make this game feel more like it, with the insanity and 12-year-old humour." Research +
+plan: `docs/open-air-report.md` (mechanics only; no names/art; durability and collectible grinds left out on purpose).
+- **Four corners (cft-ui markup + "the four corners" block in app.css):** `.cft-tl` you + missions; `.cft-tr` (top right):
+  the opening's `.cft-intro` (camp inserts it first), `.cft-tc` (clock, borough, street, chaos's mayhem/fuel), `.cft-boss`,
+  `.cft-foe`, `.cft-feed` (3 items); `.cft-bl` minimap + mission timer; `.cft-br` E prompt, `.cft-hotbar`, `.cft-btns`.
+  Banners sit beside the minimap (one at a time, `--mm-out` on `.cft`), toasts above it, chaos's Buffering beside it.
+  Corner columns are capped at 40vw / 40vh (tr overflow hidden; mission rows: 2, 1 below 900 px tall, none below 780 px).
+  Phones: every column 40vw, the hotbar a 3+2 grid. Hype words top 9% (phones 33%), the ticker a band between the top
+  corners (phones one lane at 29%). wildtest.js measures every HUD element against the middle column/row (40-60%).
+- **Legs in the ground:** pavements are drawn `KERB_Y` (0.13 m) above the ground; `pchunks` (a grid like `rchunks`, filled in
+  registerSub with the same bands buildSub draws: car roads except service/track, not bridges, high quality only) ->
+  `W.paveAt`, `W.standAt(x, z)` = ground + 0.13 on a pavement; `surfaceAt` and `segPoint` (people, traffic) use it.
+- **Climbing (cft-world.js updatePlayer):** `player.climb` {nx, nz, t, lost}; grab = push into a wall (`into` > 0.55, forward)
+  in the air, or for 0.22 s from the ground, and `W.stam.can('climb')`; while climbing: velocity pinned into the wall + sideways,
+  vy toward 1.6 up / 2.4 down, no gravity, `stam.use('climb' | 'hang', dt)`; over the top when `roofAt` behind the wall is
+  < 1.1 m above; Space = climb-jump (`stam.use('climbjump')`), S + Space = flip off (counts as a wall jump); lost contact
+  > 0.25 s or no stamina = let go. Climb pose after `W.animate`. Dodge hop: jump while `W.blocking` and grounded.
+- **cft-wild.js** (`G.wild`, after G.camp; knobs `D.TUNE.wild`; state `save.wild` {views, tips}): `W.stam` (the donut DOM
+  `.cft-donut` near your head, `X.stam` / `X.tired`, regen after `regenDelay` on the ground; `X.speedMul` in cft-game
+  speedMul; the last drop below 0.5 = tired); the umbrella = a wrapper round `W.flyHook` (gear flight wins; hold Space,
+  falling, > 1.2 m up; `updraftAt`: fires `8 + 5 x size` m high, chaos manholes 15 m); perfect dodge `X.perfectDodge(m)` from
+  cft-fun `strike` (dodge hop within `dodgeWindow`) -> `G.rt.slowmo` / `G.rt.slowK` (cft-game frame scales dt), `flurry` hits
+  (F.attack: x1.6 dmg, +1.2 reach, cooldown x0.12); `airAim` wraps `G.chaos.fire` and `G.camp.power`; `X.conduct` (camp zap +
+  strikeGround), `X.steam` (camp waterBlast), `X.soak` / `X.soaked` (hydrants, storms; camp fire skips damage, storm strikes
+  x2); rooftop antennas (`viewTick`: tallest roof >= `viewMinH` per `viewCell` square within 560 m; `X.interaction` on that
+  roof -> `tuneIn`; `X.markers` 📡 + ✨ of tuned squares); `giggleTick`. One-time tips in `save.wild.tips`.
+- Also fixed: `G.camp.markers` was never drawn on the minimap (now in `minimapData`).
+- **Tests:** `game_test.py --wild` (wildtest.js, 24 checks, last in the full run).
+- **Not verified on a real device:** climbing/gliding feel with real mouse + touch, slow motion feel, the corner layout on
+  every phone size (measured: 1264x705 desktop).
+
 ## Recipes
 
 - **New page:** copy a similar `client_code/Pages/<Name>/`, register it in `client_code/router.py`; new field on Life / Quests /
