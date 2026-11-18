@@ -139,7 +139,7 @@ mobs, events.
   hands a ped to the game). Traffic kinds: car, suv, sports, taxi, van, bus, truck (ice cream), police; headlights are unlit
   materials so they glow at night.
 - **Player:** double jump (`player.jumps`), FOV widens with speed, `W.shake`, `W.setWeapon(mesh name)` + `W.swing()`, `look.crown`.
-- **People (2026-11-11, second pass: "higher detail models"):** `W.person(look, npc)` builds a rounded figure from spheres,
+- **People (2026-11-11, second pass: "higher detail models"; rebuilt 2026-11-17, see The realism pass):** `W.person(look, npc)` builds a rounded figure from spheres,
   capsules and domes (`prims(...)`: `PRIM_HI` for you and the cast, `PRIM_MID` for passers-by, one step down each on low
   quality; about 6,500 / 2,500 triangles). Structure: `body` group → torso mesh, `head` group (turns, nods), four limb pivots
   (`legL/R`, `armL/R`) each holding a second pivot (`kneeL/R`, `elbowL/R`) and a tip (`handL/R`: weapons and the rolling pin
@@ -287,8 +287,8 @@ Diablo 2 monsters + gear, GTA missions slowly disclosed + cars destroying things
   (`look.shield` from `R.lookParts`), raised by the block pose.
 - **Graphics (high quality only; low keeps the old look):** 4096 shadow map where the GPU allows + a fill light; 512 px window
   texture; walls darken towards the ground (two bands in `addWalls`); `cornice()` ledges (roof line, above shopfronts) in the
-  roofs geometry; pavements (`KERB_Y` 0.13 above the ground, skipped where another road crosses) and edge lines; three-puff tree
-  crowns + branched trunks (vertex colours × instance colour); detailed parked cars (`carBody`) and traffic (`W.vehicle`);
+  roofs geometry; pavements (`KERB_Y` 0.13 above the ground, skipped where another road crosses) and edge lines; trees,
+  parked cars and traffic: see The realism pass;
   lamp halos (`MAT.halo`); CSS vignette + `saturate/contrast` on the canvas (not on touch devices).
 - **Ground photo textures (2026-11-17, user: "better flooring terrain... sidewalks, roads, grass look more high detail"):**
   8 Poly Haven CC0 photos in `theme/assets/ground-*.jpg` (asphalt_02, concrete_pavement, leafy_grass, forest_leaves_02,
@@ -306,6 +306,47 @@ Diablo 2 monsters + gear, GTA missions slowly disclosed + cars destroying things
 - **A new mission's giver must already have met you** and should use that person's usual spot (`at`): a second spot key for
   the same person (e.g. `rosa@home` next to `rosa@bakery`) puts two copies of them in one place and E talks to the wrong one.
 - **Tests:** `game_test.py --hero` (herotest.js, also last in the full run); pictures `--heroshots DIR`.
+
+## The realism pass (2026-11-17: "change the 3d models to be more realistic, characters around the world, vegetation, cars.. make it more realistic. but keep the sillyness")
+
+All in cft-world.js. Screenshots of every model up close: `game_test.py --models DIR` (faces, the silly extras, every
+vehicle, silly roof loads, the four trees and the bushes, animals, a street). Frame cost: `W.renderInfo()` after
+`W.render()` = {triangles, calls} of the last frame (shadow pass included).
+- **People** (`W.person`): about six and a half heads tall (a little cartoon left in the head and the eyes). `torsoGeo(look)`
+  turns the torso ring by ring (rows of [y, half width, half depth, z offset, trousers?]; `at(y)` gives the front / back
+  surface, use it to place anything worn on the body); `look.fig` 0-1 (straight -> curvy) and `look.build` (a belly over 1.04)
+  shape it. Limbs are lathes (`LIMB`: thigh, shin, upper, fore, and `sleeve` = a short sleeve or shorts leg over a limb).
+  Pivots: hips (±0.092, 0.92), thigh 0.44, shin 0.41; shoulders (±(0.19 - 0.018 fig), 1.425), upper arm 0.29, forearm 0.26;
+  `handL/handR` sit in the palm (0.075 below the wrist); arms rest at `ARM_Z` (0.11 rad) out. Head group at 1.535: skull, jaw,
+  chin, ears, nose (bridge, tip, wings), eyes (white, iris = `look.eye` or `EYES`, pupil, glint, upper lid; angry = lower
+  lids, slanted brows), lips. Hair, hats, the crown and headphones are still built round the old big head in a separate Merge
+  (`hr`) and fitted onto the skull with `hm.addMerge(hr, 0, 0.0316, 0.005, 0.5, 0.5625, 0.566)`: add new hair styles in the
+  old coordinates. Merge got `addRaw(geo)` (keeps a geometry's own vertex colours) and `addMerge(other, x, y, z, sx, sy, sz)`.
+  Triangles: passer-by about 2,900-3,500 (funtest checks < 3,600), you about 8,300.
+- **Silly extras (`look.silly`, `W.SILLY`):** propeller beanie (spins faster as they walk: `userData.prop`), party hat,
+  traffic-cone hat, antlers, a giant moustache, nose-and-glasses, a flower behind the ear, a rubber-duck ring, a balloon
+  (`userData.balloon`, in the left hand), a baguette under the arm. `W.randomLook` gives one to about one passer-by in eleven;
+  never to you (`playerLook` sets `silly: null`). `look.tuck` = shirt tucked in with a belt, else an untucked hem.
+- **Trees** (`TREE[k]` = {trunk, crown}, `treeKind(x, z, where)`): 0 broadleaf, 1 linden, 2 spruce, 3 birch; streets are mostly
+  broadleaf + linden, woods mostly spruce, parks a mix; about 7% of broadleaf are a red maple. Crowns = `leafShell` clumps
+  (normals out from the crown's centre, darker underneath). `s.treeK` = the kind per tree; each kind has its own InstancedMesh
+  pair (`im.userData.sp` = kind) and the smash index's `e.i` is the index within that kind (`e.sp`). `W.treeMesh(k)`.
+- **Bushes** (`BUSH`: 0 round, 1 flowering + `FLOWERS`, 2 a topiary duck in parks; `s.bushes` = x, z, kind, yaw): between street
+  trees on residential streets, undergrowth in woods, parks. Not smashable, no collision. High quality only. `W.bushMesh(k)`.
+- **Cars** (`CAR_SPEC`, `carShape(m, spec, paint, glass, fine)`): a side profile per body style (hatch, sedan, suv, sports,
+  van with `panel` sides, bus) extruded with rounded edges (`extrudeSide`; shape x runs from the BACK so the nose ends at -z),
+  narrowed towards the roof and rounded in plan (`carShapeX`), a glasshouse with pillars, wheel wells, tyres (`WHEEL`) with
+  rims (`fine` = spokes + hubs: traffic only), plates, grille, mirrors, handles; `carLights` adds the lights (glowing on
+  traffic). Kinds: car = hatch, taxi / police = sedan, truck = the ice cream van. Parked cars: three styles, `pc.sp` 0 hatch /
+  1 sedan / 2 SUV, drawn from `P.car0..2` (`P.car` still lists them all for tests); `carAt` lengths follow the style.
+- **Silly traffic (`W.SILLY_CARS`):** about one car in twelve has roof rails and a giant rubber duck, a mattress, a sofa, a
+  Christmas tree, a canoe or a tower of suitcases (`W.vehicle(kind, colour, {silly})`).
+- **Animals** (`W.animal`): rounded dogs (snout, floppy ears, tongue), cats (pointed ears, curled tail), pigeons and ducks
+  (breast, wings, beak). Same userData as before.
+- **Level of detail (high quality):** beyond `LOD_R` (140 m, 20 m hysteresis) a sub-tile shows `TREE_LO` and the box cars
+  (`PROP.carLo` / `vanLo`) and hides bushes: every InstancedMesh with `userData.lod` 'hi' / 'lo', switched by `lodSub` /
+  `updateLod` (every 0.4 s). Smashing updates both (setInstance). Measured in the Plateau: about 2.5M triangles a frame
+  (the old models 1.9M), ~500 draw calls. If a real GPU stutters: lower `LOD_R`, or drop bushes on residential streets.
 
 ## The wardrobe (2026-11-17: "show the character with slots, so people have to make a choice between two types of items for the same slot")
 

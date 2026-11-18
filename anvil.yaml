@@ -401,13 +401,13 @@ native_deps:
     <meta name="cft-asset" content="_/theme/three.min.js?v=a13f10ad8e">
     <meta name="cft-asset" content="_/theme/cft-content.js?v=3750a9c231">
     <meta name="cft-asset" content="_/theme/cft-tiles.js?v=a65067908e">
-    <meta name="cft-asset" content="_/theme/cft-world.js?v=d72cb41c72">
+    <meta name="cft-asset" content="_/theme/cft-world.js?v=06f2f4b2b4">
     <meta name="cft-asset" content="_/theme/cft-fun.js?v=7b59cef2c9">
     <meta name="cft-asset" content="_/theme/cft-rpg.js?v=909a563921">
     <meta name="cft-asset" content="_/theme/cft-hero.js?v=9f996ae54d">
     <meta name="cft-asset" content="_/theme/cft-debug.js?v=3137acfa95">
     <meta name="cft-asset" content="_/theme/cft-ui.js?v=0a94d40d7d">
-    <meta name="cft-asset" content="_/theme/cft-game.js?v=2982e00406">
+    <meta name="cft-asset" content="_/theme/cft-game.js?v=d6f5b616ff">
 package_name: City_Fun_Time
 runtime_options:
   client_version: '3'

@@ -130,7 +130,7 @@ window.__funOut = []; window.__funDone = false;
 
     // ---------- strangers: a joke, a pick-up line, a sweetheart
     sim(60);
-    const clear = o => !G.allPlaces().some(q => Math.hypot(q.pin.x - o.x, q.pin.z - o.z) < 12) && Math.hypot(o.x - G.homeSpot().x, o.z - G.homeSpot().z) > 14;  // not at a shop door: shops win the E key
+    const clear = o => !G.allPlaces().some(q => Math.hypot(q.pin.x - o.x, q.pin.z - o.z) < 12) && Math.hypot(o.x - G.homeSpot().x, o.z - G.homeSpot().z) > 14 && !W.borrowable(o.x + 1, o.z, 3);  // not at a shop door or a parked car: they win the E key
     const ped = () => W.life.peds.filter(q => q.type === 'walk' && !q.flirted && !q.ctl && clear(q.obj.position)).sort((a, b) => Math.hypot(a.obj.position.x - pp.x, a.obj.position.z - pp.z) - Math.hypot(b.obj.position.x - pp.x, b.obj.position.z - pp.z))[0];
     let pd = ped();
     for (let i = 0; i < 40 && !pd; i++) { sim(30); pd = ped(); }

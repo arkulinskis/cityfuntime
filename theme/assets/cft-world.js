@@ -334,6 +334,19 @@ varying float vGL; varying vec2 vGUV;
       return this;
     }
     box(w, h, d, color, x, y, z, rx, ry, rz) { return this.add(UNIT_BOX, color, x, y, z, rx, ry, rz, w, h, d); }
+    addRaw(geo) { // a non-indexed geometry with its own vertex colours, as is
+      const P = geo.attributes.position, N = geo.attributes.normal, C = geo.attributes.color;
+      for (let i = 0; i < P.count; i++) { this.p.push(P.getX(i), P.getY(i), P.getZ(i)); this.n.push(N.getX(i), N.getY(i), N.getZ(i)); this.c.push(C.getX(i), C.getY(i), C.getZ(i)); }
+      return this;
+    }
+    addMerge(o, x, y, z, sx, sy, sz) { // another Merge, scaled (sx, sy, sz) then moved by (x, y, z)
+      for (let i = 0; i < o.p.length; i += 3) {
+        this.p.push(o.p[i] * sx + x, o.p[i + 1] * sy + y, o.p[i + 2] * sz + z);
+        const nx = o.n[i] / sx, ny = o.n[i + 1] / sy, nz = o.n[i + 2] / sz, l = Math.hypot(nx, ny, nz) || 1;
+        this.n.push(nx / l, ny / l, nz / l); this.c.push(o.c[i], o.c[i + 1], o.c[i + 2]);
+      }
+      return this;
+    }
     build() {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
@@ -351,27 +364,245 @@ varying float vGL; varying vec2 vGUV;
 
   // ---------------------------------------------------------------- street furniture: shared shapes, drawn as instances per sub-tile
   // Everything faces -z (a lamp's arm, a bench's seat, a parked car's nose). SHARED geometries are never disposed with a sub-tile.
-  // Trees: on high quality a crown of three leafy puffs (lighter on top, darker underneath) on a tapered trunk with two
-  // branches; on low the old single low-poly crown. The instance colour tints the whole crown.
-  const TRUNK_G = LOW ? new THREE.CylinderGeometry(0.14, 0.2, 2.6, 6).translate(0, 1.3, 0) : (() => {
-    const m = new Merge();
-    m.add(new THREE.CylinderGeometry(0.11, 0.22, 3.0, 8), 0x6b4f37, 0, 1.5, 0);
-    m.add(new THREE.CylinderGeometry(0.05, 0.08, 1.2, 6), 0x6b4f37, 0.32, 2.6, 0.1, 0, 0, -0.9);
-    m.add(new THREE.CylinderGeometry(0.05, 0.08, 1.1, 6), 0x5e4430, -0.28, 2.75, -0.14, 0.3, 0, 0.85);
-    return m.build();
-  })();
-  const CROWN_G = LOW ? new THREE.IcosahedronGeometry(1.7, 0).translate(0, 3.9, 0) : (() => {
-    const m = new Merge(), ico = new THREE.IcosahedronGeometry(1, 1);
-    m.add(ico, 0xd4d4d4, 0, 3.75, 0, 0.3, 0.2, 0, 1.55, 1.25, 1.5);         // the main mass (darker underneath via its shade)
-    m.add(ico, 0xffffff, 0.55, 4.55, 0.2, 0, 0.7, 0, 1.05, 0.95, 1.0);       // sunny top puff
-    m.add(ico, 0xeeeeee, -0.65, 4.25, -0.35, 0.4, 0, 0.2, 0.95, 0.85, 0.95);
-    m.add(ico, 0xbdbdbd, 0.2, 3.25, -0.75, 0, 0.4, 0, 0.85, 0.65, 0.8);      // a lower puff in its own shade
-    return m.build();
+  //
+  // Trees (realism pass, 2026-11-17): four kinds, TREE[k] = {trunk, crown}, picked per spot by treeKind(): 0 broadleaf (maple,
+  // oak: a fork of limbs under a wide dome), 1 linden (a tall oval), 2 spruce (jagged tiers), 3 birch (white bark with dark
+  // marks, two stems, an airy crown). Crowns are lumpy leaf clumps (leafShell) whose normals point out from the crown's centre,
+  // so light falls on them softly like on real foliage, darker underneath and inside. MAT.crown tints the leaves per instance;
+  // MAT.trunk keeps the bark's own vertex colours. Bushes (BUSH: round, flowering, a topiary duck) fill gaps on residential
+  // streets and in parks. Low quality keeps the old single tree for every kind and no bushes.
+  const lumpy = (x, y, z) => Math.sin(x * 2.3 + y * 1.1) * Math.sin(y * 2.9 + z * 1.7) * Math.sin(z * 2.1 + x * 2.7) + 0.45 * Math.sin(x * 5.3 - z * 4.1 + y * 3.7);
+  const LEAF = [new THREE.IcosahedronGeometry(1, 0), new THREE.IcosahedronGeometry(1, 1)];  // already non-indexed
+  const CONE12 = new THREE.ConeGeometry(1, 1, 12, 1).toNonIndexed();
+  // geo's vertices put at (x, y, z) scaled (sx, sy, sz), pushed in and out by lumpy noise (amt). crown = [cx, cy, cz, R, y0, y1]:
+  // the crown's centre and radius (normals point away from it) and the heights where the shading goes from dark to light.
+  function leafShell(m, geo, col, x, y, z, sx, sy, sz, amt, crown, seed) {
+    const P = geo.attributes.position, cx = crown[0], cy = crown[1], cz = crown[2], R = crown[3], y0 = crown[4], y1 = crown[5];
+    _c.set(col); const cr = _c.r, cg = _c.g, cb = _c.b;
+    for (let i = 0; i < P.count; i++) {
+      const px = P.getX(i), py = P.getY(i), pz = P.getZ(i);
+      const n = 1 + amt * lumpy(px * 1.9 + seed, py * 1.9 - seed * 0.7, pz * 1.9 + seed * 1.3);
+      const wx = x + px * sx * n, wy = y + py * sy * n, wz = z + pz * sz * n;
+      const nx = (wx - cx) / R + px * 0.6, ny = (wy - cy) / R * 1.3 + py * 0.6 + 0.2, nz = (wz - cz) / R + pz * 0.6, l = Math.hypot(nx, ny, nz) || 1;
+      const h = Math.min(1, Math.max(0, (wy - y0) / (y1 - y0))), out = Math.min(1, Math.hypot(wx - cx, (wy - cy) * 1.2, wz - cz) / R);
+      const s = Math.min(1.08, 0.42 + 0.36 * h + 0.3 * out);
+      m.p.push(wx, wy, wz); m.n.push(nx / l, ny / l, nz / l); m.c.push(Math.min(1, cr * s), Math.min(1, cg * s), Math.min(1, cb * s));
+    }
+  }
+  // A tapered piece (TAPER) or a square stick (STICK) from a to b, r wide at a: tree limbs, car pillars, antlers...
+  const TAPER = new THREE.CylinderGeometry(0.62, 1, 1, 7, 1).translate(0, 0.5, 0).toNonIndexed();
+  const STICK = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0).toNonIndexed();
+  const _up = new THREE.Vector3(0, 1, 0), _bd = new THREE.Vector3(), _bq = new THREE.Quaternion(), _be = new THREE.Euler();
+  function seg(m, geo, col, ax, ay, az, bx, by, bz, r, r2) {
+    _bd.set(bx - ax, by - ay, bz - az); const len = _bd.length(); if (len < 1e-4) return;
+    _bd.multiplyScalar(1 / len); _bq.setFromUnitVectors(_up, _bd); _be.setFromQuaternion(_bq);
+    m.add(geo, col, ax, ay, az, _be.x, _be.y, _be.z, r, len, r2 || r);
+  }
+  const BARK = 0x6e5442, BARK_D = 0x56412f, BIRCH = 0xe9e5dc;
+  const TREE = (() => {
+    if (LOW) return [{ trunk: new THREE.CylinderGeometry(0.14, 0.2, 2.6, 6).translate(0, 1.3, 0), crown: new THREE.IcosahedronGeometry(1.7, 0).translate(0, 3.9, 0) }];
+    const out = [], r = k => hash(9001 + k), W1 = 0xffffff;
+    const tree = (fnT, fnC) => { const t = new Merge(), c = new Merge(); fnT(t); fnC(c); out.push({ trunk: t.build(), crown: c.build() }); };
+    // 0 broadleaf: a sturdy trunk forking into five limbs, a wide dome of clumps
+    tree(t => {
+      t.add(CONE, BARK_D, 0, 0.2, 0, 0, 0, 0, 0.72, 0.42, 0.72);
+      seg(t, TAPER, BARK, 0, 0, 0, 0.06, 2.5, 0.02, 0.25);
+      for (let k = 0; k < 5; k++) { const a = k * 1.257 + 0.3; seg(t, TAPER, BARK, 0.05, 2.3, 0.02, Math.cos(a) * 1.3, 3.7 + r(k) * 0.6, Math.sin(a) * 1.3, 0.13); }
+      seg(t, TAPER, BARK, 0.05, 2.4, 0, 0.1, 4.7, -0.05, 0.13);
+    }, c => {
+      const cr = [0, 4.6, 0, 2.6, 3.0, 6.6];
+      leafShell(c, LEAF[0], W1, 0, 4.5, 0, 1.55, 1.3, 1.55, 0.15, cr, 1);
+      for (let k = 0; k < 6; k++) { const a = k * 1.047 + 0.26, s = 1.05 + r(10 + k) * 0.25; leafShell(c, LEAF[1], W1, Math.cos(a) * 1.45, 4.05 + (k % 2) * 0.75, Math.sin(a) * 1.45, s, s * 0.82, s, 0.22, cr, k * 3.1); }
+      leafShell(c, LEAF[1], W1, 0.15, 5.55, -0.1, 1.15, 0.9, 1.15, 0.22, cr, 7);
+    });
+    // 1 linden: a straight trunk, a tall oval crown
+    tree(t => {
+      t.add(CONE, BARK_D, 0, 0.16, 0, 0, 0, 0, 0.55, 0.32, 0.55);
+      seg(t, TAPER, BARK, 0, 0, 0, 0, 3.2, 0, 0.2);
+      seg(t, TAPER, BARK, 0, 3.0, 0, 0.05, 6.0, 0.05, 0.12);
+      for (let k = 0; k < 3; k++) { const a = k * 2.09 + 0.5; seg(t, TAPER, BARK, 0, 2.8, 0, Math.cos(a) * 0.85, 4.1, Math.sin(a) * 0.85, 0.08); }
+    }, c => {
+      const cr = [0, 5.0, 0, 2.0, 2.9, 7.4];
+      leafShell(c, LEAF[0], W1, 0, 5.0, 0, 1.25, 1.9, 1.25, 0.12, cr, 2);
+      for (let k = 0; k < 6; k++) { const a = k * 1.047 + (k % 2) * 0.5, up = k % 2, s = 0.92 + r(20 + k) * 0.2; leafShell(c, LEAF[1], W1, Math.cos(a) * (up ? 0.8 : 0.95), up ? 5.5 : 4.0, Math.sin(a) * (up ? 0.8 : 0.95), s, s * 1.05, s, 0.2, cr, k * 2.3 + 1); }
+      leafShell(c, LEAF[1], W1, 0.05, 6.6, 0, 0.75, 0.8, 0.75, 0.2, cr, 9);
+    });
+    // 2 spruce: seven jagged tiers on a thin trunk
+    tree(t => {
+      t.add(CONE, BARK_D, 0, 0.12, 0, 0, 0, 0, 0.5, 0.24, 0.5);
+      seg(t, TAPER, BARK, 0, 0, 0, 0, 6.6, 0, 0.19);
+    }, c => {
+      const cr = [0, 3.8, 0, 2.3, 0.8, 7.8];
+      for (let k = 0; k < 7; k++) { const rr = 1.85 * (1 - k / 7.6) + 0.22; leafShell(c, CONE12, W1, 0, 1.55 + k * 0.84, 0, rr, 1.55, rr, 0.13, cr, k * 1.7); }
+      leafShell(c, CONE12, W1, 0, 7.6, 0, 0.3, 1.0, 0.3, 0.05, cr, 11);
+    });
+    // 3 birch: two white stems with dark marks, small airy clumps
+    tree(t => {
+      seg(t, TAPER, BIRCH, 0, 0, 0, 0.25, 5.4, 0.05, 0.13);
+      seg(t, TAPER, BIRCH, 0.05, 0.25, 0, -0.6, 4.7, 0.25, 0.09);
+      for (let k = 0; k < 9; k++) { // the dark marks on the bark
+        const f = 0.08 + k * 0.1, a = r(40 + k) * 6.28, rr = 0.13 * (1 - f * 0.38) + 0.004;
+        t.box(0.07 + r(50 + k) * 0.05, 0.03, 0.025, 0x2e2b28, 0.25 * f + Math.cos(a) * rr, 5.4 * f, 0.05 * f + Math.sin(a) * rr, 0, -a + Math.PI / 2, 0);
+      }
+      seg(t, TAPER, BIRCH, 0.2, 4.0, 0.04, 0.9, 5.2, -0.3, 0.05); seg(t, TAPER, BIRCH, -0.45, 3.8, 0.2, -1.0, 4.9, 0.5, 0.045);
+    }, c => {
+      const cr = [-0.1, 4.8, 0.1, 1.9, 3.0, 6.8];
+      for (let k = 0; k < 8; k++) { const a = k * 2.4, d = 0.35 + r(60 + k) * 0.65, s = 0.6 + r(70 + k) * 0.22; leafShell(c, LEAF[1], W1, -0.1 + Math.cos(a) * d, 3.55 + k * 0.4, 0.1 + Math.sin(a) * d, s, s * 0.85, s, 0.3, cr, k * 1.9 + 3); }
+    });
+    return out;
   })();
   if (!LOW) { MAT.crown.vertexColors = true; MAT.trunk.vertexColors = true; MAT.trunk.color.setHex(0xffffff); }
-  const SHARED = new Set([TRUNK_G, CROWN_G]);
+  // Level of detail (high quality): beyond LOD_R metres from you a sub-tile swaps its trees and parked cars for light stand-ins
+  // (TREE_LO, PROP.carLo / vanLo) and hides its bushes (updateLod). The full models only where you can see them.
+  const LOD_R = 140;
+  const TREE_LO = LOW ? null : (() => {
+    const W1 = 0xffffff, out = [], CONE6 = new THREE.ConeGeometry(1, 1, 7, 1).toNonIndexed();
+    const tree = (fnT, fnC) => { const t = new Merge(), c = new Merge(); fnT(t); fnC(c); out.push({ trunk: t.build(), crown: c.build() }); };
+    tree(t => seg(t, TAPER, BARK, 0, 0, 0, 0.05, 3.6, 0, 0.25), c => { const cr = [0, 4.6, 0, 2.6, 3.0, 6.6]; leafShell(c, LEAF[0], W1, 0, 4.5, 0, 2.35, 1.85, 2.35, 0.12, cr, 1); leafShell(c, LEAF[0], W1, 0.4, 5.5, 0.1, 1.4, 1.0, 1.4, 0.12, cr, 2); });
+    tree(t => seg(t, TAPER, BARK, 0, 0, 0, 0, 3.8, 0, 0.2), c => { const cr = [0, 5.0, 0, 2.0, 2.9, 7.4]; leafShell(c, LEAF[0], W1, 0, 5.0, 0, 1.65, 2.4, 1.65, 0.1, cr, 3); leafShell(c, LEAF[0], W1, 0, 6.5, 0, 0.9, 0.8, 0.9, 0.1, cr, 4); });
+    tree(t => seg(t, TAPER, BARK, 0, 0, 0, 0, 2.0, 0, 0.19), c => { const cr = [0, 3.8, 0, 2.3, 0.8, 7.8]; leafShell(c, CONE6, W1, 0, 2.3, 0, 1.95, 2.8, 1.95, 0.08, cr, 5); leafShell(c, CONE6, W1, 0, 4.4, 0, 1.4, 2.6, 1.4, 0.08, cr, 6); leafShell(c, CONE6, W1, 0, 6.4, 0, 0.8, 2.6, 0.8, 0.05, cr, 7); });
+    tree(t => { seg(t, TAPER, BIRCH, 0, 0, 0, 0.25, 4.6, 0.05, 0.13); seg(t, TAPER, BIRCH, 0.05, 0.25, 0, -0.55, 4.0, 0.25, 0.09); }, c => { const cr = [-0.1, 4.8, 0.1, 1.9, 3.0, 6.8]; leafShell(c, LEAF[0], W1, 0.1, 4.6, 0, 1.2, 1.4, 1.2, 0.18, cr, 8); leafShell(c, LEAF[0], W1, -0.5, 5.6, 0.3, 0.9, 1.0, 0.9, 0.18, cr, 9); });
+    return out;
+  })();
+  // Which tree grows here: wood = mostly spruce, park = a mix, street = broadleaf and linden with the odd birch. Low: one kind.
+  function treeKind(x, z, where) {
+    if (LOW) return 0;
+    const q = hash(Math.round(x * 3.1) * 7919 + Math.round(z * 2.7) * 104729);
+    if (where === 'wood') return q < 0.42 ? 2 : q < 0.75 ? 0 : q < 0.9 ? 3 : 1;
+    if (where === 'park') return q < 0.38 ? 0 : q < 0.6 ? 1 : q < 0.8 ? 3 : 2;
+    return q < 0.5 ? 0 : q < 0.82 ? 1 : q < 0.95 ? 3 : 2;
+  }
+  // Bushes: 0 round, 1 flowering (FLOWERS = its blossoms, untinted), 2 a topiary duck (parks only). High quality only.
+  const BUSH = LOW ? null : (() => {
+    const W1 = 0xffffff, cr = [0, 0.45, 0, 0.95, 0.0, 1.15];
+    const round = s => { const m = new Merge(); leafShell(m, LEAF[1], W1, 0, 0.5 * s, 0, 0.75, 0.56 * s, 0.75, 0.18, cr, 1); leafShell(m, LEAF[1], W1, 0.45, 0.42 * s, 0.2, 0.55, 0.45 * s, 0.55, 0.2, cr, 2); leafShell(m, LEAF[1], W1, -0.42, 0.45 * s, -0.25, 0.6, 0.48 * s, 0.6, 0.2, cr, 3); return m.build(); };
+    const duck = new Merge(), dc = [0, 0.8, 0, 1.0, 0.1, 1.5];
+    leafShell(duck, LEAF[1], W1, 0, 0.6, 0.05, 0.55, 0.45, 0.8, 0.07, dc, 4);
+    leafShell(duck, LEAF[1], W1, 0, 1.18, -0.45, 0.32, 0.32, 0.32, 0.06, dc, 5);
+    leafShell(duck, LEAF[0], W1, 0, 1.12, -0.8, 0.14, 0.07, 0.2, 0.0, dc, 6);
+    leafShell(duck, LEAF[0], W1, 0, 0.92, 0.78, 0.2, 0.26, 0.16, 0.05, dc, 7);
+    duck.add(CYL8, 0x8a5a3c, 0, 0.08, 0, 0, 0, 0, 1.2, 0.16, 1.4);   // a trimmed bed
+    return [round(1), round(1.15), duck.build()];
+  })();
+  const FLOWERS = LOW ? null : (() => {
+    const m = new Merge(), cols = [0xffffff, 0xff8fb8, 0xffd23f, 0xb48cff, 0xff6b6b];
+    for (let k = 0; k < 16; k++) {
+      const a = hash(300 + k) * 6.28, e = 0.15 + hash(320 + k) * 1.1, cx = k % 3 === 1 ? 0.45 : k % 3 === 2 ? -0.42 : 0, cz = k % 3 === 1 ? 0.2 : k % 3 === 2 ? -0.25 : 0, rr = k % 3 ? 0.58 : 0.78;
+      m.add(LEAF[0], cols[k % cols.length], cx + Math.cos(a) * Math.cos(e) * rr, 0.55 + Math.sin(e) * 0.6, cz + Math.sin(a) * Math.cos(e) * rr, 0, 0, 0, 0.07, 0.07, 0.07);
+    }
+    return m.build();
+  })();
+  const SHARED = new Set();
+  for (const t of TREE.concat(TREE_LO || [])) { SHARED.add(t.trunk); SHARED.add(t.crown); }
+  if (BUSH) { BUSH.forEach(g => SHARED.add(g)); SHARED.add(FLOWERS); }
   const shared = g => { SHARED.add(g); return g; };
   const propGeo = fn => { const m = new Merge(); fn(m); return shared(m.build()); };
+
+  // ---- cars (realism pass, 2026-11-17): a real side profile (bonnet, windscreen rake, roof, boot or hatch, wheel arches)
+  // extruded with rounded edges, then narrowed towards the roof (tumblehome) and rounded at the corners in plan; a glass
+  // greenhouse with pillars, tyres with rims and spokes, wheel wells, lights, grille, plates, mirrors and door handles.
+  // Profiles in metres from the front: ws windscreen base, rf / rb roof front / back, rear = rear-window base, deck = boot
+  // height, panel = where a van's glass stops (panel sides behind it), wf / wb axles, wr wheel radius.
+  const CAR_SPEC = {
+    hatch:  { L: 3.95, Wd: 1.74, sill: 0.3, nose: 0.8, belt: 1.0, ws: 1.2, rf: 1.95, rb: 3.5, roof: 1.5, rear: 3.88, deck: 1.0, wr: 0.31, wf: 0.78, wb: 3.2, doors: 2 },
+    sedan:  { L: 4.6, Wd: 1.8, sill: 0.3, nose: 0.78, belt: 0.98, ws: 1.45, rf: 2.2, rb: 3.35, roof: 1.45, rear: 3.95, deck: 1.02, wr: 0.32, wf: 0.9, wb: 3.65, doors: 4 },
+    suv:    { L: 4.6, Wd: 1.88, sill: 0.42, nose: 1.0, belt: 1.2, ws: 1.25, rf: 1.9, rb: 4.25, roof: 1.8, rear: 4.5, deck: 1.2, wr: 0.38, wf: 0.85, wb: 3.75, doors: 4 },
+    sports: { L: 4.35, Wd: 1.86, sill: 0.22, nose: 0.58, belt: 0.82, ws: 1.75, rf: 2.35, rb: 3.0, roof: 1.18, rear: 3.95, deck: 0.86, wr: 0.33, wf: 1.0, wb: 3.55, doors: 2, wing: true },
+    van:    { L: 4.85, Wd: 1.95, sill: 0.35, nose: 1.0, belt: 1.18, ws: 0.55, rf: 1.2, rb: 4.78, roof: 2.05, rear: 4.82, deck: 1.2, wr: 0.34, wf: 0.72, wb: 3.95, doors: 2, panel: 1.95 },
+    bus:    { L: 7.6, Wd: 2.3, sill: 0.4, nose: 1.4, belt: 1.45, ws: 0.18, rf: 0.42, rb: 7.5, roof: 2.95, rear: 7.58, deck: 1.45, wr: 0.45, wf: 1.5, wb: 6.0, doors: 0, bus: true },
+  };
+  const CAR_GLASS = 0x27333f;
+  function extrudeSide(pts, depth, bevel, arches) { // pts = [z from front, y]... in metres; arches = [[zc, yc, r, sill]] back to front; returns a geometry centred on x
+    const sh = new THREE.Shape();
+    pts.forEach((p, i) => (i ? sh.lineTo(p[0], p[1]) : sh.moveTo(p[0], p[1])));
+    for (const a of arches || []) { sh.lineTo(a[0] - a[2], a[3]); sh.absarc(a[0], a[1], a[2], Math.PI, 0, true); sh.lineTo(a[0] + a[2], a[3]); }  // back to front, over the top
+    const g = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.01, depth - 2 * bevel), bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelOffset: -bevel, bevelSegments: 1, curveSegments: 5 });
+    g.translate(0, 0, -(depth - 2 * bevel) / 2);
+    g.rotateY(Math.PI / 2);   // shape x (metres from the BACK, see below) -> world -z; extrude depth -> world x
+    return g;  // ExtrudeGeometry is non-indexed
+  }
+  // squeeze x: rounder corners in plan (ends) and a narrower glasshouse towards the roof (y0 -> y1 by k)
+  function carShapeX(g, L, y0, y1, k, ends) {
+    const P = g.attributes.position;
+    for (let i = 0; i < P.count; i++) {
+      const y = P.getY(i), z = P.getZ(i), t = Math.min(1, Math.max(0, (Math.abs(z) - (L / 2 - 0.75)) / 0.75));
+      const tu = y1 > y0 ? Math.min(1, Math.max(0, (y - y0) / (y1 - y0))) : 0;
+      P.setX(i, P.getX(i) * (1 - ends * t * t) * (1 - k * tu));
+    }
+    g.computeVertexNormals();
+    return g;
+  }
+  // Adds a car of spec s to Merge m. paint = body colour (white on parked cars: the instance tint paints them).
+  // Returns where its lights go: {head: [[x, y, z]...], tail: [...], roofY, cabZ, L, Wd} (W.vehicle puts glowing lights there).
+  function carShape(m, s, paint, glass, fine) {
+    const L = s.L, Wd = s.Wd, F = z => L / 2 - z;  // shape x = metres from the back, so after rotateY the nose faces -z
+    const dark = 0x1d1f23, trim = 0x2b2e34, rim = 0xb9bfc6, aR = s.wr + 0.07;
+    // body: nose, bonnet up to the windscreen base, then the deck / panel sides to the tail, and along the bottom over the arches
+    const body = [[F(0.06), s.sill + 0.02], [F(0), s.sill + 0.2], [F(0), s.nose - 0.12], [F(0.12), s.nose], [F(s.ws * 0.55), s.nose + (s.belt - s.nose) * 0.6], [F(s.ws), s.belt]];
+    if (s.panel) body.push([F(s.panel), s.belt], [F(s.panel), s.roof], [F(L - 0.1), s.roof], [F(L), s.roof - 0.12]);
+    else if (s.bus) body.push([F(s.rb), s.belt], [F(L), s.belt]);
+    else { body.push([F(s.rear), s.belt]); if (s.deck > s.belt) body.push([F((s.rear + L) / 2), s.deck]); body.push([F(L - 0.05), s.deck - 0.04], [F(L), s.deck - 0.2]); }
+    body.push([F(L), s.sill + 0.2], [F(L - 0.08), s.sill]);
+    const arches = [[F(s.wb), s.wr, aR, s.sill], [F(s.wf), s.wr, aR, s.sill]];
+    m.add(carShapeX(extrudeSide(body, Wd, 0.07, arches), L, s.belt - 0.35, s.belt, 0.04, 0.1), paint);
+    // the glasshouse (bus: a window band), its roof and pillars
+    const gw = Wd * (s.bus ? 0.98 : 0.86), tumble = s.bus ? 0.02 : s.panel ? 0.1 : 0.2;
+    const gEnd = s.panel || (s.bus ? s.rb : s.rear);
+    const gh = s.bus ? [[F(s.ws), s.belt], [F(s.rf), s.roof - 0.1], [F(s.rb), s.roof - 0.1], [F(s.rb), s.belt]]
+      : s.panel ? [[F(s.ws), s.belt], [F(s.rf), s.roof - 0.02], [F(s.panel), s.roof - 0.02], [F(s.panel), s.belt]]
+      : [[F(s.ws), s.belt], [F(s.rf), s.roof], [F(s.rb), s.roof], [F(s.rear), s.belt]];
+    m.add(carShapeX(extrudeSide(gh, gw, 0.04), L, s.belt, s.roof, tumble, 0.1), glass);
+    const topW = gw * (1 - tumble);
+    if (s.bus) m.add(carShapeX(extrudeSide([[F(0.1), s.roof - 0.12], [F(0.3), s.roof], [F(L - 0.1), s.roof], [F(L), s.roof - 0.12], [F(L), s.roof - 0.16], [F(0.1), s.roof - 0.16]], Wd, 0.06), L, 0, 0, 0, 0.06), paint);
+    else if (!s.panel) m.add(carShapeX(extrudeSide([[F(s.rf - 0.04), s.roof - 0.05], [F(s.rf + 0.14), s.roof + 0.025], [F(s.rb - 0.14), s.roof + 0.025], [F(s.rb + 0.04), s.roof - 0.05]], topW + 0.06, 0.03), L, 0, 0, 0, 0.1), paint);
+    else m.add(carShapeX(extrudeSide([[F(s.rf - 0.02), s.roof - 0.06], [F(s.rf + 0.12), s.roof + 0.01], [F(s.panel + 0.1), s.roof + 0.01], [F(s.panel + 0.1), s.roof - 0.06]], topW + 0.05, 0.03), L, 0, 0, 0, 0.1), paint);
+    const zf = z => z - L / 2, bx = gw / 2 + 0.012, tx = topW / 2 + 0.012;
+    for (const sx of [-1, 1]) {
+      if (s.bus) { for (let z = s.ws + 1.0; z < s.rb - 0.3; z += 1.15) m.box(0.05, s.roof - s.belt - 0.1, 0.12, paint, sx * (Wd / 2 - 0.005), (s.roof + s.belt - 0.1) / 2, zf(z)); continue; }
+      seg(m, STICK, paint, sx * bx, s.belt - 0.02, zf(s.ws), sx * tx, s.roof - 0.02, zf(s.rf), 0.07, 0.07);                           // A pillars
+      if (!s.panel) {
+        seg(m, STICK, paint, sx * bx, s.belt - 0.02, zf(s.rear), sx * tx, s.roof - 0.02, zf(s.rb), 0.09, 0.09);                     // C pillars
+        const bz = s.doors === 4 ? s.rf + (s.rb - s.rf) * 0.48 : s.rf + (s.rb - s.rf) * 0.62;
+        seg(m, STICK, paint, sx * bx, s.belt - 0.02, zf(bz + 0.06), sx * tx, s.roof - 0.02, zf(bz), 0.07, 0.07);                     // B pillar
+      }
+      m.box(0.035, 0.03, gEnd - s.ws, trim, sx * (Wd / 2 * 0.955), s.belt + 0.005, zf((s.ws + gEnd) / 2));                           // window seal
+      // mirror, door lines, handles
+      m.box(0.16, 0.09, 0.1, paint, sx * (Wd / 2 + 0.07), s.belt + 0.07, zf(s.ws + 0.16)); m.box(0.12, 0.07, 0.015, 0x8fa4b6, sx * (Wd / 2 + 0.09), s.belt + 0.07, zf(s.ws + 0.22));
+      const dz = [s.ws + 0.05, s.doors === 4 ? s.rf + (s.rb - s.rf) * 0.5 : s.rf + (s.rb - s.rf) * 0.66];
+      if (s.doors === 4) dz.push(s.rb - 0.05);
+      for (const z of dz) m.box(0.012, s.belt - s.sill - 0.12, 0.014, trim, sx * (Wd / 2 - 0.005), (s.belt + s.sill) / 2 + 0.03, zf(z));
+      for (let k = 0; k + 1 < dz.length; k++) m.box(0.02, 0.025, 0.12, trim, sx * (Wd / 2 + 0.003), s.belt - 0.12, zf(dz[k + 1] - 0.18));
+    }
+    // wheels: well (dark, inside the arch), tyre, rim with five spokes, hub
+    const tx2 = Wd / 2 - 0.13;
+    for (const az of [s.wf, s.wb]) {
+      m.add(CYL8, dark, 0, s.wr, zf(az), 0, 0, Math.PI / 2, aR * 1.9, Wd - 0.3, aR * 1.9);
+      for (const sx of [-1, 1]) {
+        m.add(WHEEL, 0x1b1c1f, sx * tx2, s.wr, zf(az), 0, 0, Math.PI / 2, s.wr * 2, 0.22, s.wr * 2);
+        m.add(fine ? CYL : CYL8, rim, sx * (tx2 + 0.1), s.wr, zf(az), 0, 0, Math.PI / 2, s.wr * 1.25, 0.03, s.wr * 1.25);
+        if (fine) {
+          for (let k = 0; k < 5; k++) { const a = k * 1.2566; m.box(0.02, s.wr * 0.62, 0.05, 0x8d949c, sx * (tx2 + 0.12), s.wr + Math.cos(a) * s.wr * 0.31, zf(az) + Math.sin(a) * s.wr * 0.31, a, 0, 0); }
+          m.add(CYL8, 0x3a3d44, sx * (tx2 + 0.125), s.wr, zf(az), 0, 0, Math.PI / 2, 0.1, 0.03, 0.1);
+        }
+      }
+    }
+    // front and back: lower bumper band, grille, number plates (lights are added by the caller: they glow on traffic)
+    const fy = s.bus ? s.sill + 0.3 : s.sill + 0.12;
+    m.box(Wd * 0.9, 0.14, 0.05, trim, 0, fy, zf(0) - 0.012); m.box(Wd * 0.9, 0.14, 0.05, trim, 0, fy, zf(L) + 0.012);
+    if (!s.bus) m.box(Wd * 0.42, Math.max(0.1, (s.nose - s.sill) * 0.3), 0.04, dark, 0, s.sill + (s.nose - s.sill) * 0.48, zf(0) - 0.015);
+    m.box(0.46, 0.11, 0.02, 0xf2f2ec, 0, fy + 0.13, zf(0) - 0.03); m.box(0.46, 0.11, 0.02, 0xf2f2ec, 0, s.bus ? fy + 0.4 : s.deck - 0.38, zf(L) + 0.03);
+    if (s.wing) { m.box(Wd * 0.84, 0.04, 0.26, trim, 0, s.deck + 0.2, zf(L - 0.18)); for (const sx of [-1, 1]) m.box(0.04, 0.2, 0.08, trim, sx * Wd * 0.34, s.deck + 0.09, zf(L - 0.2)); }
+    const hy = s.nose - 0.1, ty = s.bus ? s.belt - 0.5 : s.deck - 0.16;
+    return { head: [[-Wd * 0.34, hy, zf(0) - 0.02], [Wd * 0.34, hy, zf(0) - 0.02]], tail: [[-Wd * 0.38, ty, zf(L) + 0.02], [Wd * 0.38, ty, zf(L) + 0.02]], roofY: s.roof, cabZ: zf((s.rf + s.rb) / 2), L, Wd };
+  }
+  function carLights(m, at, Wd, bus) { // headlight and tail-light shapes (parked cars: plain colours; traffic: an unlit glow mesh)
+    for (const p of at.head) m.box(Wd * 0.2, bus ? 0.16 : 0.1, 0.05, 0xfff6c8, p[0], p[1], p[2]);
+    for (const p of at.tail) m.box(Wd * 0.17, 0.11, 0.05, 0xff2a2a, p[0], p[1], p[2]);
+  }
+  const WHEEL = (() => { // a tyre: a fat cylinder with rounded shoulders (Lathe)
+    const pts = [[0.3, -0.5], [0.43, -0.5], [0.5, -0.22], [0.5, 0.22], [0.43, 0.5], [0.3, 0.5]].map(q => new THREE.Vector2(q[0], q[1]));
+    return new THREE.LatheGeometry(pts, 11).toNonIndexed();
+  })();
   const PROP = {
     lamp: propGeo(m => { m.add(CYL6, 0x3a3f4a, 0, 2.7, 0, 0, 0, 0, 0.15, 5.4, 0.15); m.add(CYL6, 0x2a2e37, 0, 0.18, 0, 0, 0, 0, 0.34, 0.36, 0.34); m.box(0.1, 0.1, 1.5, 0x3a3f4a, 0, 5.36, -0.7); m.box(0.4, 0.14, 0.66, 0x2a2e37, 0, 5.32, -1.35); }),
     bulb: shared(new THREE.BoxGeometry(0.3, 0.08, 0.54).translate(0, 5.22, -1.35)),
@@ -385,43 +616,28 @@ varying float vGL; varying vec2 vGUV;
     hydrant: propGeo(m => { m.add(CYL8, 0xe23b2e, 0, 0.36, 0, 0, 0, 0, 0.3, 0.72, 0.3); m.box(0.24, 0.16, 0.24, 0xe23b2e, 0, 0.8, 0); m.add(CYL6, 0xf2b134, 0, 0.5, 0, 0, 0, Math.PI / 2, 0.16, 0.5, 0.16); m.add(CYL8, 0xc22d22, 0, 0.05, 0, 0, 0, 0, 0.4, 0.1, 0.4); }),
     bin: propGeo(m => { m.add(CYL8, 0x2f8f5b, 0, 0.5, 0, 0, 0, 0, 0.56, 1.0, 0.56); m.add(CYL8, 0x226b44, 0, 1.03, 0, 0, 0, 0, 0.62, 0.08, 0.62); m.box(0.36, 0.12, 0.04, 0x1f1a3d, 0, 0.8, -0.28); }),
     box: propGeo(m => { m.box(0.5, 0.95, 0.44, 0x2b6cb0, 0, 0.62, 0); m.add(CYL8, 0x2b6cb0, 0, 1.08, 0, 0, 0, Math.PI / 2, 0.44, 0.5, 0.44); m.box(0.07, 0.3, 0.07, 0x33373f, -0.18, 0.15, 0); m.box(0.07, 0.3, 0.07, 0x33373f, 0.18, 0.15, 0); m.box(0.3, 0.05, 0.02, 0xf4f1ea, 0, 0.95, -0.23); }),
-    // parked cars are white where the paint goes: each instance tints its own (glass and tyres are dark, so they stay dark)
-    car: propGeo(m => carBody(m, 3.9, 1.75, 0.75, 0.62, 2.15, 0.15, 0xffffff)),
-    van: propGeo(m => carBody(m, 4.5, 1.9, 1.0, 0.8, 3.0, 0.45, 0xffffff)),
+    // parked cars are white where the paint goes: each instance tints its own (glass and tyres are dark, so they stay dark).
+    // car = three body styles (hatchback, saloon, SUV: e.sp says which), van = a panel van.
+    car: ['hatch', 'sedan', 'suv'].map(k => propGeo(m => carBody(m, k))),
+    van: propGeo(m => carBody(m, 'van')),
+    carLo: ['hatch', 'sedan', 'suv'].map(k => propGeo(m => carBox(m, CAR_SPEC[k], 0xffffff))),
+    vanLo: propGeo(m => carBox(m, CAR_SPEC.van, 0xffffff)),
     sigPole: propGeo(m => { m.add(CYL, 0x33373f, 0, 2.0, 0, 0, 0, 0, 0.18, 4.0, 0.18); m.box(0.54, 1.56, 0.36, 0x1f2229, 0, 4.2, 0); m.box(0.7, 0.08, 0.5, 0xf2b134, 0, 5.02, 0); m.add(CYL, 0x1f2229, 0, 0.14, 0, 0, 0, 0, 0.44, 0.28, 0.44); }),
     sigLamp: shared(new THREE.SphereGeometry(0.19, 10, 8)),
   };
-  // Parked cars. High quality (2026-11-17): a sloped bonnet and boot, bumpers, a grille, head and tail lights, door lines,
-  // mirrors, pillars between the windows and wheels with hubcaps. The white parts take the instance tint (the paint).
-  function carBody(m, L, Wd, H, cabH, cabL, cabZ, col) {
-    const dark = 0x222428, glass = 0x2d3d52, base = 0.32;
-    if (LOW) {
+  // Parked cars: the low-quality box car, or the realistic body (carShape) with plain-coloured lights.
+  function carBody(m, kind) {
+    const s = CAR_SPEC[kind], col = 0xffffff;
+    if (LOW) { carBox(m, s, col); return; }
+    carLights(m, carShape(m, s, col, CAR_GLASS), s.Wd);
+  }
+  function carBox(m, s, col) {
+    {
+      const L = s.L, Wd = s.Wd, H = s.belt - s.sill, base = s.sill, cabH = s.roof - s.belt, cabL = (s.panel || s.rear) - s.ws, cabZ = ((s.panel || s.rear) + s.ws) / 2 - L / 2;
       m.box(Wd, H, L, col, 0, base + H / 2, 0);
-      m.box(Wd * 0.88, cabH, cabL, glass, 0, base + H + cabH / 2, cabZ);
+      m.box(Wd * 0.88, cabH, cabL, 0x2d3d52, 0, base + H + cabH / 2, cabZ);
       m.box(Wd * 0.9, 0.06, cabL * 0.9, col, 0, base + H + cabH + 0.03, cabZ);
-      for (const [x, z] of [[-Wd / 2, -L * 0.33], [Wd / 2, -L * 0.33], [-Wd / 2, L * 0.33], [Wd / 2, L * 0.33]]) m.add(CYL6, dark, x, 0.34, z, 0, 0, Math.PI / 2, 0.68, 0.26, 0.68);
-      return;
-    }
-    const trim = 0x3a3d44, light = 0xfff3c4, tail = 0xc0262d, chrome = 0xc9ced3;
-    m.box(Wd, H * 0.62, L, col, 0, base + H * 0.31, 0);                                       // lower body
-    m.box(Wd * 0.98, H * 0.4, L * 0.96, col, 0, base + H * 0.8, 0);                            // shoulder line
-    m.box(Wd * 0.94, 0.12, L * 0.3, col, 0, base + H - 0.02, -L * 0.33, 0.07);                 // bonnet, sloping to the nose
-    m.box(Wd * 0.94, 0.1, L * 0.18, col, 0, base + H - 0.02, L * 0.39, -0.08);                 // boot
-    m.box(Wd * 0.86, cabH, cabL, glass, 0, base + H + cabH / 2, cabZ);                        // glasshouse
-    m.box(Wd * 0.88, 0.07, cabL * 0.82, col, 0, base + H + cabH + 0.03, cabZ);                // roof
-    for (const sx of [-1, 1]) {
-      for (const z of [-cabL / 2 + 0.05, cabL * 0.05, cabL / 2 - 0.05]) m.box(0.05, cabH, 0.09, col, sx * Wd * 0.43, base + H + cabH / 2, cabZ + z);   // pillars
-      m.box(0.02, H * 0.55, 0.02, trim, sx * (Wd / 2 + 0.005), base + H * 0.55, cabZ + 0.05);    // door line
-      m.box(0.16, 0.09, 0.1, col, sx * (Wd / 2 + 0.08), base + H + 0.08, cabZ - cabL / 2 + 0.12); // mirror
-      m.box(Wd * 0.18, 0.12, 0.04, light, sx * Wd * 0.33, base + H * 0.62, -L / 2 - 0.01);      // headlight
-      m.box(Wd * 0.18, 0.1, 0.04, tail, sx * Wd * 0.33, base + H * 0.66, L / 2 + 0.01);         // tail light
-    }
-    m.box(Wd * 0.36, 0.14, 0.04, trim, 0, base + H * 0.45, -L / 2 - 0.012);                    // grille
-    m.box(Wd * 1.02, 0.16, 0.14, trim, 0, base + 0.06, -L / 2 + 0.04);                          // bumpers
-    m.box(Wd * 1.02, 0.16, 0.14, trim, 0, base + 0.06, L / 2 - 0.04);
-    for (const [x, z] of [[-Wd / 2, -L * 0.33], [Wd / 2, -L * 0.33], [-Wd / 2, L * 0.33], [Wd / 2, L * 0.33]]) {
-      m.add(CYL8, dark, x, 0.34, z, 0, 0, Math.PI / 2, 0.68, 0.24, 0.68);
-      m.add(CYL6, chrome, x + Math.sign(x) * 0.13, 0.34, z, 0, 0, Math.PI / 2, 0.36, 0.02, 0.36);  // hubcap
+      for (const [x, z] of [[-Wd / 2, s.wf - L / 2], [Wd / 2, s.wf - L / 2], [-Wd / 2, s.wb - L / 2], [Wd / 2, s.wb - L / 2]]) m.add(CYL6, 0x222428, x, s.wr, z, 0, 0, Math.PI / 2, s.wr * 2, 0.26, s.wr * 2);
     }
   }
   const CULL = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 420), cullGeos = new Map();
@@ -1015,7 +1231,8 @@ varying float vGL; varying vec2 vGUV;
     s.hn = [];
     for (let i = 0; i < r.hn.length; i += 3) s.hn.push({ x: ox + r.hn[i] * k, z: oz + r.hn[i + 1] * k, t: r.hn[i + 2] });
     s.trees = plantTrees(s);
-    for (let i = 0; i < s.trees.length; i += 2) if (heightAt(s.trees[i], s.trees[i + 1]) === 0) indexProp(s, 'tree', i / 2, s.trees[i], s.trees[i + 1]);
+    const tc = [0, 0, 0, 0];
+    for (let i = 0; i < s.trees.length; i += 2) { const k = s.treeK[i / 2], li = tc[k]++; if (heightAt(s.trees[i], s.trees[i + 1]) === 0) indexProp(s, 'tree', li, s.trees[i], s.trees[i + 1], { sp: k }); }
     s.reg = true;
     for (const sg of s.walk) if (sg.car) { sg.n1 = nodeAt(sg.x1, sg.z1, sg, 1); sg.n2 = nodeAt(sg.x2, sg.z2, sg, 2); }
     s.props = layProps(s);
@@ -1110,7 +1327,7 @@ varying float vGL; varying vec2 vGUV;
     return e;
   }
   function layProps(s) {
-    const P = { lamp: [], bench: [], hydrant: [], bin: [], box: [], car: [], van: [] };
+    const P = { lamp: [], bench: [], hydrant: [], bin: [], box: [], car: [], car0: [], car1: [], car2: [], van: [] };
     let seed = (s.tile.x * 613 + s.tile.y * 271 + s.idx * 97) | 0;
     const rnd = () => hash(seed++);
     const free = (x, z) => !heightAt(x, z) && !heightAt(x + 0.8, z) && !heightAt(x - 0.8, z) && !heightAt(x, z + 0.8) && !heightAt(x, z - 0.8);
@@ -1141,10 +1358,12 @@ varying float vGL; varying vec2 vGUV;
             if (rnd() < (LOW ? 0.8 : 0.55)) continue;
             const x = x1 + ux * d - uz * (hw - 0.95) * sd, z = z1 + uz * d + ux * (hw - 0.95) * sd;
             const yaw = Math.atan2(-ux * sd, -uz * sd), tint = CAR_TINT[Math.floor(rnd() * CAR_TINT.length)];
-            const pc = { x, z, yaw, ux, uz, van: rnd() < 0.2, tint };
-            const list = pc.van ? P.van : P.car;
-            pc.prop = indexProp(s, pc.van ? 'van' : 'car', list.length / 4, x, z, { car: pc, tint });
+            const van = rnd() < 0.18, q2 = rnd(), sp = van ? null : q2 < 0.45 ? 0 : q2 < 0.78 ? 1 : 2;  // hatchback, saloon, SUV
+            const pc = { x, z, yaw, ux, uz, van, tint, sp };
+            const list = van ? P.van : P['car' + sp];
+            pc.prop = indexProp(s, van ? 'van' : 'car', list.length / 4, x, z, van ? { car: pc, tint } : { car: pc, tint, sp });
             list.push(x, z, yaw, tint);
+            if (!van) P.car.push(x, z, yaw, tint);
             addToBuckets(carBuckets, x - 2.5, z - 2.5, x + 2.5, z + 2.5, pc);
           }
         }
@@ -1159,7 +1378,7 @@ varying float vGL; varying vec2 vGUV;
     for (const c of list) {
       if (c.gone) continue;  // borrowed (or a loose car that drove off)
       const dx = x - c.x, dz = z - c.z, along = dx * c.ux + dz * c.uz, across = -dx * c.uz + dz * c.ux;
-      if (Math.abs(along) < (c.van ? 2.25 : 1.95) + R && Math.abs(across) < 0.92 + R) return c;
+      if (Math.abs(along) < (c.van ? 2.45 : c.sp ? 2.32 : 2.0) + R && Math.abs(across) < 0.92 + R) return c;
     }
     return null;
   }
@@ -1190,6 +1409,7 @@ varying float vGL; varying vec2 vGUV;
   function setInstance(e, fn) {
     if (!e.s || !e.s.inst) return;
     for (const im of e.s.inst[e.k] || []) {
+      if (im.userData.sp != null && im.userData.sp !== e.sp) continue;
       if (e.i >= im.count) continue;
       fn(im);
       im.instanceMatrix.needsUpdate = true;
@@ -1245,7 +1465,7 @@ varying float vGL; varying vec2 vGUV;
   }
   const geysers = [], fires = [], fallen = [];
   function fallTree(e, dir) { // a stand-in tree that tips over and sinks away
-    const g = new THREE.Group(), t = new THREE.Mesh(TRUNK_G, MAT.trunk), c = new THREE.Mesh(CROWN_G, new THREE.MeshLambertMaterial({ color: 0x5e8f43, vertexColors: !LOW }));
+    const T = TREE[e.sp || 0] || TREE[0], g = new THREE.Group(), t = new THREE.Mesh(T.trunk, MAT.trunk), c = new THREE.Mesh(T.crown, new THREE.MeshLambertMaterial({ color: 0x5e8f43, vertexColors: !LOW }));
     g.add(t, c); g.position.set(e.x, groundAt(e.x, e.z) - 0.1, e.z);
     g.rotation.y = dir ? Math.atan2(dir.x, dir.z) : Math.random() * 6.28;
     scene.add(g);
@@ -1298,7 +1518,7 @@ varying float vGL; varying vec2 vGUV;
     mesh.position.set(x, groundAt(x, z), z); mesh.rotation.y = yaw;
     scene.add(mesh);
     const fx2 = -Math.sin(yaw), fz2 = -Math.cos(yaw);
-    const pc = { x, z, yaw, ux: fx2, uz: fz2, van: false, tint, loose: mesh };
+    const pc = { x, z, yaw, ux: fx2, uz: fz2, van: false, tint, loose: mesh, sp: 0 };
     pc.prop = { k: 'car', x, z, key: 'loose:' + looseCars.length + ':' + Math.round(x) + ',' + Math.round(z), car: pc, loose: mesh, tint };
     addToBuckets(carBuckets, x - 2.5, z - 2.5, x + 2.5, z + 2.5, pc);
     addToBuckets(propBuckets, x - 1.5, z - 1.5, x + 1.5, z + 1.5, pc.prop);
@@ -1336,7 +1556,9 @@ varying float vGL; varying vec2 vGUV;
   }
 
   function plantTrees(s) {
-    const out = [];
+    const out = [], kinds = [], bush = [];
+    s.treeK = kinds; s.bushes = bush;
+    const okB = (x, z) => !LOW && bush.length < 6000 && heightAt(x, z) === 0 && heightAt(x + 1, z) === 0 && heightAt(x - 1, z) === 0 && heightAt(x, z + 1) === 0 && heightAt(x, z - 1) === 0 && !roadAt(x, z) && !roadAt(x + 0.9, z) && !roadAt(x - 0.9, z) && !roadAt(x, z + 0.9) && !roadAt(x, z - 0.9);
     const ok = (x, z) => heightAt(x, z) === 0 && heightAt(x + 2, z) === 0 && heightAt(x - 2, z) === 0 && heightAt(x, z + 2) === 0 && heightAt(x, z - 2) === 0 &&
       !roadAt(x, z) && !roadAt(x + 1, z) && !roadAt(x - 1, z) && !roadAt(x, z + 1) && !roadAt(x, z - 1);
     let seed = (s.tile.x * 131 + s.tile.y * 977 + Math.round(s.x0)) | 0;
@@ -1351,7 +1573,11 @@ varying float vGL; varying vec2 vGUV;
         for (let d = 6 + rnd() * 6; d < L - 6; d += 11 + rnd() * 6) for (const side of [-1, 1]) {
           if (rnd() < 0.3) continue;
           const x = x1 + ux * d - uz * off * side, z = z1 + uz * d + ux * off * side;
-          if (ok(x, z)) out.push(x, z);
+          if (ok(x, z)) { out.push(x, z); kinds.push(treeKind(x, z, 'street')); }
+          if (rd.t === 'residential' && rnd() < 0.4) { // a bush between the trees, a little further from the kerb
+            const bd = d + (rnd() < 0.5 ? -1 : 1) * (2.6 + rnd() * 1.4), bo = off + 0.6 + rnd() * 1.2, bx = x1 + ux * bd - uz * bo * side, bz = z1 + uz * bd + ux * bo * side;
+            if (okB(bx, bz)) bush.push(bx, bz, rnd() < 0.3 ? 1 : 0, rnd() * 6.28);
+          }
         }
       }
     }
@@ -1364,7 +1590,14 @@ varying float vGL; varying vec2 vGUV;
       const n = Math.min(LOW ? 200 : 600, Math.abs(signedArea(p)) * dens);
       for (let t = 0; t < n * 1.6 && out.length < 3000; t++) {
         const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0);
-        if (inRings([p].concat(a.hs || []), x, z) && ok(x, z)) out.push(x, z);
+        if (inRings([p].concat(a.hs || []), x, z) && ok(x, z)) { out.push(x, z); kinds.push(treeKind(x, z, a.k === 'wood' ? 'wood' : 'park')); }
+      }
+      if (!LOW) { // undergrowth in woods; round, flowering and the odd topiary duck in parks
+        const nb = Math.min(500, Math.abs(signedArea(p)) * (a.k === 'wood' ? 1 / 140 : 1 / 180));
+        for (let t = 0; t < nb * 1.6; t++) {
+          const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0), q = rnd();
+          if (inRings([p].concat(a.hs || []), x, z) && okB(x, z)) bush.push(x, z, a.k === 'wood' ? 0 : q < 0.05 ? 2 : q < 0.4 ? 1 : 0, rnd() * 6.28);
+        }
       }
     }
     return out;
@@ -1527,19 +1760,49 @@ varying float vGL; varying vec2 vGUV;
     const keep = (kind, im) => { (s.inst[kind] || (s.inst[kind] = [])).push(im); return im; };
     const n = s.trees.length / 2;
     if (n) {
-      const trunks = new THREE.InstancedMesh(cullGeo(TRUNK_G), MAT.trunk, n), crowns = new THREE.InstancedMesh(cullGeo(CROWN_G), MAT.crown, n);
+      const cnt = TREE.map(() => 0), fill = TREE.map(() => 0);
+      for (let i = 0; i < n; i++) cnt[s.treeK[i] || 0]++;
+      const pairOf = (T, k) => cnt[k] ? [new THREE.InstancedMesh(cullGeo(T.trunk), MAT.trunk, cnt[k]), new THREE.InstancedMesh(cullGeo(T.crown), MAT.crown, cnt[k])] : null;
+      const ims = TREE.map(pairOf), los = TREE_LO ? TREE_LO.map(pairOf) : null;
       const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), v = new THREE.Vector3(), e = new THREE.Euler(), c = new THREE.Color();
       for (let i = 0; i < n; i++) {
-        const sx = s.trees[2 * i], sz = s.trees[2 * i + 1], hh = Math.round(sx * 7 + sz * 13), size = 0.75 + hash(hh) * 0.6;
+        const k = s.treeK[i] || 0, j = fill[k]++, sx = s.trees[2 * i], sz = s.trees[2 * i + 1], hh = Math.round(sx * 7 + sz * 13), size = 0.75 + hash(hh) * 0.6;
         e.set(0, hash(hh + 1) * 6.28, 0); q.setFromEuler(e); sc.set(size, size * (0.9 + hash(hh + 2) * 0.3), size);
         if (smashed.has(propKey('tree', sx, sz))) sc.set(0, 0, 0);
         v.set(sx - ccx, groundAt(sx, sz) - 0.1 - ccy, sz - ccz); m.compose(v, q, sc);
-        trunks.setMatrixAt(i, m); crowns.setMatrixAt(i, m);
-        c.setHSL(0.24 + hash(hh + 3) * 0.08, 0.45 + hash(hh + 4) * 0.2, 0.3 + hash(hh + 5) * 0.12 + (LOW ? 0 : 0.06));
-        crowns.setColorAt(i, c);
+        ims[k][0].setMatrixAt(j, m); ims[k][1].setMatrixAt(j, m);
+        if (los) { los[k][0].setMatrixAt(j, m); los[k][1].setMatrixAt(j, m); }
+        const h3 = hash(hh + 3), h4 = hash(hh + 4), h5 = hash(hh + 5);
+        if (LOW) c.setHSL(0.24 + h3 * 0.08, 0.45 + h4 * 0.2, 0.3 + h5 * 0.12);
+        else if (k === 0 && hash(hh + 6) < 0.07) c.setHSL(0.02 + h3 * 0.07, 0.72, 0.5 + h5 * 0.06);    // the odd maple already turning red
+        else if (k === 0) c.setHSL(0.23 + h3 * 0.08, 0.36 + h4 * 0.18, 0.38 + h5 * 0.1);
+        else if (k === 1) c.setHSL(0.22 + h3 * 0.06, 0.38 + h4 * 0.14, 0.4 + h5 * 0.1);
+        else if (k === 2) c.setHSL(0.36 + h3 * 0.06, 0.3 + h4 * 0.12, 0.3 + h5 * 0.08);
+        else c.setHSL(0.17 + h3 * 0.06, 0.5 + h4 * 0.15, 0.52 + h5 * 0.1);
+        ims[k][1].setColorAt(j, c); if (los) los[k][1].setColorAt(j, c);
       }
-      crowns.castShadow = trunks.castShadow = !LOW;
-      keep('tree', culled(trunks)); keep('tree', culled(crowns));
+      ims.forEach((pair, k) => { if (pair) for (const im of pair) { im.castShadow = !LOW; im.userData.sp = k; if (los) im.userData.lod = 'hi'; keep('tree', culled(im)); } });
+      if (los) los.forEach((pair, k) => { if (pair) for (const im of pair) { im.castShadow = true; im.userData.sp = k; im.userData.lod = 'lo'; keep('tree', culled(im)); } });
+    }
+    const bl = s.bushes || [];
+    if (BUSH && bl.length) { // bushes: not smashable, so not kept per kind
+      const byK = [[], [], []];
+      for (let i = 0; i < bl.length; i += 4) byK[bl[i + 2]].push(i);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), v = new THREE.Vector3(), e = new THREE.Euler(), c = new THREE.Color();
+      byK.forEach((list, k) => {
+        if (!list.length) return;
+        const im = new THREE.InstancedMesh(cullGeo(BUSH[k]), MAT.crown, list.length), fl = k === 1 ? new THREE.InstancedMesh(cullGeo(FLOWERS), MAT.prop, list.length) : null;
+        list.forEach((i, j) => {
+          const x = bl[i], z = bl[i + 1], hh = Math.round(x * 11 + z * 5), size = k === 2 ? 1 : 0.75 + hash(hh) * 0.55;
+          e.set(0, bl[i + 3], 0); q.setFromEuler(e); sc.set(size, size * (0.85 + hash(hh + 1) * 0.3), size);
+          v.set(x - ccx, groundAt(x, z) - 0.05 - ccy, z - ccz); m.compose(v, q, sc);
+          im.setMatrixAt(j, m); if (fl) fl.setMatrixAt(j, m);
+          if (k === 2) c.setHSL(0.3, 0.45, 0.36); else c.setHSL(0.22 + hash(hh + 2) * 0.1, 0.4 + hash(hh + 3) * 0.2, 0.4 + hash(hh + 4) * 0.1);
+          im.setColorAt(j, c);
+        });
+        im.castShadow = true; im.userData.lod = 'hi'; culled(im);
+        if (fl) { fl.userData.lod = 'hi'; culled(fl); }
+      });
     }
     const pr = s.props || {};
     const inst = (kind, geo, mat, list, stride, shadow) => {
@@ -1563,12 +1826,27 @@ varying float vGL; varying vec2 vGUV;
       const pool = inst('lamp', PROP.pool, MAT.pool, pr.lamp, 3, false); if (pool) pool.renderOrder = 2;
       if (!LOW) { const halo = inst('lamp', PROP.halo, MAT.halo, pr.lamp, 3, false); if (halo) halo.renderOrder = 3; }
     }
-    if (pr.car) inst('car', PROP.car, MAT.tint, pr.car, 4, true);
-    if (pr.van) inst('van', PROP.van, MAT.tint, pr.van, 4, true);
+    for (let v = 0; v < 3; v++) if (pr['car' + v]) {
+      const im = inst('car', PROP.car[v], MAT.tint, pr['car' + v], 4, true); if (im) { im.userData.sp = v; if (!LOW) im.userData.lod = 'hi'; }
+      const lo = !LOW && inst('car', PROP.carLo[v], MAT.tint, pr['car' + v], 4, true); if (lo) { lo.userData.sp = v; lo.userData.lod = 'lo'; }
+    }
+    if (pr.van) { const im = inst('van', PROP.van, MAT.tint, pr.van, 4, true); if (im && !LOW) { im.userData.lod = 'hi'; const lo = inst('van', PROP.vanLo, MAT.tint, pr.van, 4, true); if (lo) lo.userData.lod = 'lo'; } }
+    s.near = null;
     worldGroup.add(group);
     s.group = group;
+    lodSub(s);
     if (!s.canvas) s.canvas = drawSubMap(s);
   }
+  // Shows a sub-tile's full models (lod 'hi') near you, its stand-ins (lod 'lo') further away. Hysteresis: 20 m.
+  function lodSub(s) {
+    if (LOW || !s.group) return;
+    const d = rectDist(s, player.pos.x, player.pos.z), near = s.near ? d < LOD_R + 20 : d < LOD_R;
+    if (near === s.near) return;
+    s.near = near;
+    for (const o of s.group.children) if (o.userData.lod) o.visible = (o.userData.lod === 'hi') === near;
+  }
+  let lodT = 0;
+  function updateLod(dt) { lodT -= dt; if (lodT > 0) return; lodT = 0.4; for (const s of allSubs) lodSub(s); }
   function dropSub(s) {
     worldGroup.remove(s.group);
     s.group.traverse(o => { if (o.geometry && !SHARED.has(o.geometry)) o.geometry.dispose(); if (o.isInstancedMesh) o.dispose(); });
@@ -1873,130 +2151,254 @@ varying float vGL; varying vec2 vGUV;
       long: r(6) < 0.4, dress: r(7) < 0.15, hat: r(8) < 0.12 ? pick(CLOTH, 9) : null, bag: r(10) < 0.25 ? pick(CLOTH, 11) : null, h: 0.92 + r(12) * 0.16,
       hs: Math.floor(r(13) * 24), sleeve: r(14) < 0.45 ? 'short' : 'long', shorts: r(15) < 0.14, glasses: r(16) < 0.14, beard: r(17) < 0.1 && r(6) >= 0.4,
       stripes: r(18) < 0.16 ? pick(CLOTH, 19) : null, logo: r(20) < 0.2 ? pick(CLOTH, 21) : null, phones: r(22) < 0.07 ? pick(CLOTH, 23) : null,
-      build: 0.92 + r(24) * 0.2, scarf: r(25) < 0.06 ? pick(CLOTH, 26) : null, collar: r(27) < 0.2 };
+      build: 0.92 + r(24) * 0.2, scarf: r(25) < 0.06 ? pick(CLOTH, 26) : null, collar: r(27) < 0.2,
+      fig: Math.min(1, Math.max(0, r(28) * 0.45 + (r(7) < 0.15 ? 0.5 : 0) + (r(6) < 0.4 ? 0.25 : 0) - (r(17) < 0.1 ? 0.3 : 0))),
+      tuck: r(30) < 0.5, silly: r(31) < 0.09 ? W.SILLY[Math.floor(r(32) * W.SILLY.length) % W.SILLY.length] : null };
   };
-  // The shapes people are made of (rounded, smooth-shaded). Fewer facets on low quality.
-  // Three levels of roundness: you and the story's cast get the smoothest, the dozens of passers-by a lighter one.
-  const prims = (su, sv, mu, mv, cs, cr, du, dv, rr) => ({
-    sph: new THREE.SphereGeometry(0.5, su, sv).toNonIndexed(), sm: new THREE.SphereGeometry(0.5, mu, mv).toNonIndexed(),
-    cap: new THREE.CapsuleGeometry(0.5, 1, cs, cr).toNonIndexed(),                                  // 2 tall, 1 wide
-    dome: new THREE.SphereGeometry(0.5, du, dv, 0, Math.PI * 2, 0, Math.PI * 0.46).toNonIndexed(),
-    skirt: new THREE.CylinderGeometry(0.3, 0.5, 1, rr).toNonIndexed(), ring: new THREE.CylinderGeometry(0.5, 0.5, 1, rr, 1, true).toNonIndexed() });
-  const PRIM_HI = prims(16, 12, 10, 7, 4, 12, 16, 6, 14), PRIM_MID = prims(10, 7, 6, 4, 2, 8, 10, 4, 10), PRIM_LO = prims(8, 5, 5, 3, 1, 6, 8, 3, 8);
+  const ARM_Z = 0.11;  // arms hang a little away from the body
+  // The shapes people are made of (smooth-shaded). Three levels of roundness: you and the story's cast get the smoothest, the
+  // dozens of passers-by a lighter one, one step down each on low quality.
+  // Realism pass (2026-11-17, user: "more realistic... but keep the silliness"): about six and a half heads tall (a little
+  // cartoon left in the head and the eyes), a shaped torso (torsoGeo: chest, waist, hips from look.fig and look.build, a belly
+  // for big builds), lathe-turned limbs (LIMB: thighs, calves, deltoids, forearms), hands with a thumb, shoes with soles and
+  // toe caps, a face with lids, irises, a real nose and lips. The silliness stays in the walk and in look.silly (SILLY).
+  const LIMB = {
+    thigh: [[0, -1.04], [0.5, -1.02], [0.64, -0.94], [0.68, -0.8], [0.76, -0.55], [0.88, -0.3], [0.98, -0.1], [0.95, 0.02], [0.62, 0.1], [0, 0.13]],
+    shin: [[0, -1.03], [0.55, -1.01], [0.6, -0.92], [0.6, -0.78], [0.72, -0.55], [0.95, -0.3], [0.98, -0.16], [0.86, 0], [0.55, 0.08], [0, 0.1]],
+    upper: [[0, -1.05], [0.6, -1.02], [0.8, -0.92], [0.84, -0.7], [0.9, -0.4], [0.98, -0.15], [0.92, 0.02], [0.6, 0.12], [0, 0.16]],
+    fore: [[0, -1.03], [0.62, -1.0], [0.7, -0.9], [0.74, -0.6], [0.9, -0.3], [0.97, -0.1], [0.86, 0.02], [0, 0.08]],
+    sleeve: [[0.86, -0.55], [1.04, -0.52], [1.06, -0.3], [1.02, -0.06], [0.94, 0.05], [0.62, 0.16], [0, 0.19]],  // a short sleeve / shorts leg over a limb (scaled by the limb's full length)
+  };
+  const prims = (su, sv, mu, mv, cs, cr, du, dv, rr, ln) => {
+    const o = { sph: new THREE.SphereGeometry(0.5, su, sv).toNonIndexed(), sm: new THREE.SphereGeometry(0.5, mu, mv).toNonIndexed(),
+      cap: new THREE.CapsuleGeometry(0.5, 1, cs, cr).toNonIndexed(),                                  // 2 tall, 1 wide
+      dome: new THREE.SphereGeometry(0.5, du, dv, 0, Math.PI * 2, 0, Math.PI * 0.46).toNonIndexed(),
+      skirt: new THREE.CylinderGeometry(0.3, 0.5, 1, rr).toNonIndexed(), ring: new THREE.CylinderGeometry(0.5, 0.5, 1, rr, 1, true).toNonIndexed(), seg: rr };
+    for (const k in LIMB) o[k] = new THREE.LatheGeometry(LIMB[k].map(p => new THREE.Vector2(p[0], p[1])), ln).toNonIndexed();
+    return o;
+  };
+  const PRIM_HI = prims(16, 12, 10, 7, 4, 12, 16, 6, 14, 12), PRIM_MID = prims(10, 7, 6, 3, 2, 8, 10, 4, 10, 8), PRIM_LO = prims(8, 5, 5, 3, 1, 6, 8, 3, 8, 6);
+  const DUCK_RING = new THREE.TorusGeometry(0.5, 0.16, 6, 16).rotateX(Math.PI / 2).toNonIndexed();
   const shade = (c, k) => { _c.set(c).multiplyScalar(k); return _c.getHex(); };
+  const mix = (a, b, t) => { _c.set(a).lerp(new THREE.Color(b), t); return _c.getHex(); };
   const LONG_HAIR = [1, 3, 6, 2, 1, 6], SHORT_HAIR = [0, 4, 5, 0, 8, 0, 7, 4];
   W.HAIR_STYLES = ['Short', 'Long', 'Bun', 'Ponytail', 'Curly', 'Spiky', 'Bob', 'Thin on top', 'Side part'];
-  // A person, facing -z. Rounded body, a face (eyes, brows, nose, mouth, ears), nine hair styles, and joints: the body
-  // group holds a head and four limbs, each limb a pivot with a second pivot (knee / elbow) inside, so people can walk,
-  // run, sit, pedal, wave and dance. userData: {body, head, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, handL, handR}.
-  // look: {skin, hair, shirt, pants, shoe, h, build, style | long + hs, sleeve: 'short' | 'long' | 'none', shorts, dress,
-  //   hat, beanie, crown, glasses, beard, bag, apron, cape, coat, scarf, stripes, logo, phones, collar, tie, mood: 'angry'}.
-  // npc: true = only the big parts cast shadows (the streets hold dozens of people).
+  const EYES = [0x5a3a22, 0x3b2616, 0x6b8e4e, 0x4a7ab0, 0x8a6a3a, 0x2c2c2c];
+  // Silly extras about one passer-by in eleven wears (W.SILLY): the city is realistic, its people are not quite.
+  W.SILLY = ['propeller', 'party', 'cone', 'antlers', 'stache', 'nosegl', 'flower', 'duckring', 'balloon', 'baguette'];
+  // A torso as one smooth ring-by-ring shape. Rows: [y, half width, half depth, z offset (+ = back), 1 = trousers colour].
+  function torsoGeo(look, n, top, bottom) {
+    const f = look.fig != null ? look.fig : 0.5, b = Math.max(0, (look.build || 1) - 1.04);
+    const belt = [1.02, 0.157 + 0.01 * f + b * 0.1, 0.108 + b * 0.25, -b * 0.08];
+    const R = [
+      [0.83, 0.14, 0.09, 0.004, 1], [0.88, 0.155 + 0.016 * f, 0.104 + 0.01 * f, 0.006, 1], [0.97, 0.162 + 0.016 * f, 0.11 + 0.004 * f, 0.002, 1],
+      belt.concat(1), belt.concat(0),
+      [1.1, 0.152 - 0.016 * f + b * 0.18, 0.104 - 0.004 * f + b * 0.45, -b * 0.15, 0],                                   // waist (a belly for big builds)
+      [1.22, 0.16 - 0.008 * f + b * 0.1, 0.112 + b * 0.25, -0.005 - b * 0.08, 0],
+      [1.32, 0.168 - 0.014 * f, 0.121 + 0.016 * f, -0.012 - 0.01 * f, 0],                                                // chest
+      [1.4, 0.174 - 0.02 * f, 0.11, -0.006, 0], [1.448, 0.172 - 0.022 * f, 0.092, 0.0, 0],                                 // shoulders, rounding
+      [1.48, 0.145 - 0.018 * f, 0.078, 0.004, 0], [1.503, 0.1, 0.062, 0.008, 0], [1.525, 0.055, 0.048, 0.01, 0],                 // into the neck
+    ];
+    const pos = [], col = [], idx = [], ct = new THREE.Color(top), cb = new THREE.Color(bottom);
+    for (const r of R) for (let j = 0; j <= n; j++) {
+      const a = j / n * Math.PI * 2, c = r[4] ? cb : ct;
+      pos.push(Math.cos(a) * r[1], r[0], r[3] + Math.sin(a) * r[2]); col.push(c.r, c.g, c.b);
+    }
+    const row = n + 1;
+    for (let i = 0; i + 1 < R.length; i++) for (let j = 0; j < n; j++) {
+      const A = i * row + j, B = A + 1, C = A + row, D = C + 1;
+      idx.push(A, C, B, B, C, D);
+    }
+    const bot = pos.length / 3; pos.push(0, 0.81, 0.004); col.push(cb.r, cb.g, cb.b);
+    const tp = pos.length / 3; pos.push(0, 1.535, 0.01); col.push(ct.r, ct.g, ct.b);
+    const last = (R.length - 1) * row;
+    for (let j = 0; j < n; j++) { idx.push(bot, j, j + 1); idx.push(tp, last + j + 1, last + j); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    // where the surface is at height y: front z (negative), back z, half width
+    const at = y => { let i = 0; while (i < R.length - 2 && R[i + 1][0] < y) i++; const p = R[i], q = R[i + 1], t = Math.min(1, Math.max(0, (y - p[0]) / ((q[0] - p[0]) || 1))); const hw = p[1] + (q[1] - p[1]) * t, hd = p[2] + (q[2] - p[2]) * t, zo = p[3] + (q[3] - p[3]) * t; return { hw, hd, zo, front: zo - hd, back: zo + hd }; };
+    return { geo: g.toNonIndexed(), at };
+  }
+  // A person, facing -z. userData: {body, head, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, handL, handR, prop}:
+  // the body group holds a head and four limbs, each limb a pivot with a second pivot (knee / elbow) inside, so people can
+  // walk, run, sit, pedal, wave and dance; handR/handL are in the palm (weapons attach there).
+  // look: {skin, hair, shirt, pants, shoe, h, build, fig 0-1 (straight -> curvy), eye, style | long + hs, sleeve: 'short' |
+  //   'long' | 'none', shorts, dress, hat, beanie, crown, glasses, beard, bag, apron, cape, coat, scarf, stripes, logo, phones,
+  //   collar, tie, tuck, mood: 'angry', silly (one of W.SILLY)}. npc: true = only the big parts cast shadows.
   W.person = function (look, npc) {
     look = look || W.randomLook(Math.random() * 1e6 | 0);
-    const { sph: P_SPH, sm: P_SM, cap: P_CAP, dome: P_DOME, skirt: P_SKIRT, ring: P_RING } = npc ? (LOW ? PRIM_LO : PRIM_MID) : (LOW ? PRIM_MID : PRIM_HI);
+    const P = npc ? (LOW ? PRIM_LO : PRIM_MID) : (LOW ? PRIM_MID : PRIM_HI);
+    const { sph: P_SPH, sm: P_SM, cap: P_CAP, dome: P_DOME, skirt: P_SKIRT, ring: P_RING } = P;
     const g = new THREE.Group(), body = new THREE.Group();
     g.add(body);
     const skin = look.skin, hair = look.hair, shirt = look.coat || look.shirt, pants = look.pants, shoe = look.shoe == null ? 0x222222 : look.shoe;
-    const kid = W.isKid(look);
+    const kid = W.isKid(look), f = look.fig != null ? look.fig : 0.5, silly = look.silly || null;
     const part = (m, shadow) => { const mesh = m.mesh(); mesh.castShadow = !LOW && (shadow || !npc); return mesh; };
     // ---- torso
+    const T = torsoGeo(look, P.seg + 2, shirt, look.dress ? shirt : pants), at = T.at;
     const t = new Merge();
-    t.add(P_SPH, look.dress ? shirt : pants, 0, 0.93, 0, 0, 0, 0, 0.44, 0.3, 0.3);                    // hips
-    t.add(P_CAP, shirt, 0, 1.2, 0, 0, 0, 0, 0.47, 0.31, 0.3);                                         // chest
-    t.add(P_SPH, shirt, 0, 1.41, 0, 0, 0, 0, 0.6, 0.2, 0.3);                                          // shoulders
-    t.add(CYL8, skin, 0, 1.53, 0, 0, 0, 0, 0.14, 0.12, 0.14);                                         // neck
-    if (look.dress) t.add(P_SKIRT, shirt, 0, 0.74, 0, 0, 0, 0, 0.72, 0.46, 0.6);
-    else if (!look.coat) t.add(P_RING, shade(pants, 0.55), 0, 1.0, 0, 0, 0, 0, 0.455, 0.05, 0.31);    // belt
-    if (look.coat) t.add(P_SKIRT, look.coat, 0, 0.84, 0, 0, 0, 0, 0.66, 0.42, 0.52);
-    if (look.stripes) for (const y of [1.1, 1.24]) t.add(P_RING, look.stripes, 0, y, 0, 0, 0, 0, 0.482, 0.055, 0.312);
-    if (look.logo && !look.apron && !look.tie) t.add(P_SM, look.logo, 0, 1.27, -0.148, 0, 0, 0, 0.13, 0.13, 0.03);
-    if (look.collar || look.tie) { t.box(0.1, 0.07, 0.05, 0xf4f1ea, -0.07, 1.47, -0.13, 0, 0, 0.5); t.box(0.1, 0.07, 0.05, 0xf4f1ea, 0.07, 1.47, -0.13, 0, 0, -0.5); }
-    if (look.tie) { t.box(0.06, 0.3, 0.02, look.tie, 0, 1.28, -0.158); t.box(0.08, 0.06, 0.03, look.tie, 0, 1.44, -0.15); }
-    if (look.apron) { t.box(0.4, 0.62, 0.03, look.apron, 0, 1.05, -0.158); t.box(0.3, 0.04, 0.03, look.apron, 0, 1.4, -0.14); }
-    if (look.cape) t.box(0.52, 0.85, 0.04, look.cape, 0, 1.08, 0.18, -0.08);
-    if (look.scarf) { t.add(P_RING, look.scarf, 0, 1.51, 0, 0, 0, 0, 0.3, 0.1, 0.3); t.box(0.1, 0.3, 0.04, look.scarf, 0.08, 1.36, -0.15); }
-    if (look.bag) { // a backpack, with straps
-      t.add(P_CAP, look.bag, 0, 1.2, 0.21, 0, 0, 0, 0.34, 0.2, 0.2);
-      t.add(P_SM, shade(look.bag, 0.75), 0, 1.12, 0.31, 0, 0, 0, 0.22, 0.16, 0.06);
-      t.box(0.05, 0.44, 0.02, shade(look.bag, 0.75), -0.15, 1.25, -0.15); t.box(0.05, 0.44, 0.02, shade(look.bag, 0.75), 0.15, 1.25, -0.15);
+    t.addRaw(T.geo);
+    t.add(CYL8, skin, 0, 1.51, 0.005, 0, 0, 0, 0.1, 0.12, 0.092);                                          // neck
+    const tucked = look.tuck != null ? look.tuck : !((look.hs || 0) % 2);
+    if (look.dress) t.add(P_SKIRT, shirt, 0, 0.79, 0.004, 0, 0, 0, 0.62, 0.48, 0.5);
+    else if (!look.coat) {
+      const w = at(1.02);
+      if (tucked) { t.add(P_RING, shade(pants, 0.45), 0, 1.02, w.zo, 0, 0, 0, w.hw * 2 + 0.012, 0.04, w.hd * 2 + 0.012); t.box(0.035, 0.03, 0.01, 0xc9ced3, 0, 1.02, w.front - 0.008); }
+      else { const h = at(1.0); t.add(P_RING, shirt, 0, 0.995, h.zo, 0, 0, 0, h.hw * 2 + 0.02, 0.05, h.hd * 2 + 0.02); }  // an untucked hem
     }
+    if (look.coat) { // a coat: skirts to the knee, lapels, buttons
+      const h = at(0.97), c = at(1.3);
+      t.add(P_SKIRT, look.coat, 0, 0.8, h.zo, 0, 0, 0, h.hw * 3.4, 0.4, h.hd * 3.6);
+      t.box(0.05, 0.2, 0.012, shade(look.coat, 0.75), -0.045, 1.37, c.front - 0.004, 0, 0, -0.25); t.box(0.05, 0.2, 0.012, shade(look.coat, 0.75), 0.045, 1.37, c.front - 0.004, 0, 0, 0.25);
+      for (const y of [1.2, 1.1, 1.0]) t.add(P_SM, shade(look.coat, 0.5), 0.02, y, at(y).front - 0.004, 0, 0, 0, 0.018, 0.018, 0.01);
+    }
+    if (look.stripes) for (const y of [1.18, 1.3]) { const w = at(y); t.add(P_RING, look.stripes, 0, y, w.zo, 0, 0, 0, w.hw * 2 + 0.01, 0.045, w.hd * 2 + 0.01); }
+    if (look.logo && !look.apron && !look.tie) t.add(P_SM, look.logo, 0.035, 1.3, at(1.3).front + 0.002, 0, 0, 0, 0.07, 0.07, 0.016);
+    if (look.collar || look.tie) { const z = at(1.49).front - 0.006; t.box(0.065, 0.045, 0.025, 0xf4f1ea, -0.035, 1.485, z, 0, 0, 0.5); t.box(0.065, 0.045, 0.025, 0xf4f1ea, 0.035, 1.485, z, 0, 0, -0.5); }
+    if (look.tie) { const z = at(1.3).front - 0.008; t.box(0.045, 0.28, 0.012, look.tie, 0, 1.3, z, 0.08); t.box(0.05, 0.045, 0.02, look.tie, 0, 1.45, at(1.45).front - 0.008); }
+    if (look.apron) { t.box(0.3, 0.56, 0.018, look.apron, 0, 1.08, at(1.15).front - 0.012); t.box(0.22, 0.03, 0.018, look.apron, 0, 1.38, at(1.38).front - 0.01); }
+    if (look.cape) t.box(0.4, 0.82, 0.025, look.cape, 0, 1.08, at(1.3).back + 0.03, -0.08);
+    if (look.scarf) { t.add(P_RING, look.scarf, 0, 1.49, 0.01, 0, 0, 0, 0.21, 0.075, 0.19); t.box(0.07, 0.26, 0.025, look.scarf, 0.05, 1.36, at(1.36).front - 0.012); }
+    if (look.bag) { // a backpack with straps
+      const bz = at(1.25).back;
+      t.add(P_CAP, look.bag, 0, 1.24, bz + 0.07, 0, 0, 0, 0.27, 0.17, 0.15);
+      t.add(P_SM, shade(look.bag, 0.75), 0, 1.15, bz + 0.15, 0, 0, 0, 0.18, 0.13, 0.05);
+      for (const sx of [-1, 1]) t.box(0.035, 0.3, 0.012, shade(look.bag, 0.6), sx * 0.095, 1.27, at(1.27).front - 0.006, -0.12);
+    }
+    if (silly === 'duckring') { const w = at(1.06); t.add(DUCK_RING, 0xffd23f, 0, 1.0, w.zo, 0, 0, 0, w.hw * 2 + 0.16, 0.6, w.hd * 2 + 0.2); t.add(P_SM, 0xffd23f, 0, 1.1, w.front - 0.1, 0, 0, 0, 0.11, 0.11, 0.11); t.add(P_SM, 0xff8a3d, 0, 1.09, w.front - 0.17, 0, 0, 0, 0.06, 0.03, 0.06); t.add(P_SM, 0x1c1a24, 0.03, 1.13, w.front - 0.14, 0, 0, 0, 0.015, 0.015, 0.01); t.add(P_SM, 0x1c1a24, -0.03, 1.13, w.front - 0.14, 0, 0, 0, 0.015, 0.015, 0.01); }
+    if (silly === 'baguette') { t.add(P_CAP, 0xd9a35b, -0.17, 1.2, -0.02, 1.25, 0, 0.12, 0.055, 0.2, 0.055); for (let k = -1; k <= 1; k++) t.box(0.012, 0.012, 0.05, 0xf0d29a, -0.17, 1.2 + k * 0.07 * 0.32, -0.02 - k * 0.07 * 0.95 - 0.03, 0.4); }
     body.add(part(t, true));
-    // ---- head (its own group: it can turn and nod)
+    // ---- head (its own group: it turns and nods). Skull, jaw and chin; the face sits on their curve.
     const head = new THREE.Group();
-    head.position.set(0, 1.56, 0);
+    head.position.set(0, 1.535, 0);
     if (kid) head.scale.setScalar(1.22);
     body.add(head);
-    const hm = new Merge(), dark = 0x1c1a24;
-    hm.add(P_SPH, skin, 0, 0.175, 0, 0, 0, 0, 0.38, 0.4, 0.38);
-    hm.add(P_SM, skin, -0.188, 0.15, 0.01, 0, 0, 0, 0.06, 0.1, 0.07); hm.add(P_SM, skin, 0.188, 0.15, 0.01, 0, 0, 0, 0.06, 0.1, 0.07);     // ears
-    hm.add(P_SM, shade(skin, 0.9), 0, 0.118, -0.192, 0, 0, 0, 0.055, 0.055, 0.06);                                                         // nose
-    const angry = look.mood === 'angry';
+    const hm = new Merge(), dark = 0x1c1a24, angry = look.mood === 'angry', eye = look.eye != null ? look.eye : EYES[(look.hs || 0) % EYES.length];
+    const lip = mix(skin, 0xa84848, 0.38), lid = shade(skin, 0.94);
+    hm.add(P_SPH, skin, 0, 0.13, 0.005, 0, 0, 0, 0.19, 0.225, 0.215);                                      // skull
+    hm.add(P_SPH, skin, 0, 0.068, -0.02, 0, 0, 0, 0.152 - 0.01 * f, 0.13, 0.17);                           // jaw and cheeks
+    hm.add(P_SM, skin, 0, 0.022, -0.078, 0, 0, 0, 0.07 - 0.012 * f, 0.055, 0.055);                          // chin
+    for (const sx of [-1, 1]) hm.add(P_SM, shade(skin, 0.95), sx * 0.096, 0.112, 0.012, 0, sx * 0.25, 0, 0.022, 0.056, 0.036);   // ears
+    hm.add(P_SM, skin, 0, 0.112, -0.103, -0.15, 0, 0, 0.026, 0.05, 0.03);                                  // nose: bridge, tip, wings
+    hm.add(P_SM, shade(skin, 0.97), 0, 0.087, -0.113, 0, 0, 0, 0.034, 0.027, 0.03);
+    for (const sx of [-1, 1]) hm.add(P_SM, shade(skin, 0.92), sx * 0.015, 0.084, -0.104, 0, 0, 0, 0.018, 0.016, 0.02);
     for (const sx of [-1, 1]) {
-      hm.add(P_SM, 0xffffff, sx * 0.08, 0.18, -0.166, 0, 0, 0, 0.1, 0.115, 0.05);                                                          // eye
-      hm.add(P_SM, dark, sx * 0.08, 0.178, -0.186, 0, 0, 0, 0.055, 0.07, 0.03);                                                            // pupil
-      hm.add(P_SM, 0xffffff, sx * 0.08 + 0.014, 0.196, -0.198, 0, 0, 0, 0.018, 0.018, 0.01);                                               // glint
-      hm.box(0.09, 0.022, 0.02, shade(hair, 0.8), sx * 0.082, angry ? 0.25 : 0.262, -0.162, 0, 0, angry ? sx * 0.45 : -sx * 0.1);          // brow
+      const ex = sx * 0.04, ey = 0.128;
+      hm.add(P_SM, 0xfbfaf6, ex, ey, -0.085, 0, 0, 0, 0.04, 0.03, 0.03);                                   // eye
+      hm.add(P_SM, eye, ex, ey - 0.001, -0.0985, 0, 0, 0, 0.022, 0.024, 0.01);                             // iris
+      hm.add(P_SM, dark, ex, ey - 0.001, -0.1013, 0, 0, 0, 0.011, 0.012, 0.006);                           // pupil
+      hm.add(P_SM, 0xffffff, ex + 0.005, ey + 0.006, -0.1043, 0, 0, 0, 0.006, 0.006, 0.003);              // glint
+      hm.add(P_SM, lid, ex, angry ? 0.14 : 0.1465, -0.086, angry ? 0 : -0.25, 0, angry ? sx * 0.3 : 0, 0.043, 0.014, 0.031); // upper lid
+      hm.box(0.042, 0.009, 0.014, shade(hair, 0.8), sx * 0.041, angry ? 0.152 : 0.159, -0.1, 0, 0, angry ? sx * 0.42 : -sx * 0.08);   // brow
     }
-    if (look.beard) {
-      hm.add(P_SPH, hair, 0, 0.0, -0.06, 0, 0, 0, 0.35, 0.2, 0.3);
-      hm.box(0.14, 0.03, 0.03, hair, 0, 0.076, -0.187);
-    } else if (angry) hm.box(0.1, 0.025, 0.02, 0x7a2a2a, 0, 0.046, -0.158);
-    else { hm.box(0.09, 0.022, 0.02, 0x8a3a3a, 0, 0.048, -0.158); hm.box(0.03, 0.02, 0.02, 0x8a3a3a, -0.055, 0.057, -0.152, 0, 0, -0.6); hm.box(0.03, 0.02, 0.02, 0x8a3a3a, 0.055, 0.057, -0.152, 0, 0, 0.6); }
-    if (look.glasses) {
-      for (const sx of [-1, 1]) { hm.box(0.13, 0.014, 0.014, dark, sx * 0.083, 0.236, -0.205); hm.box(0.13, 0.014, 0.014, dark, sx * 0.083, 0.124, -0.205); hm.box(0.014, 0.112, 0.014, dark, sx * 0.02, 0.18, -0.205); hm.box(0.014, 0.112, 0.014, dark, sx * 0.146, 0.18, -0.205); hm.box(0.014, 0.014, 0.21, dark, sx * 0.183, 0.19, -0.1); }
-      hm.box(0.04, 0.014, 0.014, dark, 0, 0.19, -0.205);
+    if (look.beard) { hm.add(P_SPH, hair, 0, 0.045, -0.035, 0, 0, 0, 0.16, 0.1, 0.15); hm.box(0.07, 0.014, 0.016, hair, 0, 0.072, -0.108); }
+    if (!look.beard || angry) {
+      hm.add(P_SM, lip, 0, 0.062, -0.104, 0, 0, 0, 0.044, 0.012, 0.014);                                 // upper lip
+      hm.add(P_SM, shade(lip, 1.06), 0, 0.05, -0.102, 0, 0, 0, 0.038, 0.014, 0.014);                     // lower lip
+      if (!angry && !look.beard) for (const sx of [-1, 1]) hm.box(0.012, 0.006, 0.01, shade(lip, 0.8), sx * 0.024, 0.061, -0.099, 0, 0, sx * 0.6);   // a little smile
     }
-    // hair: style 0 short, 1 long, 2 bun, 3 ponytail, 4 curly, 5 spiky, 6 bob, 7 thin on top, 8 side part
+    const gl = look.glasses || silly === 'nosegl';
+    if (gl) {
+      const fr = silly === 'nosegl' ? 0x111111 : dark, th = silly === 'nosegl' ? 0.01 : 0.006;
+      for (const sx of [-1, 1]) {
+        const x = sx * 0.041;
+        hm.box(0.054, th, th, fr, x, 0.147, -0.108); hm.box(0.054, th, th, fr, x, 0.111, -0.108);
+        hm.box(th, 0.036, th, fr, x - 0.027, 0.129, -0.108); hm.box(th, 0.036, th, fr, x + 0.027, 0.129, -0.108);
+        hm.box(0.005, 0.005, 0.11, fr, sx * 0.094, 0.135, -0.055);
+      }
+      hm.box(0.022, 0.005, 0.005, fr, 0, 0.133, -0.11);
+    }
+    // ---- silly face and head extras (in the head's own coordinates)
+    if (silly === 'nosegl') { hm.add(P_SM, 0xf2a3a3, 0, 0.09, -0.125, 0, 0, 0, 0.055, 0.05, 0.06); hm.box(0.1, 0.02, 0.02, 0x222222, 0, 0.069, -0.11); for (const sx of [-1, 1]) hm.box(0.05, 0.02, 0.016, 0x222222, sx * 0.041, 0.164, -0.104, 0, 0, -sx * 0.15); }
+    if (silly === 'stache') { hm.box(0.1, 0.024, 0.022, hair === 0xd9d4cc ? 0xd9d4cc : 0x2b1a10, 0, 0.073, -0.11); for (const sx of [-1, 1]) { hm.add(P_SM, 0x2b1a10, sx * 0.06, 0.08, -0.106, 0, 0, 0, 0.035, 0.03, 0.022); hm.add(P_SM, 0x2b1a10, sx * 0.078, 0.098, -0.1, 0, 0, 0, 0.022, 0.022, 0.016); } }
+    if (silly === 'flower') { const fx = 0.088, fy = 0.17, fz = 0.03; for (let k = 0; k < 5; k++) { const a = k * 1.2566; hm.add(P_SM, 0xff6fa8, fx + 0.012, fy + Math.cos(a) * 0.024, fz + Math.sin(a) * 0.024, 0, 0, 0, 0.012, 0.026, 0.026); } hm.add(P_SM, 0xffd23f, fx + 0.02, fy, fz, 0, 0, 0, 0.014, 0.022, 0.022); }
+    // hair, hats, the crown and headphones: built round the old big head, then fitted to the new skull
+    const hr = new Merge();
     const style = look.style != null ? look.style : (look.long ? LONG_HAIR[(look.hs || 0) % LONG_HAIR.length] : SHORT_HAIR[(look.hs || 0) % SHORT_HAIR.length]);
-    const covered = look.hat || look.beanie;
-    if (style === 4) hm.add(P_SPH, hair, 0, 0.26, 0.035, 0, 0, 0, covered ? 0.44 : 0.53, covered ? 0.38 : 0.48, 0.49);
-    else if (style === 7) { hm.add(P_SM, hair, -0.175, 0.2, 0.04, 0, 0, 0, 0.1, 0.17, 0.26); hm.add(P_SM, hair, 0.175, 0.2, 0.04, 0, 0, 0, 0.1, 0.17, 0.26); hm.add(P_SM, hair, 0, 0.16, 0.16, 0, 0, 0, 0.32, 0.22, 0.1); }
+    const beanie = look.beanie || (silly === 'propeller' ? 0xe8453c : null);
+    const covered = look.hat || beanie || silly === 'cone' || silly === 'party';
+    if (style === 4) hr.add(P_SPH, hair, 0, 0.26, 0.035, 0, 0, 0, covered ? 0.44 : 0.53, covered ? 0.38 : 0.48, 0.49);
+    else if (style === 7) { hr.add(P_SM, hair, -0.175, 0.2, 0.04, 0, 0, 0, 0.1, 0.17, 0.26); hr.add(P_SM, hair, 0.175, 0.2, 0.04, 0, 0, 0, 0.1, 0.17, 0.26); hr.add(P_SM, hair, 0, 0.16, 0.16, 0, 0, 0, 0.32, 0.22, 0.1); }
     else {
-      hm.add(P_DOME, hair, 0, 0.17, 0.012, 0.5, 0, 0, 0.405, 0.44, 0.415);                              // the cap of hair, tipped back off the forehead
-      if (!covered && style !== 5) hm.add(P_SM, hair, style === 8 ? -0.05 : 0, 0.325, -0.105, 0.55, 0, style === 8 ? 0.35 : 0, 0.33, 0.1, 0.2);   // a fringe
+      hr.add(P_DOME, hair, 0, 0.17, 0.012, 0.5, 0, 0, 0.405, 0.44, 0.415);                              // the cap of hair, tipped back off the forehead
+      if (!covered && style !== 5) hr.add(P_SM, hair, style === 8 ? -0.05 : 0, 0.325, -0.105, 0.55, 0, style === 8 ? 0.35 : 0, 0.33, 0.1, 0.2);   // a fringe
     }
-    if (style === 1) { hm.add(P_CAP, hair, 0, 0, 0.14, 0.12, 0, 0, 0.38, 0.27, 0.16); hm.add(P_CAP, hair, -0.18, 0.06, 0.03, 0, 0, 0, 0.09, 0.2, 0.17); hm.add(P_CAP, hair, 0.18, 0.06, 0.03, 0, 0, 0, 0.09, 0.2, 0.17); }
-    if (style === 2) hm.add(P_SM, hair, 0, 0.39, 0.1, 0, 0, 0, 0.18, 0.17, 0.18);
-    if (style === 3) { hm.add(P_SM, hair, 0, 0.31, 0.2, 0, 0, 0, 0.1, 0.1, 0.1); hm.add(P_CAP, hair, 0, 0.14, 0.29, 0.5, 0, 0, 0.1, 0.18, 0.1); }
-    if (style === 5 && !covered) for (let k = 0; k < 5; k++) hm.add(CONE, hair, 0, 0.405 - Math.abs(k - 2) * 0.012, -0.12 + k * 0.068, -0.5 + k * 0.25, 0, 0, 0.12, 0.18, 0.12);
-    if (style === 6) hm.add(P_CAP, hair, 0, 0.12, 0.075, 0, 0, 0, 0.45, 0.2, 0.31);
-    if (look.hat) { hm.add(P_DOME, look.hat, 0, 0.235, 0.005, 0.1, 0, 0, 0.425, 0.39, 0.435); hm.add(P_SM, look.hat, 0, 0.272, -0.25, 0.1, 0, 0, 0.31, 0.035, 0.27); hm.add(P_SM, shade(look.hat, 0.7), 0, 0.43, 0.03, 0, 0, 0, 0.05, 0.03, 0.05); }
-    if (look.beanie) { hm.add(P_DOME, look.beanie, 0, 0.21, 0.01, 0.3, 0, 0, 0.432, 0.46, 0.44); hm.add(P_RING, shade(look.beanie, 0.8), 0, 0.272, 0.012, 0.3, 0, 0, 0.437, 0.08, 0.445); hm.add(P_SM, 0xf4f1ea, 0, 0.46, 0.05, 0, 0, 0, 0.1, 0.1, 0.1); }
+    if (style === 1) { hr.add(P_CAP, hair, 0, 0, 0.14, 0.12, 0, 0, 0.38, 0.27, 0.16); hr.add(P_CAP, hair, -0.18, 0.06, 0.03, 0, 0, 0, 0.09, 0.2, 0.17); hr.add(P_CAP, hair, 0.18, 0.06, 0.03, 0, 0, 0, 0.09, 0.2, 0.17); }
+    if (style === 2) hr.add(P_SM, hair, 0, 0.39, 0.1, 0, 0, 0, 0.18, 0.17, 0.18);
+    if (style === 3) { hr.add(P_SM, hair, 0, 0.31, 0.2, 0, 0, 0, 0.1, 0.1, 0.1); hr.add(P_CAP, hair, 0, 0.14, 0.29, 0.5, 0, 0, 0.1, 0.18, 0.1); }
+    if (style === 5 && !covered) for (let k = 0; k < 5; k++) hr.add(CONE, hair, 0, 0.405 - Math.abs(k - 2) * 0.012, -0.12 + k * 0.068, -0.5 + k * 0.25, 0, 0, 0.12, 0.18, 0.12);
+    if (style === 6) hr.add(P_CAP, hair, 0, 0.12, 0.075, 0, 0, 0, 0.45, 0.2, 0.31);
+    if (look.hat) { hr.add(P_DOME, look.hat, 0, 0.235, 0.005, 0.1, 0, 0, 0.425, 0.39, 0.435); hr.add(P_SM, look.hat, 0, 0.272, -0.25, 0.1, 0, 0, 0.31, 0.035, 0.27); hr.add(P_SM, shade(look.hat, 0.7), 0, 0.43, 0.03, 0, 0, 0, 0.05, 0.03, 0.05); }
+    if (beanie) { hr.add(P_DOME, beanie, 0, 0.21, 0.01, 0.3, 0, 0, 0.432, 0.46, 0.44); hr.add(P_RING, shade(beanie, 0.8), 0, 0.272, 0.012, 0.3, 0, 0, 0.437, 0.08, 0.445); if (silly !== 'propeller') hr.add(P_SM, 0xf4f1ea, 0, 0.46, 0.05, 0, 0, 0, 0.1, 0.1, 0.1); }
     if (look.crown) { // a cardboard crown, worn with pride
-      hm.add(P_RING, 0xf2c14e, 0, 0.385, 0.01, 0, 0, 0, 0.32, 0.1, 0.32);
-      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; hm.add(CONE, 0xf2c14e, Math.sin(a) * 0.145, 0.475, 0.01 - Math.cos(a) * 0.145, 0, 0, 0, 0.09, 0.12, 0.09); }
-      hm.add(P_SM, 0xe8453c, 0, 0.385, -0.155, 0, 0, 0, 0.06, 0.06, 0.03);
+      hr.add(P_RING, 0xf2c14e, 0, 0.385, 0.01, 0, 0, 0, 0.32, 0.1, 0.32);
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; hr.add(CONE, 0xf2c14e, Math.sin(a) * 0.145, 0.475, 0.01 - Math.cos(a) * 0.145, 0, 0, 0, 0.09, 0.12, 0.09); }
+      hr.add(P_SM, 0xe8453c, 0, 0.385, -0.155, 0, 0, 0, 0.06, 0.06, 0.03);
     }
-    if (look.phones) { hm.add(P_RING, 0x24262e, 0, 0.2, 0.01, 0, 0, Math.PI / 2, 0.44, 0.04, 0.42); for (const sx of [-1, 1]) hm.add(P_SM, look.phones, sx * 0.21, 0.15, 0.01, 0, 0, 0, 0.07, 0.15, 0.15); }
+    if (look.phones) { hr.add(P_RING, 0x24262e, 0, 0.2, 0.01, 0, 0, Math.PI / 2, 0.44, 0.04, 0.42); for (const sx of [-1, 1]) hr.add(P_SM, look.phones, sx * 0.21, 0.15, 0.01, 0, 0, 0, 0.07, 0.15, 0.15); }
+    hm.addMerge(hr, 0, 0.0316, 0.005, 0.5, 0.5625, 0.566);
+    if (silly === 'party' && !look.crown && !look.hat) { hm.add(CONE, 0x7b52c7, 0.015, 0.31, 0, 0, 0, -0.22, 0.12, 0.17, 0.12); hm.add(P_RING, 0xffd23f, 0.007, 0.28, 0, 0, 0, -0.22, 0.095, 0.022, 0.095); hm.add(P_SM, 0xff6fa8, 0.035, 0.4, 0, 0, 0, 0, 0.04, 0.04, 0.04); }
+    if (silly === 'cone' && !look.crown && !look.hat) { hm.add(CONE, 0xff6a1a, 0, 0.36, 0.005, 0, 0, 0, 0.17, 0.27, 0.17); hm.add(P_RING, 0xf4f1ea, 0, 0.35, 0.005, 0, 0, 0, 0.115, 0.035, 0.115); hm.box(0.2, 0.025, 0.2, 0xff6a1a, 0, 0.235, 0.005); }
+    if (silly === 'antlers' && !look.crown) { hm.add(P_RING, 0x5b4636, 0, 0.215, 0.01, 0.15, 0, Math.PI / 2, 0.2, 0.015, 0.21); for (const sx of [-1, 1]) { seg(hm, TAPER, 0x8a5a2b, sx * 0.07, 0.22, 0.01, sx * 0.15, 0.37, 0.03, 0.014); seg(hm, TAPER, 0x8a5a2b, sx * 0.11, 0.29, 0.02, sx * 0.07, 0.36, -0.02, 0.008); seg(hm, TAPER, 0x8a5a2b, sx * 0.13, 0.33, 0.025, sx * 0.21, 0.37, 0.0, 0.008); } }
     head.add(part(hm, true));
-    // ---- limbs: a pivot at the hip / shoulder, a second one at the knee / elbow
-    const limb = (x, y, upper, lower, lenA, lenB, wA, wB, end) => {
+    let prop = null;
+    if (silly === 'propeller' && !look.crown && !look.hat) { // spins faster the faster they walk (W.animate)
+      const pm = new Merge(); pm.add(CYL8, 0x33373f, 0, 0.0, 0, 0, 0, 0, 0.012, 0.05, 0.012); pm.box(0.2, 0.006, 0.035, 0xffd23f, 0.09, 0.025, 0, 0.3, 0, 0); pm.box(0.2, 0.006, 0.035, 0x2b6cb0, -0.09, 0.025, 0, -0.3, 0, 0); pm.add(P_SM, 0xe8453c, 0, 0.03, 0, 0, 0, 0, 0.025, 0.02, 0.025);
+      prop = part(pm, false); prop.position.set(0, 0.272, 0.01); head.add(prop);
+    }
+    // ---- limbs: a pivot at the hip / shoulder, a second at the knee / elbow, a tip in the palm / sole
+    const limb = (x, y, lenA, lenB, upper, lower, tipY) => {
       const pivot = new THREE.Group(); pivot.position.set(x, y, 0); body.add(pivot);
-      const a = new Merge();
-      a.add(P_CAP, upper, 0, -lenA / 2 + wA * 0.2, 0, 0, 0, 0, wA, (lenA + wA * 0.6) / 2, wA);
-      pivot.add(part(a, true));
+      const a = new Merge(); upper(a, lenA); pivot.add(part(a, true));
       const joint = new THREE.Group(); joint.position.set(0, -lenA, 0); pivot.add(joint);
-      const b = new Merge();
-      b.add(P_CAP, lower, 0, -lenB / 2 + wB * 0.15, 0, 0, 0, 0, wB, (lenB + wB * 0.5) / 2, wB);
-      end(b, lenB);
-      joint.add(part(b, false));
-      const tip = new THREE.Group(); tip.position.set(0, -lenB, 0); joint.add(tip);
+      const b = new Merge(); lower(b, lenB); joint.add(part(b, false));
+      const tip = new THREE.Group(); tip.position.set(0, tipY != null ? tipY : -lenB, 0); joint.add(tip);
       return [pivot, joint, tip];
     };
-    const bare = look.dress || look.shorts, legC = look.dress ? skin : pants;
-    const foot = (m, len) => { m.add(P_SM, shoe, 0, -len - 0.002, -0.06, 0, 0, 0, 0.21, 0.14, 0.34); m.box(0.185, 0.035, 0.3, shade(shoe, 0.5), 0, -len - 0.054, -0.055); if (bare) m.add(P_RING, 0xf4f1ea, 0, -len + 0.09, 0, 0, 0, 0, 0.17, 0.08, 0.17); };
-    const hand = (m, len) => { m.add(P_SM, skin, 0, -len - 0.02, 0, 0, 0, 0, 0.13, 0.15, 0.12); if (look.sleeve !== 'short' && look.sleeve !== 'none' && !look.dress) m.add(P_RING, shade(shirt, 0.8), 0, -len + 0.06, 0, 0, 0, 0, 0.135, 0.04, 0.135); };
-    const [legL, kneeL] = limb(-0.12, 0.9, legC, bare ? skin : pants, 0.42, 0.42, 0.225, 0.185, foot);
-    const [legR, kneeR] = limb(0.12, 0.9, legC, bare ? skin : pants, 0.42, 0.42, 0.225, 0.185, foot);
-    const up = look.sleeve === 'none' ? skin : shirt, low = look.sleeve === 'long' || (look.sleeve == null && !look.dress) || look.coat ? shirt : skin;
-    const [armL, elbowL, handL] = limb(-0.315, 1.42, up, low, 0.29, 0.28, 0.15, 0.125, hand);
-    const [armR, elbowR, handR] = limb(0.315, 1.42, up, low, 0.29, 0.28, 0.15, 0.125, hand);
-    armL.rotation.z = -0.08; armR.rotation.z = 0.08;
+    const bare = look.dress || look.shorts, thighR = 0.09 + 0.006 * f, shinR = 0.064;
+    const darkShoe = shoe === 0x222222 || shoe === 0x8a5a2b || shoe === 0x3a3f4a || shoe === 0x1f2937, sole = darkShoe ? 0x1a1a1a : 0xf0efea;
+    const thigh = (m, len) => {
+      m.add(P.thigh, look.dress || look.shorts ? skin : pants, 0, 0, 0, 0, 0, 0, thighR, len, thighR * 0.96);
+      if (look.shorts && !look.dress) m.add(P.sleeve, pants, 0, 0, 0, 0, 0, 0, thighR * 1.08, len * 1.1, thighR * 1.05);
+    };
+    const shin = (m, len) => {
+      m.add(P.shin, bare ? skin : pants, 0, 0, 0, 0, 0, 0, shinR, len, shinR * 1.02);
+      if (bare) m.add(P_RING, 0xf4f1ea, 0, -len + 0.06, 0, 0, 0, 0, 0.085, 0.05, 0.085);                     // socks
+      m.add(P_SM, shoe, 0, -len - 0.03, -0.03, 0, 0, 0, 0.092, 0.08, 0.2);                                   // the shoe: upper, toe cap, heel, sole, tongue
+      m.add(P_SM, shoe, 0, -len - 0.042, -0.115, 0, 0, 0, 0.088, 0.062, 0.1);
+      m.add(P_SM, shade(shoe, 0.9), 0, -len - 0.036, 0.048, 0, 0, 0, 0.084, 0.07, 0.08);
+      m.box(0.094, 0.026, 0.25, sole, 0, -len - 0.07, -0.042);
+      if (!darkShoe) m.box(0.04, 0.012, 0.08, shade(shoe, 1.15), 0, -len - 0.004, -0.07, 0.55);
+    };
+    const [legL, kneeL] = limb(-0.092, 0.92, 0.44, 0.41, thigh, shin);
+    const [legR, kneeR] = limb(0.092, 0.92, 0.44, 0.41, thigh, shin);
+    const sleeve = look.dress && look.sleeve == null ? 'none' : look.coat ? 'long' : look.sleeve || 'long';
+    const armR0 = 0.059 - 0.005 * f, foreR = 0.049 - 0.004 * f;
+    const upper = (m, len) => {
+      m.add(P.upper, sleeve === 'long' ? shirt : skin, 0, 0, 0, 0, 0, 0, armR0, len, armR0 * 0.95);
+      if (sleeve === 'short') m.add(P.sleeve, shirt, 0, 0, 0, 0, 0, 0, armR0 * 1.1, len, armR0 * 1.07);
+    };
+    const fore = (m, len) => {
+      m.add(P.fore, sleeve === 'long' ? shirt : skin, 0, 0, 0, 0, 0, 0, foreR, len, foreR * 0.9);
+      if (sleeve === 'long') m.add(P_RING, shade(shirt, 0.8), 0, -len + 0.03, 0, 0, 0, 0, foreR * 2.15, 0.035, foreR * 2.0);
+      m.add(P_SM, skin, 0, -len - 0.045, -0.004, 0, 0, 0, 0.034, 0.09, 0.075);                               // palm (facing the thigh)
+      m.add(P_SM, skin, 0, -len - 0.108, -0.008, 0.12, 0, 0, 0.028, 0.075, 0.066);                           // fingers
+      m.add(P_CAP, skin, 0, -len - 0.05, -0.038, 0.5, 0, 0, 0.022, 0.03, 0.022);                             // thumb
+    };
+    const sw = 0.19 - 0.018 * f;
+    const [armL, elbowL, handL] = limb(-sw, 1.425, 0.29, 0.26, upper, fore, -0.26 - 0.075);
+    const [armR, elbowR, handR] = limb(sw, 1.425, 0.29, 0.26, upper, fore, -0.26 - 0.075);
+    armL.rotation.z = -ARM_Z; armR.rotation.z = ARM_Z;
+    if (silly === 'balloon') { // a balloon on a string, held in the left hand
+      const bm = new Merge(), bc = [0xe8453c, 0x2b6cb0, 0xffd23f, 0x2f9e6e, 0xef6aa5][(look.hs || 0) % 5];
+      bm.box(0.004, 1.1, 0.004, 0xf4f1ea, 0, 0.55, 0); bm.add(P_SPH, bc, 0, 1.28, 0, 0, 0, 0, 0.32, 0.38, 0.32); bm.add(CONE, bc, 0, 1.08, 0, Math.PI, 0, 0, 0.05, 0.05, 0.05);
+      const bal = part(bm, false); bal.castShadow = false; handL.add(bal); g.userData.balloon = bal;
+    }
     let shield = null;
-    if (look.shield) { shield = W.shieldMesh(look.shield.kind, look.shield.col); shield.position.set(-0.43, 1.02, 0.03); shield.rotation.y = Math.PI / 2; body.add(shield); }
-    g.userData = { body, head, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, handL, handR, phase: Math.random() * 6, kind: 'person', kid, shield };
-    body.scale.x = look.build || 1;
+    if (look.shield) { shield = W.shieldMesh(look.shield.kind, look.shield.col); shield.position.set(-0.31, 1.0, 0.03); shield.rotation.y = Math.PI / 2; body.add(shield); }
+    g.userData = Object.assign(g.userData || {}, { body, head, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, handL, handR, phase: Math.random() * 6, kind: 'person', kid, shield, prop });
+    body.scale.x = 1 + ((look.build || 1) - 1) * 0.6;
     g.scale.setScalar(look.h || 1);
     return g;
   };
@@ -2012,8 +2414,10 @@ varying float vGL; varying vec2 vGUV;
       if (u.head && speed < 0.1) u.head.rotation.x = Math.max(0, Math.sin(u.phase * 0.5)) * 0.5;
       return;
     }
+    if (u.prop) u.prop.rotation.y += dt * (5 + speed * 4);
+    if (u.balloon) u.balloon.rotation.z = Math.sin((u.phase || 0) * 0.7) * 0.12;
     const L = u.legL.rotation, R = u.legR.rotation, KL = u.kneeL.rotation, KR = u.kneeR.rotation, AL = u.armL.rotation, AR = u.armR.rotation, EL = u.elbowL.rotation, ER = u.elbowR.rotation, B = u.body, H = u.head.rotation;
-    L.z = R.z = 0; AL.z = -0.08; AR.z = 0.08; EL.z = ER.z = 0; B.rotation.set(0, 0, 0); H.x = H.y = H.z = 0; B.position.y = 0;
+    L.z = R.z = 0; AL.z = -ARM_Z; AR.z = ARM_Z; EL.z = ER.z = 0; B.rotation.set(0, 0, 0); H.x = H.y = H.z = 0; B.position.y = 0;
     if (pose === 'sit') { L.x = R.x = 1.45; KL.x = KR.x = -1.45; B.position.y = -0.45; AL.x = AR.x = 0.35; EL.x = ER.x = 0.5; return; }
     if (pose === 'ground') { // on a blanket, legs crossed, hands in the lap
       u.phase += dt;
@@ -2059,41 +2463,57 @@ varying float vGL; varying vec2 vGUV;
     H.y = s * amp * 0.1;
     if (amp < 0.05) { // standing: breathing, a look around now and then
       const k = Math.sin(u.phase * 0.5);
-      AL.z = -0.08 - k * 0.012; AR.z = 0.08 + k * 0.012; EL.x = ER.x = 0.14;
+      AL.z = -ARM_Z - k * 0.012; AR.z = ARM_Z + k * 0.012; EL.x = ER.x = 0.14;
       H.y = Math.sin(u.phase * 0.17) * 0.3; H.x = Math.sin(u.phase * 0.11) * 0.06;
     }
   };
-  // Animals: dog, cat, pigeon, duck
+  // Animals: dog, cat, pigeon, duck (realism pass 2026-11-17: rounded bodies, snouts, floppy or pointed ears, tails, wings).
+  // userData: {kind: 'animal', legs (4 pivots; none for birds), head, tail, bird}. Faces -z.
   W.animal = function (kind, color) {
-    const g = new THREE.Group(), body = new Merge();
+    const g = new THREE.Group(), body = new Merge(), { sph: S, sm: SM, cap: CAP } = PRIM_LO;
     const c = color || (kind === 'dog' ? 0xc8894a : kind === 'cat' ? 0x6b6b6b : kind === 'duck' ? 0x8a6a3a : 0x8b8f9c);
-    const legs = [];
+    const legs = [], dark = 0x15151a;
     let head = null, tail = null;
     if (kind === 'pigeon' || kind === 'duck') {
-      const s = kind === 'duck' ? 1.4 : 1;
-      body.box(0.16 * s, 0.14 * s, 0.26 * s, c, 0, 0.14 * s, 0);
-      body.box(0.1 * s, 0.1 * s, 0.1 * s, kind === 'duck' ? 0x2f6b3a : 0x5c6f8a, 0, 0.25 * s, -0.12 * s);
-      body.box(0.04 * s, 0.03 * s, 0.07 * s, 0xe0a030, 0, 0.24 * s, -0.2 * s);
-      body.box(0.12 * s, 0.03 * s, 0.12 * s, c, 0, 0.16 * s, 0.17 * s);
+      const s = kind === 'duck' ? 1.45 : 1, hc = kind === 'duck' ? 0x2f6b3a : 0x5c6f8a, beak = kind === 'duck' ? 0xf0a030 : 0x3a3a3a;
+      body.add(S, c, 0, 0.15 * s, 0.01 * s, -0.15, 0, 0, 0.17 * s, 0.16 * s, 0.3 * s);                          // body
+      body.add(S, kind === 'duck' ? 0x8a6a3a : 0x9aa0ad, 0, 0.13 * s, -0.06 * s, 0, 0, 0, 0.15 * s, 0.15 * s, 0.16 * s);   // breast
+      body.add(SM, shade(c, 0.8), 0, 0.17 * s, 0.17 * s, 0.35, 0, 0, 0.12 * s, 0.04 * s, 0.16 * s);              // tail
+      for (const sx of [-1, 1]) body.add(SM, shade(c, 0.85), sx * 0.075 * s, 0.17 * s, 0.03 * s, -0.1, 0, sx * 0.25, 0.05 * s, 0.11 * s, 0.24 * s);   // wings
+      body.add(SM, hc, 0, 0.27 * s, -0.12 * s, 0, 0, 0, 0.1 * s, 0.1 * s, 0.11 * s);                            // head
+      if (kind === 'pigeon') body.add(SM, 0x6aa38a, 0, 0.22 * s, -0.1 * s, 0, 0, 0, 0.09, 0.05, 0.08);           // the shiny neck
+      body.add(CONE, beak, 0, 0.26 * s, -0.19 * s, -Math.PI / 2, 0, 0, 0.035 * s, 0.07 * s, kind === 'duck' ? 0.02 * s : 0.03 * s);
+      for (const sx of [-1, 1]) body.add(SM, dark, sx * 0.04 * s, 0.285 * s, -0.15 * s, 0, 0, 0, 0.02 * s, 0.02 * s, 0.015 * s);
+      for (const sx of [-1, 1]) body.box(0.012 * s, 0.07 * s, 0.012 * s, 0xd9734a, sx * 0.035 * s, 0.035 * s, 0);
       const m = body.mesh(); g.add(m);
       g.userData = { kind: 'animal', legs: [], phase: Math.random() * 6, bird: true, head: m };
       return g;
     }
-    const L = kind === 'cat' ? 0.45 : 0.62, H = kind === 'cat' ? 0.2 : 0.28, legH = kind === 'cat' ? 0.18 : 0.26;
-    body.box(0.26, H, L, c, 0, legH + H / 2, 0);
+    const cat = kind === 'cat', L = cat ? 0.45 : 0.62, H = cat ? 0.19 : 0.27, legH = cat ? 0.2 : 0.28, belly = shade(c, cat ? 1.1 : 1.2);
+    body.add(CAP, c, 0, legH + H / 2, 0, Math.PI / 2, 0, 0, H * 0.95, L * 0.42, H);                            // body (a capsule lying down)
+    body.add(S, c, 0, legH + H * 0.6, -L * 0.3, 0, 0, 0, H * 1.05, H * 1.1, H * 1.0);                         // chest
+    body.add(S, belly, 0, legH + H * 0.3, -L * 0.05, 0, 0, 0, H * 0.7, H * 0.4, L * 0.6);                    // belly
     g.add(body.mesh());
     const hm = new Merge();
-    hm.box(0.24, 0.22, 0.24, c, 0, 0, -0.08);
-    hm.box(0.12, 0.1, 0.14, kind === 'cat' ? c : 0x3a2a1a, 0, -0.05, -0.24);
-    hm.box(0.06, kind === 'cat' ? 0.1 : 0.14, 0.04, kind === 'cat' ? c : 0x7a4a2a, -0.08, 0.15, -0.04);
-    hm.box(0.06, kind === 'cat' ? 0.1 : 0.14, 0.04, kind === 'cat' ? c : 0x7a4a2a, 0.08, 0.15, -0.04);
-    hm.box(0.04, 0.04, 0.02, 0x111111, -0.06, 0.04, -0.21); hm.box(0.04, 0.04, 0.02, 0x111111, 0.06, 0.04, -0.21);
-    head = new THREE.Group(); head.position.set(0, legH + H + 0.05, -L / 2); head.add(hm.mesh()); g.add(head);
-    const tm = new Merge(); tm.box(0.06, 0.06, kind === 'cat' ? 0.34 : 0.24, c, 0, 0, 0.12, kind === 'cat' ? -0.6 : -0.5);
-    tail = new THREE.Group(); tail.position.set(0, legH + H * 0.8, L / 2); tail.add(tm.mesh()); g.add(tail);
-    for (const [x, z] of [[-0.09, -L / 2 + 0.07], [0.09, -L / 2 + 0.07], [-0.09, L / 2 - 0.07], [0.09, L / 2 - 0.07]]) {
+    hm.add(S, c, 0, 0, -0.06, 0, 0, 0, cat ? 0.2 : 0.22, cat ? 0.18 : 0.2, cat ? 0.19 : 0.22);                // head
+    hm.add(S, cat ? belly : c, 0, -0.04, cat ? -0.15 : -0.2, 0, 0, 0, cat ? 0.09 : 0.11, cat ? 0.07 : 0.09, cat ? 0.08 : 0.17);   // snout
+    hm.add(SM, dark, 0, cat ? -0.02 : -0.01, cat ? -0.19 : -0.285, 0, 0, 0, 0.035, 0.028, 0.03);              // nose
+    for (const sx of [-1, 1]) {
+      hm.add(SM, cat ? 0x9ccf5a : 0x2a1a10, sx * 0.055, 0.03, -0.14, 0, 0, 0, 0.035, 0.035, 0.02);            // eyes
+      hm.add(SM, dark, sx * 0.055, 0.03, -0.152, 0, 0, 0, cat ? 0.01 : 0.02, 0.026, 0.01);
+      if (cat) hm.add(CONE, c, sx * 0.065, 0.11, -0.04, 0, 0, sx * -0.25, 0.07, 0.09, 0.04);                  // pointed ears
+      else hm.add(SM, shade(c, 0.7), sx * 0.1, 0.0, -0.03, 0, 0, sx * 0.35, 0.05, 0.14, 0.09);                // floppy ears
+    }
+    if (!cat) hm.add(SM, 0xe86a7a, 0, -0.085, -0.25, 0.3, 0, 0, 0.04, 0.01, 0.05);                           // a happy tongue
+    head = new THREE.Group(); head.position.set(0, legH + H + 0.04, -L / 2); head.add(hm.mesh()); g.add(head);
+    const tm = new Merge();
+    seg(tm, TAPER, c, 0, 0, 0, 0, cat ? 0.3 : 0.16, cat ? 0.14 : 0.2, cat ? 0.03 : 0.035);
+    if (cat) seg(tm, TAPER, c, 0, 0.29, 0.14, 0, 0.36, 0.06, 0.02);
+    tail = new THREE.Group(); tail.position.set(0, legH + H * 0.75, L / 2); tail.add(tm.mesh()); g.add(tail);
+    for (const [x, z] of [[-0.075, -L / 2 + 0.08], [0.075, -L / 2 + 0.08], [-0.075, L / 2 - 0.08], [0.075, L / 2 - 0.08]]) {
       const p = new THREE.Group(); p.position.set(x, legH, z);
-      const lm = new Merge(); lm.box(0.07, legH, 0.07, c, 0, -legH / 2, 0); p.add(lm.mesh()); g.add(p); legs.push(p);
+      const lm = new Merge(); lm.add(CAP, c, 0, -legH / 2 + 0.01, 0, 0, 0, 0, 0.065, legH * 0.42, 0.065); lm.add(SM, shade(c, 0.85), 0, -legH + 0.02, -0.02, 0, 0, 0, 0.07, 0.04, 0.09);
+      p.add(lm.mesh()); g.add(p); legs.push(p);
     }
     g.userData = { kind: 'animal', legs, head, tail, phase: Math.random() * 6 };
     return g;
@@ -2251,6 +2671,17 @@ varying float vGL; varying vec2 vGUV;
     else { b.rotation.z = s * 0.12 * Math.min(1, speed + 0.2); b.position.y = Math.abs(s) * 0.1 * Math.min(1, speed + 0.2); }
     if (u.hurt > 0) { u.hurt -= dt; const f = 1 + Math.sin(u.hurt * 40) * 0.12; g.scale.setScalar((u.size || 1) * f); } else g.scale.setScalar(u.size || 1);
   };
+  // One tree (kind 0-3, see TREE) or bush (0-2, high quality only) as a plain mesh: screenshots and the play-test panel.
+  W.treeMesh = function (k, col) {
+    const T = TREE[k] || TREE[0], g = new THREE.Group(), c = new THREE.Mesh(T.crown, new THREE.MeshLambertMaterial({ color: col || [0x5e9a3e, 0x6aa046, 0x2f6e48, 0x9cc25a][k] || 0x5e9a3e, vertexColors: !LOW }));
+    const t = new THREE.Mesh(T.trunk, MAT.trunk); t.castShadow = c.castShadow = !LOW; g.add(t, c); return g;
+  };
+  W.bushMesh = function (k) {
+    const g = new THREE.Group(); if (!BUSH) return g;
+    g.add(new THREE.Mesh(BUSH[k] || BUSH[0], new THREE.MeshLambertMaterial({ color: k === 2 ? 0x4a8a3a : 0x5a9a40, vertexColors: true })));
+    if (k === 1) g.add(new THREE.Mesh(FLOWERS, MAT.prop));
+    return g;
+  };
   // Things to hold (and swing). W.setWeapon(kind | null) puts one in the player's right hand, W.swing() swings it.
   W.propMesh = function (kind) {
     const m = new Merge();
@@ -2293,14 +2724,24 @@ varying float vGL; varying vec2 vGUV;
     return mesh;
   };
   // Vehicles: skateboard, kickscooter, bike, moped, car, suv, sports (+ taxi, van, bus, truck, police in traffic). Facing -z.
-  W.vehicle = function (kind, color) {
+  // Cars use the realistic bodies (carShape, CAR_SPEC) on high quality. opts.silly (traffic only, W.SILLY_CARS): something
+  // daft strapped to the roof: a giant rubber duck, a mattress, a sofa, a Christmas tree, a canoe, a tower of suitcases.
+  W.SILLY_CARS = ['duck', 'mattress', 'sofa', 'xmas', 'canoe', 'suitcases'];
+  const CAR_KIND = { car: 'hatch', suv: 'suv', sports: 'sports', taxi: 'sedan', police: 'sedan', van: 'van', truck: 'van', bus: 'bus' };
+  W.vehicle = function (kind, color, opts) {
     const m = new Merge(), col = color || 0xe8453c, dark = 0x222428, glass = 0x9fc3dd, chrome = 0xcfd3d6;
     const wheel = (x, y, z, r, w) => m.add(CYL, dark, x, y, z, 0, 0, Math.PI / 2, r * 2, w, r * 2);
-    if (kind === 'skateboard') { m.box(0.26, 0.05, 0.86, col, 0, 0.12, 0); wheel(-0.09, 0.05, -0.28, 0.05, 0.05); wheel(0.09, 0.05, -0.28, 0.05, 0.05); wheel(-0.09, 0.05, 0.28, 0.05, 0.05); wheel(0.09, 0.05, 0.28, 0.05, 0.05); }
-    else if (kind === 'kickscooter') { m.box(0.16, 0.05, 0.8, col, 0, 0.12, 0); m.box(0.05, 1.0, 0.05, chrome, 0, 0.6, -0.4); m.box(0.5, 0.05, 0.05, dark, 0, 1.1, -0.4); wheel(0, 0.08, -0.4, 0.08, 0.06); wheel(0, 0.08, 0.38, 0.08, 0.06); }
-    else if (kind === 'bike') { wheel(0, 0.34, -0.52, 0.34, 0.05); wheel(0, 0.34, 0.52, 0.34, 0.05); m.box(0.05, 0.05, 0.95, col, 0, 0.62, 0, -0.1); m.box(0.05, 0.6, 0.05, col, 0, 0.55, 0.2, 0.2); m.box(0.05, 0.6, 0.05, col, 0, 0.62, -0.45, -0.2); m.box(0.2, 0.06, 0.26, dark, 0, 0.92, 0.22); m.box(0.56, 0.05, 0.05, dark, 0, 1.0, -0.5); }
-    else if (kind === 'moped') { wheel(0, 0.25, -0.62, 0.25, 0.12); wheel(0, 0.25, 0.55, 0.25, 0.12); m.box(0.36, 0.3, 0.9, col, 0, 0.5, 0.15); m.box(0.32, 0.12, 0.5, dark, 0, 0.72, 0.2); m.box(0.4, 0.75, 0.16, col, 0, 0.7, -0.5, -0.25); m.box(0.62, 0.05, 0.06, chrome, 0, 1.12, -0.62); m.box(0.18, 0.12, 0.05, 0xfff3b0, 0, 0.95, -0.66); }
-    else { // cars, and the traffic-only kinds: taxi, van, bus, (ice cream) truck, police
+    if (kind === 'skateboard') { m.box(0.24, 0.025, 0.8, col, 0, 0.12, 0); m.box(0.2, 0.03, 0.12, col, 0, 0.13, -0.42, -0.35); m.box(0.2, 0.03, 0.12, col, 0, 0.13, 0.42, 0.35); m.box(0.18, 0.04, 0.05, chrome, 0, 0.085, -0.28); m.box(0.18, 0.04, 0.05, chrome, 0, 0.085, 0.28); for (const z of [-0.28, 0.28]) { wheel(-0.09, 0.04, z, 0.035, 0.04); wheel(0.09, 0.04, z, 0.035, 0.04); } }
+    else if (kind === 'kickscooter') { m.box(0.14, 0.04, 0.72, col, 0, 0.1, 0); seg(m, STICK, chrome, 0, 0.1, -0.36, 0, 1.05, -0.42, 0.035); m.box(0.48, 0.03, 0.03, dark, 0, 1.05, -0.42); for (const sx of [-1, 1]) m.add(CYL8, 0x333333, sx * 0.24, 1.05, -0.42, 0, 0, Math.PI / 2, 0.04, 0.1, 0.04); wheel(0, 0.08, -0.4, 0.08, 0.05); wheel(0, 0.08, 0.36, 0.08, 0.05); }
+    else if (kind === 'bike') { // a diamond frame, spoked wheels, saddle, bars
+      for (const z of [-0.52, 0.52]) { m.add(WHEEL, 0x1b1c1f, 0, 0.34, z, 0, 0, Math.PI / 2, 0.68, 0.05, 0.68); m.add(CYL8, 0x9aa0a8, 0, 0.34, z, 0, 0, Math.PI / 2, 0.08, 0.06, 0.08); if (!LOW) for (let k = 0; k < 6; k++) m.box(0.006, 0.6, 0.006, 0xb8bec6, 0, 0.34, z, k * 0.5236, 0, 0); }
+      const B = [0, 0.4, 0.04], S = [0, 0.86, 0.18], H = [0, 0.9, -0.38];
+      seg(m, STICK, col, B[0], B[1], B[2], S[0], S[1], S[2], 0.035); seg(m, STICK, col, B[0], B[1], B[2], H[0], H[1] - 0.12, H[2] + 0.03, 0.035); seg(m, STICK, col, S[0], S[1] - 0.06, S[2] - 0.02, H[0], H[1] - 0.06, H[2] + 0.02, 0.03);
+      seg(m, STICK, col, B[0], B[1], B[2], 0, 0.34, 0.52, 0.025); seg(m, STICK, col, S[0], S[1] - 0.04, S[2], 0, 0.34, 0.52, 0.025); seg(m, STICK, chrome, H[0], H[1], H[2], 0, 0.34, -0.52, 0.03);
+      m.add(SPHERE, dark, 0, 0.93, 0.2, 0, 0, 0, 0.14, 0.06, 0.26); m.box(0.56, 0.03, 0.03, dark, 0, 1.0, -0.42); m.add(CYL8, 0x3a3a3a, 0, 0.4, 0.04, 0, 0, Math.PI / 2, 0.16, 0.03, 0.16);
+    }
+    else if (kind === 'moped') { wheel(0, 0.25, -0.62, 0.25, 0.12); wheel(0, 0.25, 0.55, 0.25, 0.12); m.add(SPHERE, col, 0, 0.5, 0.25, 0, 0, 0, 0.42, 0.42, 0.9); m.box(0.3, 0.1, 0.55, dark, 0, 0.74, 0.2); m.box(0.4, 0.75, 0.16, col, 0, 0.7, -0.5, -0.25); m.box(0.62, 0.05, 0.06, chrome, 0, 1.12, -0.62); m.box(0.18, 0.12, 0.05, 0xfff3b0, 0, 0.95, -0.66); m.box(0.5, 0.06, 0.5, dark, 0, 0.3, -0.1); }
+    else if (LOW || !CAR_KIND[kind]) { // the low-quality box cars (and anything unknown)
       const big = kind === 'bus', tall = kind === 'van' || kind === 'truck';
       const body = kind === 'taxi' ? 0xf7c21a : kind === 'police' ? 0xf4f1ea : kind === 'truck' ? 0xffd1e3 : kind === 'bus' ? [0x2b6cb0, 0xe8453c, 0x2f9e6e][Math.floor(Math.random() * 3)] : col;
       const L = big ? 7.6 : tall ? 4.7 : kind === 'sports' ? 4.3 : kind === 'suv' ? 4.6 : 3.9, Wd = big ? 2.3 : tall ? 1.95 : kind === 'suv' ? 1.9 : 1.75;
@@ -2310,33 +2751,45 @@ varying float vGL; varying vec2 vGUV;
       const cabZ = big ? 0 : tall ? 0.5 : kind === 'sports' ? 0.3 : 0.15;
       m.box(Wd * (big || tall ? 0.97 : 0.88), cabH, cabL, kind === 'truck' ? 0xfdf6e8 : glass, 0, base + H + cabH / 2, cabZ);
       m.box(Wd * (big || tall ? 0.99 : 0.9), 0.06, cabL * (big ? 1 : 0.9), body, 0, base + H + cabH + 0.03, cabZ);
-      if (tall) m.box(Wd * 0.86, cabH * 0.6, 0.06, glass, 0, base + H + cabH * 0.55, cabZ - cabL / 2 - 0.02);
-      if (big) for (let k = -3; k <= 3; k++) { m.box(0.06, cabH, 0.14, body, -Wd * 0.49, base + H + cabH / 2, k * 1.0); m.box(0.06, cabH, 0.14, body, Wd * 0.49, base + H + cabH / 2, k * 1.0); }
-      if (kind === 'taxi') { m.box(0.5, 0.16, 0.24, 0x1f1a3d, 0, base + H + cabH + 0.14, cabZ); for (let k = -3; k <= 3; k++) m.box(0.02, 0.12, 0.26, k % 2 ? 0x1f1a3d : 0xf4f1ea, Wd / 2 + 0.005, base + H * 0.75, k * 0.3); }
-      if (kind === 'police') { m.box(Wd * 1.01, 0.22, L * 0.5, 0x24324a, 0, base + H * 0.55, 0); }
-      if (kind === 'truck') { m.add(CONE, 0xd9a05b, 0, base + H + cabH + 0.55, cabZ, Math.PI, 0, 0, 0.5, 0.9, 0.5); m.add(SPHERE, 0xff8fb8, 0, base + H + cabH + 1.12, cabZ, 0, 0, 0, 0.62, 0.62, 0.62); m.box(1.5, 0.5, 0.05, 0x9fe3d0, Wd / 2 + 0.03, base + H + cabH * 0.5, cabZ + 0.3, 0, Math.PI / 2); }
-      if (kind === 'sports') m.box(Wd * 0.9, 0.05, 0.3, dark, 0, base + H + 0.25, L / 2 - 0.2);
+      if (kind === 'taxi') m.box(0.5, 0.16, 0.24, 0x1f1a3d, 0, base + H + cabH + 0.14, cabZ);
+      if (kind === 'police') m.box(Wd * 1.01, 0.22, L * 0.5, 0x24324a, 0, base + H * 0.55, 0);
+      if (kind === 'truck') { m.add(CONE, 0xd9a05b, 0, base + H + cabH + 0.55, cabZ, Math.PI, 0, 0, 0.5, 0.9, 0.5); m.add(SPHERE, 0xff8fb8, 0, base + H + cabH + 1.12, cabZ, 0, 0, 0, 0.62, 0.62, 0.62); }
       for (const [x, z] of [[-Wd / 2, -L * 0.33], [Wd / 2, -L * 0.33], [-Wd / 2, L * 0.33], [Wd / 2, L * 0.33]]) wheel(x, 0.34, z, 0.34, 0.26);
-      if (!LOW) { // 2026-11-17: bumpers, grille, mirrors, hubcaps, door lines and window pillars
-        const trim = 0x3a3d44;
-        m.box(Wd * 1.03, 0.18, 0.16, trim, 0, base + 0.08, -L / 2 + 0.05); m.box(Wd * 1.03, 0.18, 0.16, trim, 0, base + 0.08, L / 2 - 0.05);
-        m.box(Wd * 0.4, 0.16, 0.04, trim, 0, base + H * 0.42, -L / 2 - 0.015);
-        for (const sx of [-1, 1]) {
-          m.box(0.16, 0.1, 0.12, body, sx * (Wd / 2 + 0.08), base + H + 0.1, cabZ - cabL / 2 + 0.15);
-          m.box(0.02, H * 0.6, 0.02, trim, sx * (Wd / 2 + 0.005), base + H * 0.5, cabZ);
-          if (!big) for (const z of [-cabL / 2 + 0.04, cabL / 2 - 0.04]) m.box(0.05, cabH, 0.08, body, sx * Wd * (tall ? 0.48 : 0.43), base + H + cabH / 2, cabZ + z);
-          for (const z of [-L * 0.33, L * 0.33]) m.add(CYL, chrome, sx * (Wd / 2 + 0.14), 0.34, z, 0, 0, Math.PI / 2, 0.34, 0.02, 0.34);
-        }
-      }
-      // lights are their own unlit mesh, so they shine at night
       const lm = new Merge();
       lm.box(Wd * 0.2, 0.14, 0.05, 0xfff6c8, -Wd * 0.32, base + H * 0.6, -L / 2 - 0.02); lm.box(Wd * 0.2, 0.14, 0.05, 0xfff6c8, Wd * 0.32, base + H * 0.6, -L / 2 - 0.02);
       lm.box(Wd * 0.2, 0.12, 0.05, 0xff2a2a, -Wd * 0.32, base + H * 0.6, L / 2 + 0.02); lm.box(Wd * 0.2, 0.12, 0.05, 0xff2a2a, Wd * 0.32, base + H * 0.6, L / 2 + 0.02);
       if (kind === 'police') { lm.box(0.3, 0.14, 0.2, 0xff3b30, -0.22, base + H + cabH + 0.12, cabZ); lm.box(0.3, 0.14, 0.2, 0x3b82f6, 0.22, base + H + cabH + 0.12, cabZ); }
-      if (kind === 'taxi') lm.box(0.4, 0.1, 0.02, 0xfff1a8, 0, base + H + cabH + 0.14, cabZ - 0.13);
-      const lights = new THREE.Mesh(lm.build(), MAT.glow);
-      const mesh0 = m.mesh(), g0 = new THREE.Group(); g0.add(mesh0, lights);
+      const g0 = new THREE.Group(); g0.add(m.mesh(), new THREE.Mesh(lm.build(), MAT.glow));
       g0.userData = { kind: 'vehicle', vkind: kind };
+      return g0;
+    }
+    else { // realistic cars, taxis, police cars, vans, the ice cream truck and buses
+      const s = CAR_SPEC[CAR_KIND[kind]];
+      const paint = kind === 'taxi' ? 0xf7c21a : kind === 'police' ? 0xf4f1ea : kind === 'truck' ? 0xffd1e3 : kind === 'bus' ? [0x2b6cb0, 0xe8453c, 0x2f9e6e][Math.floor(Math.random() * 3)] : col;
+      const at = carShape(m, s, paint, CAR_GLASS, true), top = s.roof + 0.03, cz = at.cabZ;
+      const lm = new Merge();
+      carLights(lm, at, s.Wd, kind === 'bus');
+      if (kind === 'taxi') { m.box(0.56, 0.16, 0.26, 0x1f1a3d, 0, top + 0.08, cz); lm.box(0.46, 0.1, 0.02, 0xfff1a8, 0, top + 0.08, cz - 0.135); for (const sx of [-1, 1]) for (let k = 0; k < 8; k++) m.box(0.01, 0.07, 0.14, k % 2 ? 0x1f1a3d : 0xf4f1ea, sx * (s.Wd / 2 + 0.006), s.belt - 0.12, -1.2 + k * 0.14 + 0.6); }
+      if (kind === 'police') { for (const sx of [-1, 1]) m.box(0.012, 0.36, s.L * 0.5, 0x24324a, sx * (s.Wd / 2 + 0.004), s.sill + 0.33, 0.05); m.box(1.0, 0.05, 0.26, 0x2b2e34, 0, top + 0.02, cz); lm.box(0.42, 0.12, 0.22, 0xff3b30, -0.24, top + 0.1, cz); lm.box(0.42, 0.12, 0.22, 0x3b82f6, 0.24, top + 0.1, cz); }
+      if (kind === 'truck') { // an ice cream van: hatch, awning, the giant cone
+        m.add(CONE, 0xd9a05b, 0, top + 0.5, 0.6, Math.PI, 0, 0, 0.5, 0.9, 0.5); m.add(SPHERE, 0xff8fb8, 0, top + 1.08, 0.6, 0, 0, 0, 0.62, 0.62, 0.62); m.add(SPHERE, 0xd94a5a, 0, top + 1.42, 0.6, 0, 0, 0, 0.14, 0.14, 0.14);
+        m.box(0.02, 0.62, 1.4, 0x3a3d44, s.Wd / 2 + 0.008, s.belt + 0.4, 0.75); m.box(0.5, 0.03, 1.5, 0x9fe3d0, s.Wd / 2 + 0.24, s.roof - 0.12, 0.75, 0, 0, -0.35);
+        for (let k = 0; k < 5; k++) m.box(0.02, 0.1, 0.3, k % 2 ? 0xf4f1ea : 0xff8fb8, s.Wd / 2 + 0.47, s.roof - 0.26, 0.15 + k * 0.3, 0, 0, -0.35);
+      }
+      if (kind === 'bus') { m.box(1.3, 0.26, 0.04, 0x1f2229, 0, s.roof - 0.25, -s.L / 2 - 0.02); lm.box(1.1, 0.14, 0.02, 0xffb020, 0, s.roof - 0.25, -s.L / 2 - 0.045); for (const z of [-2.2, 1.0]) m.box(0.02, s.roof - s.sill - 0.4, 0.95, 0x3a3d44, s.Wd / 2 + 0.006, (s.roof + s.sill) / 2 - 0.15, z); }
+      const silly = opts && opts.silly;
+      if (silly && kind !== 'bus' && kind !== 'truck') { // roof rails, then the silly load
+        for (const sx of [-1, 1]) m.box(0.04, 0.05, (s.rb - s.rf) * 0.8, 0x2b2e34, sx * s.Wd * 0.33, top + 0.02, cz);
+        const y = top + 0.06;
+        if (silly === 'duck') { m.add(SPHERE, 0xffd23f, 0, y + 0.45, cz + 0.1, 0, 0, 0, 1.1, 0.8, 1.4); m.add(SPHERE, 0xffd23f, 0, y + 1.05, cz - 0.45, 0, 0, 0, 0.62, 0.62, 0.62); m.add(SPHERE, 0xff8a3d, 0, y + 0.98, cz - 0.82, 0, 0, 0, 0.32, 0.12, 0.34); for (const sx of [-1, 1]) m.add(SPHERE, 0x1c1a24, sx * 0.17, y + 1.15, cz - 0.7, 0, 0, 0, 0.08, 0.1, 0.06); m.add(SPHERE, 0xffd23f, 0, y + 0.75, cz + 0.75, -0.6, 0, 0, 0.3, 0.5, 0.2); }
+        if (silly === 'mattress') { m.box(1.5, 0.22, 2.0, 0xf4efe4, 0, y + 0.13, cz, 0.04, 0, 0.03); for (let k = -2; k <= 2; k++) m.box(1.52, 0.02, 0.04, 0x8fb3d9, 0, y + 0.25, cz + k * 0.38, 0.04); for (const z of [-0.6, 0.6]) m.box(s.Wd + 0.04, 0.03, 0.05, 0xe8453c, 0, y + 0.18, cz + z); }
+        if (silly === 'sofa') { m.box(1.6, 0.3, 0.8, 0x7b52c7, 0, y + 0.18, cz); m.box(1.6, 0.45, 0.2, 0x6a45ad, 0, y + 0.5, cz + 0.32); for (const sx of [-1, 1]) m.box(0.18, 0.4, 0.8, 0x6a45ad, sx * 0.8, y + 0.32, cz); m.box(0.3, 0.3, 0.12, 0xffd23f, 0.3, y + 0.45, cz + 0.12, -0.3, 0.3, 0); }
+        if (silly === 'xmas') { m.add(CONE, 0x2f7a45, 0, y + 0.3, cz, Math.PI / 2, 0, 0, 0.75, 2.4, 0.75); m.add(CYL8, 0x6b4f37, 0, y + 0.3, cz + 1.35, Math.PI / 2, 0, 0, 0.14, 0.4, 0.14); for (const z of [-0.4, 0.4]) m.box(s.Wd + 0.04, 0.03, 0.05, 0xe8453c, 0, y + 0.5, cz + z); }
+        if (silly === 'canoe') { m.add(SPHERE, 0xe8453c, 0, y + 0.18, cz, 0, 0, 0, 0.75, 0.32, 4.4); m.add(SPHERE, 0xf4f1ea, 0, y + 0.26, cz, 0, 0, 0, 0.6, 0.18, 4.1); }
+        if (silly === 'suitcases') { const cs = [0x2b6cb0, 0xe8453c, 0x2f9e6e, 0xf2b134, 0x7b52c7]; for (let k = 0; k < 5; k++) m.box(0.75 - k * 0.08, 0.32, 0.5, cs[k], (k % 2 ? 0.08 : -0.06), y + 0.17 + k * 0.32, cz + (k % 3 - 1) * 0.08, 0, (k % 2 ? 0.25 : -0.2), 0); }
+      }
+      const g0 = new THREE.Group(); g0.add(m.mesh(), new THREE.Mesh(lm.build(), MAT.glow));
+      g0.userData = { kind: 'vehicle', vkind: kind, silly: silly || null };
       return g0;
     }
     const mesh = m.mesh(); const g = new THREE.Group(); g.add(mesh);
@@ -2811,7 +3264,8 @@ varying float vGL; varying vec2 vGUV;
     a.off = laneOff(a.sg);
     for (const o of life.cars) if (Math.hypot(o.obj.position.x - p.x, o.obj.position.z - p.z) < 9) return; // not on top of another car
     const kind = TRAFFIC[Math.random() * TRAFFIC.length | 0];
-    const obj = W.vehicle(kind, CAR_TINT[Math.random() * CAR_TINT.length | 0]);
+    const silly = !LOW && kind !== 'bus' && kind !== 'truck' && kind !== 'police' && Math.random() < 0.085 ? W.SILLY_CARS[Math.random() * W.SILLY_CARS.length | 0] : null;
+    const obj = W.vehicle(kind, CAR_TINT[Math.random() * CAR_TINT.length | 0], { silly });
     obj.rotation.order = 'YXZ';
     const q = segPoint(a);
     obj.position.set(q.x, q.y, q.z); obj.rotation.y = Math.atan2(-q.ux, -q.uz);
@@ -3199,6 +3653,7 @@ varying float vGL; varying vec2 vGUV;
     for (let i = bubbles.length - 1; i >= 0; i--) { const b = bubbles[i]; b.t -= dt; if (b.t <= 0) { b.obj.remove(b.sp); b.sp.material.dispose(); bubbles.splice(i, 1); } }
     updateFx(dt);
     updateSmash(dt);
+    updateLod(dt);
     updateCamera(dt);
     updateSky(dt);
     if (opts.render === false) return;
@@ -3247,6 +3702,7 @@ varying float vGL; varying vec2 vGUV;
     return { x: (_pj.x * (behind ? -1 : 1) + 1) / 2 * r.width, y: (1 - _pj.y * (behind ? -1 : 1)) / 2 * r.height, behind, w: r.width, h: r.height };
   };
   W.render = () => { updateCamera(0.016); updateSky(0); renderer.render(scene, camera); };
+  W.renderInfo = () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls });  // the last frame (tests, tuning)
   W.resize = resize;
 
   // Rotating minimap. opts: {radius, markers:[{x,z,color,emoji,r,ring,edge}], rects:[{x0,z0,x1,z1,fill,stroke}], heading}

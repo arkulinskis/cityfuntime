@@ -58,7 +58,10 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Loot, gear, shields | "drops too rare", "shield invisible" | cft-rpg `drop` `make` `makeGear` `add` `equip` `lookParts`, cft-world `W.shieldMesh` | `D.RPG` (QUALITY, SOURCES, GEAR) | --rpg --hero |
 | Talents, reputation, achievements | | cft-rpg `learn` `repTick` `achTick` | `D.RPG.TALENTS/FACTIONS/ACH` | --rpg |
 | Wardrobe (slots, one thing each) | "slot list wrong", "can't swap", "badge" | cft-ui `U.wardrobe` `wardPick` `wardDraw` `onWardClick` `fxChips`, cft-game `wornIn` `wearShop` `takeOff` `slotOptions` `wearFx` `migrateWear`, cft-rpg `equip` `worn` `spare`; CSS `.cft-ward*` `.cft-wslot` | `D.WEAR_SLOTS`, gear `slot` in `D.ITEMS` | --hero |
-| Your character's look | "hair clips hat" | cft-world `W.person` `W.animate`, cft-game `playerLook`, cft-ui `U.lookEditor` | | --people |
+| Your character's look | "hair clips hat" | cft-world `W.person` (`torsoGeo`, `LIMB`, hair in `hr`) `W.animate`, cft-game `playerLook`, cft-ui `U.lookEditor` | | --people --models |
+| Faces, body shapes, silly extras on people | "eyes look sleepy", "too many silly hats" | cft-world `W.person` (face block, `ARM_Z`), `W.randomLook` (`silly` chance, `fig`), `W.SILLY` | | --models |
+| Car shapes, silly roof loads | "wheels too small", "roof duck clips" | cft-world `CAR_SPEC` `carShape` `carLights` `W.vehicle`, `W.SILLY_CARS` (chance in `spawnCar`) | | --models |
+| Animals | "dog looks odd" | cft-world `W.animal` | | --models |
 | People and traffic | "streets empty", "cars stuck" | cft-world `updateLife` `spawnPed` `spawnCar` | `D.TUNE.world` | --shots |
 | Shops, buying | "can't buy", "price" | cft-ui `U.shopPanel`, cft-game `G.buy` | `D.ITEMS`, `D.KINDS[kind].sells` | gametest |
 | Businesses, turf, homes | | cft-game (`G.buyBiz`, turf: `updateTurf`, homes: `U.homePanel`) | `D.BUSINESSES`, `D.CREWS`, `D.APARTMENTS` | gametest |
@@ -66,9 +69,9 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Phone apps | "Street life card wrong" | cft-ui `render` + `VIEWS.<app>` (e.g. `VIEWS.street`) | | --heroshots |
 | Buildings, roads, pavements | "pavement over the road", "roof ledge odd" | cft-world `buildSub` `addWalls` `cornice` `gable` `roofClutter`; constants `KERB_Y` `paveCol` | | --heroshots |
 | Ground textures (road, pavement, grass, plaza look) | "grass too yellow", "tiles too big", "cracks too strong" | cft-world `TEX` (m = size, k = detail, real = photo colour), `TL`, `groundify` (shader), `loadGround`; which surface gets which photo: `AREA[k][3]`, `ROAD_STYLE.*.l`, `TERRAIN_COL`; photos: `tools/ground_textures.py` | | --ground |
-| Trees, lamps, halos, street furniture | | cft-world `TRUNK_G`/`CROWN_G` (top), `PROP`, `layProps`, halos in `W.setClock` | | --heroshots |
+| Trees, bushes, lamps, halos, street furniture | "too many spruces", "bushes everywhere" | cft-world `TREE` / `TREE_LO` `treeKind` `leafShell`, `BUSH` (placed in `plantTrees`), tree colours in `buildSub`, `PROP`, `layProps`, halos in `W.setClock` | | --models --heroshots |
 | Sky, day/night, lighting, shadows | "night too dark" | cft-world `W.setClock` (`SKY`, `SKY_TOP`), lights at the top of `create` | | --shots |
-| Performance | "laggy" | cft-world `layProps` (density), `TRUNK_G` detail, `SHADOW`, `D.TUNE.world` | | real device |
+| Performance | "laggy" | cft-world `LOD_R` (full models only near you), `layProps` (density), bushes in `plantTrees`, `SHADOW`, `D.TUNE.world`; `W.renderInfo()` | | real device |
 | Music, sounds | | cft-game `music` / `MUSIC`, `G.sfx` | | |
 | Saving | "progress lost" | cft-game `doSave`, cft-kit `persist` `loadSave`, server `server_code/Game.py` `put_save` | | ui_test |
 | Pages outside the game (Life, Quests, Album, Ranks, Landing) | | `client_code/Pages/<Name>/` (template + Python), data from cft-kit `VIEWS` | | ui_test |
@@ -83,7 +86,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | `python -I tools/live/game_test.py --hero` | speed, combat, smashing, cars, outposts, hype, blips, shields | ~2 min |
 | `... --fun` / `--combat` / `--rpg` | street life / monsters, health, guardians / loot, talents | 2-3 min each |
 | `... ` (no flag) | everything (gametest + fun + rpg + combat + hero) | 5-7 min |
-| `... --heroshots DIR` / `--shots` / `--monsters` / `--people` | screenshots to look at (no checks) | 2-3 min |
+| `... --heroshots DIR` / `--shots` / `--monsters` / `--people` / `--models` | screenshots to look at (no checks) | 2-3 min |
 | `python -I tools/ui_test.py` | the Anvil pages in Docker | ~5 min |
 
 A tiny text or number change: content_check + check.py is enough; a behaviour change: the matching game_test flag.

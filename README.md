@@ -112,6 +112,13 @@ City Coin Run (`Documents/CLAUDE/citycoinrun`).
   furious goose, a slime alert, a parachuting mystery crate, a pack of friendly dogs, Pigeonzilla. Banana peels are speed
   boosts; trampolines throw you at coins in the air. A 14th sticker set, **Shenanigans**, is earned by feats only.
 
+**The realism pass** (2026-11-17): realistic people (six and a half heads tall, shaped bodies, faces with irises, lids and lips,
+proper hands and shoes), four kinds of tree (broadleaf, linden, spruce, birch, the odd red maple), bushes and a topiary duck,
+real car shapes (hatchbacks, saloons, SUVs, vans, sports cars, buses, the ice cream van) and rounder dogs, cats, pigeons and
+ducks. Still silly: about one passer-by in eleven wears a propeller beanie, a traffic cone, antlers, a rubber-duck ring or
+carries a balloon or a baguette, and about one car in twelve has a giant rubber duck, a sofa or a canoe on its roof. Full
+detail near you, lighter stand-ins further away.
+
 **The main character update** (2026-11-17; for people unwinding after a tough day: everyone adores you):
 - **Blocks and parries:** every figment winds up before it strikes (a red ❗ and a ring on the ground that shrinks to its
   reach and turns gold at the last moment). Hold **G**, the **right mouse button** or **🛡️** to block most of the damage
@@ -229,6 +236,7 @@ node tools/live/content_check.mjs                # missions, items, weapons, mon
 python -I tools/live/game_test.py                # plays the 3D game for real (needs internet): missions, then street life
 python -I tools/live/game_test.py --shots DIR    # pictures of the city by day, at dusk and at night
 python -I tools/live/game_test.py --people DIR   # close-ups of the characters: you, passers-by in poses, the look editor
+python -I tools/live/game_test.py --models DIR   # the 3D models up close: faces, silly extras, vehicles, trees, bushes, animals
 python -I tools/live/game_test.py --long DIR     # the Character / Reputation / Achievements apps, a Legendary drop, a rare monster
 python -I tools/live/game_test.py --monsters DIR # the 15 monster types, a metro guardian, a fight, loot gear on you
 git push origin master                           # the deploy: Anvil pulls master

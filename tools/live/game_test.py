@@ -11,6 +11,7 @@
     python -I tools/live/game_test.py --monsters [OUTDIR] no tests: the 15 monster types, a metro guardian, a fight, loot gear on you
     python -I tools/live/game_test.py --long [OUTDIR]     no tests: the Character / Reputation / Achievements apps, a Legendary drop, a rare monster, a level-up
     python -I tools/live/game_test.py --people [OUTDIR]   no tests: close-ups of the characters (you, passers-by in poses, the look editor)
+    python -I tools/live/game_test.py --models [OUTDIR]   no tests: the 3D models up close (faces, silly extras, every vehicle, trees, bushes, animals)
     python -I tools/live/game_test.py --eval FILE.js [OUTDIR]   start a game, run FILE.js in the page, print what it returns
 
 It serves the game from theme/assets with tools/live/harness.py (a plain page, no Anvil), starts a fresh guest game in
@@ -100,6 +101,30 @@ PEOPLE = (
     + scene("p6-run", "G.ui.closeAll(); W.showOff = false; W.controls.enabled = true; W.cam.dist = W.cam.cur = 5; W.cam.pitch = 0.18; W.cam.yaw += 2.4; W.input.f = 1; W.input.sprint = true; s.energy = 100;", 40)
 )
 
+# The 3D models up close (realism pass 2026-11-17): faces, the silly extras, every vehicle, silly roof loads, the four tree
+# kinds and the bushes, animals, and a street. Objects are put in front of the camera (window.__mo) and cleared each scene.
+MO = ("(window.__mo || []).forEach(o => W.scene.remove(o)); window.__mo = []; W.avatar.visible = false; W.showOff = false;"
+      "const f = { x: -Math.sin(W.cam.yaw), z: -Math.cos(W.cam.yaw) };"
+      "const put = (o, ahead, side, turn) => { const x = p.x + f.x * ahead + f.z * side, z = p.z + f.z * ahead - f.x * side; o.position.set(x, W.groundAt(x, z), z); o.rotation.y = W.cam.yaw + Math.PI + (turn || 0); W.scene.add(o); window.__mo.push(o); return o; };"
+      "const person = (look, ahead, side, pose, turn) => { const g = W.person(Object.assign(W.randomLook(look.seed || 1), look)); W.animate(g, 0, 0.5, pose); return put(g, ahead, side, turn); };")
+MODELS = (
+    scene("m1-faces", "s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11;"
+          "const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 11) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.02; W.cam.dist = W.cam.cur = 1.0;" + MO +
+          "[{ seed: 3, fig: 0.1, beard: true, silly: null }, { seed: 8, fig: 0.9, long: true, style: 1, silly: null, glasses: false }, { seed: 12, fig: 0.4, glasses: true, silly: null, skin: 0x6b4126 }, { seed: 21, fig: 0.8, style: 4, silly: null, skin: 0xd39d6c }]"
+          ".forEach((l, i) => person(l, 1.9, (i - 1.5) * 0.62, null));", 20)
+    + scene("m2-silly", "W.cam.dist = W.cam.cur = 4.2; W.cam.pitch = 0.06;" + MO +
+            "W.SILLY.forEach((k, i) => person({ seed: 40 + i, silly: k, h: 1, dress: false }, 4.2, (i - 4.5) * 0.85, i % 3 === 1 ? 'wave' : null));", 20)
+    + scene("m3-cars", "W.cam.dist = W.cam.cur = 7; W.cam.pitch = 0.2;" + MO +
+            "['car', 'suv', 'sports', 'taxi', 'police', 'van'].forEach((k, i) => put(W.vehicle(k, [0xe8453c, 0x2b6cb0, 0xf2b134, 0, 0, 0xf4f1ea][i]), 9 + (i % 2) * 6, (Math.floor(i / 2) - 1) * 3.4 + (i % 2) * 1.6, 0.9));", 20)
+    + scene("m4-big-and-silly", "W.cam.dist = W.cam.cur = 8; W.cam.pitch = 0.22;" + MO +
+            "put(W.vehicle('bus'), 14, -5, 0.8); put(W.vehicle('truck'), 9, 1.5, 0.8); W.SILLY_CARS.forEach((k, i) => put(W.vehicle(i % 2 ? 'suv' : 'car', [0x2f9e6e, 0x7b52c7, 0x3aa6b9, 0xb9c0c8, 0xe8453c, 0xff8a3d][i], { silly: k }), 18 + (i % 3) * 5, (Math.floor(i / 3) * 2 - 1) * 4 + 6, 0.8));", 20)
+    + scene("m5-trees", "W.cam.dist = W.cam.cur = 9; W.cam.pitch = 0.08;" + MO +
+            "[0, 1, 2, 3].forEach(k => put(W.treeMesh(k), 14, (k - 1.5) * 5)); [0, 1, 2].forEach(k => put(W.bushMesh(k), 9, (k - 1) * 2.4));", 20)
+    + scene("m6-animals", "W.cam.dist = W.cam.cur = 1.6; W.cam.pitch = 0.3;" + MO +
+            "[['dog'], ['cat'], ['pigeon'], ['duck'], ['dog', 0x2b2b2b]].forEach((a, i) => { const g = W.animal(a[0], a[1]); W.animate(g, 0, 0.3); put(g, 2.2, (i - 2) * 0.6, 0.5); });", 20)
+    + scene("m7-street", "(window.__mo || []).forEach(o => W.scene.remove(o)); window.__mo = []; W.avatar.visible = true; W.cam.dist = W.cam.cur = 14; W.cam.pitch = 0.32; W.cam.yaw += 0.6;", 40)
+)
+
 # The long game: the Character, Reputation and Achievements apps, a Legendary drop with its beam, a rare monster.
 LONG_SETUP = ("s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11; s.money = 900; s.xp = G.xpAt(14) + 40; const R = G.rpg;"
               "['pinch', 'pinch', 'haggle', 'side', 'side', 'side', 'study', 'feet', 'feet', 'hands', 'smooth', 'smooth', 'dress'].forEach(id => R.learn(id));"
@@ -174,6 +199,8 @@ elif "--ground" in flags:
     steps = START + GROUND
 elif "--people" in flags:
     steps = START + PEOPLE
+elif "--models" in flags:
+    steps = START + MODELS
 elif "--long" in flags:
     steps = START + LONG
 elif "--monsters" in flags:
@@ -212,13 +239,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--people" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

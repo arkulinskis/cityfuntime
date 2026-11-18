@@ -1303,7 +1303,7 @@ function mount(root, opts) {
   function playerLook() {
     // you: a plain tee, jeans and the backpack you arrived with; shops change it (outfits, shoes, headphones...)
     const base = Object.assign(W.randomLook(77), { dress: false, hat: null, glasses: false, beard: false, shorts: false, stripes: null, logo: null, phones: null,
-      scarf: null, collar: false, build: 1, h: 1, sleeve: 'short', bag: 0x6b4eff, shoe: 0xf2f2f2 }, save.look || {});
+      scarf: null, collar: false, build: 1, h: 1, sleeve: 'short', bag: 0x6b4eff, shoe: 0xf2f2f2, silly: null }, save.look || {});
     if (base.style == null) base.style = base.long ? 1 : 0;
     if (base.pack === false) base.bag = null;
     const eq = save.equip, o = D.ITEMS[eq.body];  // shop gear by wardrobe slot (D.WEAR_SLOTS)
