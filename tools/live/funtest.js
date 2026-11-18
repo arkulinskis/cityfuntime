@@ -143,6 +143,11 @@ window.__funOut = []; window.__funDone = false;
     const pf = F.pedMenu(pd); await drain(/Flirt/); await pf; await sleep(3300);
     Math.random = rand;
     ok(s.fun.crushes.length === 1 && c('flirts') === 1 && c('sweet') === 1, 'the pick-up line worked: ' + (s.fun.crushes[0] || {}).name + ' is a sweetheart');
+    // nobody who looks like a child can be flirted with (nor while you look like one)
+    const kidPed = { type: 'kid', look: { h: 0.6 } }, adult = { type: 'walk', look: { h: 1 } }, hadLook = s.look;
+    const noKidFlirt = F.noFlirt(kidPed) && F.noFlirt({ type: 'walk', look: { h: 0.6 } }) && !F.noFlirt(adult);
+    s.look = Object.assign({}, hadLook, { h: 0.6 }); const youKid = F.noFlirt(adult); s.look = hadLook;
+    ok(noKidFlirt && youKid, 'no flirting with kids, or while you look like a kid');
     await sleep(3000); sim(80);
     const sw = [...F.sweet.values()][0];
     ok(!!sw && !W.life.peds.includes(pd), 'they stay on their street and wait for you');

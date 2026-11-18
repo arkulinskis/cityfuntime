@@ -618,12 +618,16 @@ function attach(G, api) {
   const onStory = () => { const m = save().m['c1-couch']; return !!(m && m.s === 'done'); };
 
   // ------------------------------------------------------------------ strangers: hi, jokes, flirting
+  // No flirting with someone who looks like a child, nor while your own character looks like one.
+  const noFlirt = ped => W.isKid(ped && ped.look, ped && ped.type) || W.isKid(save().look);
+  F.noFlirt = noFlirt;
   F.pedMenu = async function (ped) {
     if (quiet()) return;
     api.setBusy(true);
     try {
-      const v = await U.choose({ title: '🧍 A stranger', text: 'They slow down and look at you. What now?', opts: [
-        { t: '👋 Say hi', v: 'hi' }, { t: '😘 Flirt', v: 'flirt' }, { t: '🤡 Tell a joke', v: 'joke' }, { t: 'Never mind', v: '' }] });
+      const kid = noFlirt(ped); // a child (or you look like one): no flirting, ever
+      const v = await U.choose({ title: kid && W.isKid(ped.look, ped.type) ? '🧒 A kid' : '🧍 A stranger', text: 'They slow down and look at you. What now?', opts: [
+        { t: '👋 Say hi', v: 'hi' }].concat(kid ? [] : [{ t: '😘 Flirt', v: 'flirt' }], [{ t: '🤡 Tell a joke', v: 'joke' }, { t: 'Never mind', v: '' }]) });
       if (v === 'hi') api.chatPed(ped);
       else if (v === 'flirt') flirt(ped);
       else if (v === 'joke') joke(ped);
@@ -646,6 +650,7 @@ function attach(G, api) {
   }
   function flirt(ped) {
     const s = save(), f = fun();
+    if (noFlirt(ped)) return;
     if (ped.flirted) { sayAt(ped.obj, 'One line per person, hotshot.', 2.2); return; }
     if (s.married) { U.toast('💍 Your ring finger tingles. Maybe just say hi.'); return; }
     ped.flirted = true;

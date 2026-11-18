@@ -51,7 +51,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Missions: step logic | "step doesn't complete" | cft-game `updateMissions` `triggerStep` `talkTo` `completeMission` `beginStep` | | gametest (full) |
 | Quests page "???" | "shows too much / too little" | cft-kit `mystery` + `quests` view | | ui_test |
 | Talking to people, dialog | "dialog stuck", "choices" | cft-ui `U.dialog` `U.choose`, cft-game `chatPed`, cft-fun `F.pedMenu` | | --fun |
-| Sweethearts, flirting (E menu) | "flirt never works" | cft-fun `flirt` `updateSweet` `sweetMenu` | chance in `flirt` | --fun |
+| Sweethearts, flirting (E menu) | "flirt never works", "flirt shown for a kid" | cft-fun `flirt` `noFlirt` (kids: cft-world `W.isKid`, `KID_H`) `updateSweet` `sweetMenu` | chance in `flirt` | --fun |
 | Street folk, crown | | cft-fun `updateFolk` `folkMenu` `crown` | `D.STREETFOLK`, `D.CROWN_AT` | --fun |
 | Pranks, chasers, rivals | | cft-fun `F.prank` `updateChasers` `updateRivals` | `D.PRANKS` | --fun |
 | Street events | "UFO too rare" | cft-fun `startEvent` `updateEvent` (`eventT` in `F.tick`) | `D.EVENTS` | --fun |

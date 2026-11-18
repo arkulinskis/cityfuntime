@@ -1863,6 +1863,9 @@ varying float vGL; varying vec2 vGUV;
   const CLOTH = [0xe8453c, 0x2b6cb0, 0x2f9e6e, 0xf2b134, 0x7b52c7, 0xef6aa5, 0x1f2937, 0xf4f1ea, 0x3aa6b9, 0xff8a3d, 0x6d8b3a, 0x9b2c4f];
   const PANTS = [0x2b4c7e, 0x1f2937, 0x5b4636, 0x6b7280, 0x2d3a2e, 0x8a6e4b, 0x24324a, 0xc2b59b];
   const SHOES = [0xf2f2f2, 0x222222, 0xe8453c, 0x2b6cb0, 0x8a5a2b, 0xf2b134, 0x3a3f4a];
+  // Who looks like a child (small: height under KID_H). Kids are never flirted with or flirt (W.isKid / ped.type 'kid').
+  const KID_H = 0.78;
+  W.isKid = (look, type) => type === 'kid' || !!(look && (look.h || 1) < KID_H);
   W.randomLook = function (seed) {
     const r = i => hash(seed * 31 + i);
     const pick = (a, i) => a[Math.floor(r(i) * a.length) % a.length];
@@ -1895,7 +1898,7 @@ varying float vGL; varying vec2 vGUV;
     const g = new THREE.Group(), body = new THREE.Group();
     g.add(body);
     const skin = look.skin, hair = look.hair, shirt = look.coat || look.shirt, pants = look.pants, shoe = look.shoe == null ? 0x222222 : look.shoe;
-    const kid = (look.h || 1) < 0.78;
+    const kid = W.isKid(look);
     const part = (m, shadow) => { const mesh = m.mesh(); mesh.castShadow = !LOW && (shadow || !npc); return mesh; };
     // ---- torso
     const t = new Merge();

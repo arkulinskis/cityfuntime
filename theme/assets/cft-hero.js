@@ -181,7 +181,7 @@ function attach(G, api) {
   function compliment() {
     const ped = nearPed(17);
     if (!ped) return;
-    const s = save(), flirty = !s.married && Math.random() < TH.flirtShare, heroic = G.rt.t - killT < 20 && Math.random() < 0.5;
+    const s = save(), flirty = !s.married && !(G.fun && G.fun.noFlirt(ped)) && Math.random() < TH.flirtShare, heroic = G.rt.t - killT < 20 && Math.random() < 0.5;
     const line = fill(pick(heroic ? HY.hero : flirty ? HY.flirts : HY.compliments));
     W.holdPed(ped, 2.6, Math.random() < 0.6 ? 'wave' : null);
     W.say(ped.obj, line, 3.2);

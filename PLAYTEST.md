@@ -25,3 +25,4 @@ phone · buildings/graphics · day/night · performance · sound · saving · pa
 ## Done
 
 <!-- "- [x] 12. (combat) ... → what changed (commit abc1234)" -->
+- [x] 1. (sweethearts) "when the character is small it still says flirt in the options... if the character looks like a child, let's make sure there is no way to flirt" → kids (ped type 'kid' or height under 0.78, W.isKid) get a "🧒 A kid" menu with no Flirt; flirt() refuses them; passing compliments from them are never flirty; same if your own look is child-sized (F.noFlirt). Test in funtest.js.
