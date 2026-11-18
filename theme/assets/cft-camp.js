@@ -149,8 +149,9 @@ function attach(G, api) {
     const c = st();
     if (c.intro === 'done') return;
     if (c.intro === 'ending' || (c.intro === 'run' && !(c.left > 1))) { // closed the game right as it ended: it's over
-      c.intro = 'done'; c.left = 0; c.seen = storyDone(); G.dirty(); U.help(true); return;
+      c.intro = 'done'; c.left = 0; wakeUp(c); c.seen = storyDone(); G.dirty(); U.help(true); return;
     }
+    if (!c.snap) c.snap = dreamSnap();   // what the save looked like before the dream (put back when you wake up)
     c.intro = 'run';
     if (!(c.left > 0)) c.left = CP.INTRO_SECS;
     const home = G.homeSpot();
@@ -207,6 +208,26 @@ function attach(G, api) {
     if (Math.abs(c.left - 10) < dt * 1.01) word('10!', 'red', 'almost...', true);
     if (c.left <= 0) endIntro();
   }
+  // The opening was a fever dream (the user, 2026-11-18): you wake at the address you typed, level 1 with $0, and nothing
+  // from those five minutes is kept: no gear, loot, stickers, achievements, counters, aura or Dex entries. DREAM_KEYS are the
+  // parts of the save that are put back exactly as they were before it started (save.camp.snap, taken in startIntro).
+  const DREAM_KEYS = ['bag', 'owned', 'equip', 'rpg', 'stickers', 'counters', 'hero', 'chaos', 'fun', 'm', 'track', 'jobs', 'dyn'];
+  function dreamSnap() { const s = save(), o = {}; for (const k of DREAM_KEYS) o[k] = s[k] === undefined ? null : JSON.parse(JSON.stringify(s[k])); return o; }
+  function wakeUp(c) {
+    const s = save();
+    if (c.snap) for (const k of DREAM_KEYS) { if (c.snap[k] === null) delete s[k]; else s[k] = c.snap[k]; }
+    delete c.snap;
+    s.xp = 0; s.money = 0; s.savings = 0;
+    if (s.rpg) s.rpg.rested = 0;
+    s.energy = G.maxEnergy();
+    if (s.fun) s.fun.hp = F.maxHp();
+    c.ammo = T.ammoStart; c.water = T.waterStart; c.volt = T.voltStart; c.foam = 0;
+    if (G.rpg && G.rpg.mark) G.rpg.mark();
+    if (F.rideChanged) F.rideChanged();   // the weapon in your hand goes back to what you really own
+    W.setLook(G.playerLook());
+    G.setRide(s.equip.ride || null);
+    for (const k of G.rt.pickups.slice()) if (!k.mission && !k.dead) k.dead = 0.0001;   // the dream's coins vanish too
+  }
   async function endIntro() {
     const c = st();
     if (c.intro !== 'run') return;
@@ -220,20 +241,31 @@ function attach(G, api) {
     for (const f of K.fires.slice()) removeFire(f, false);
     stopStorm();
     if (F.event) F.endEvent();
-    const h = G.homeSpot();
-    save().clock = 8;
-    await api.travel({ x: h.x + 6, z: h.z + 6 }, '😮‍💨 ...and then, just like that, it stopped.');
+    // wake up at the address you typed on the start screen (save.home, the world's origin), on the nearest pavement
+    const s = save(), hq = G.xz(s.home), hw = W.nearestWalk(hq.x, hq.z, 40) || hq;
+    s.clock = 8;
+    await api.travel({ x: hw.x, z: hw.z }, '🤒 ...you wake up, drenched in sweat.');
     if (!alive) return;
     c.intro = 'done'; c.left = 0;
-    c.ammo = Math.max(c.ammo, T.ammoStart); c.water = Math.max(c.water, T.waterStart); c.volt = Math.max(c.volt, T.voltStart);
+    wakeUp(c);
     c.seen = storyDone();
     shell.classList.remove('cft-panic'); introEl.hidden = true;
     api.bump('intro');
-    G.log('Survived the opening chaos', '🌀');
-    U.banner('🕊️ Peace and quiet', 'Whatever that was, it\'s over. This is your new home. The world is calm now. Max is waiting for you.', 'day');
-    if (G.hero) G.hero.ticker('Welcome home. It\'s quiet now. For now.', 'The city', '🕊️');
+    G.log('Woke up from a very strange fever dream', '🤒');
     G.dirty(true);
-    later(2600, () => { if (G.state() === 'play') U.help(true); });
+    api.setBusy(true);
+    try {
+      await U.dialog({ who: 'max', lines: [
+        'Whoa, whoa, easy! You\'re awake. You were thrashing around on my couch like you were fighting a goose.',
+        'You came down with a fever the second you got here. You\'ve been out for hours, yelling "I CAN\'T DIE!" and "WHY IS THE BUILDING WALKING?!"',
+        'None of it was real. No monsters, no fires, no giant goose. It was all a fever dream. You\'re at ' + (s.home.short || s.home.label) + ', safe.',
+        'Bad news, though: anything you "found" in there stayed in there. And moving here ate every last dollar. Your wallet is empty.',
+        'So: level one, zero dollars, a brand new city. Honestly? Best way to start. Come talk to me when you\'re ready.',
+      ] });
+    } finally { api.setBusy(false); }
+    U.banner('🤒 It was all a fever dream', 'Level 1, $0, nothing in your pockets. The city is calm. Max has your first mission.', 'day');
+    if (G.hero) G.hero.ticker('It was all a dream. (Was it?)', 'Your brain', '🤒');
+    later(1800, () => { if (G.state() === 'play') U.help(true); });
   }
   K.skipIntro = () => { const c = st(); if (c.intro === 'run') { c.left = 0.01; } else if (c.intro === 'todo') { c.intro = 'done'; c.seen = storyDone(); } };
   K.shrug = function (n) {

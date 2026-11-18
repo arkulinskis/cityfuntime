@@ -90,12 +90,22 @@ window.__campOut = []; window.__campDone = false;
     ok(K.fires.length > 0 && !!K.storm, 'fires and a lightning storm during the opening (' + K.fires.length + ' fires)');
     const hp0 = F.hp(); F.hurt(999); ok(F.hp() === hp0 && !F.dying, 'you can\'t die during the opening');
     ok(K.useAmmo({ ammo: 3 }) && /∞/.test(document.querySelector('[data-pwn="water"]').textContent), 'infinite ammo and powers during the opening');
+    // things you 'get' in the dream: money, XP (levels), a weapon, loot, a sticker, a counter
+    const before = { loot: (s.rpg && s.rpg.loot || []).length, tshirt: !!s.owned.w_tshirt, stickers: JSON.stringify(s.stickers), bonks: c('bonks') };
+    s.money += 777; s.xp = G.xpAt(6); s.owned.w_tshirt = true; s.equip.weapon = 'w_tshirt'; if (G.rpg) { G.rpg.drop('boss'); G.rpg.drop('chest'); } G.addSticker(); s.counters.bonks = (s.counters.bonks || 0) + 50;
+    ok(G.level() >= 6 && (s.rpg.loot || []).length > before.loot, 'in the dream you level up and find things (level ' + G.level() + ', ' + (s.rpg.loot || []).length + ' loot)');
     s.camp.left = 0.5; sim(10);
     for (let i = 0; i < 400 && s.camp.intro !== 'done'; i++) await sleep(150);
     window.CFT_TEST.calm = true;
-    ok(s.camp.intro === 'done' && Math.hypot(pp.x - home.x, pp.z - home.z) < 60, 'when the clock runs out you are next to your home (' + Math.round(Math.hypot(pp.x - home.x, pp.z - home.z)) + ' m)');
+    const typed = G.xz(s.home), dHome = Math.hypot(pp.x - typed.x, pp.z - typed.z);
+    ok(s.camp.intro === 'done' && dHome < 45, 'when the clock runs out you wake up at the address you typed (' + Math.round(dHome) + ' m from ' + (s.home.short || s.home.label) + ')');
+    let dream = false; for (let i = 0; i < 40 && !dream; i++) { await sleep(120); const d = document.querySelector('.cft-dlg'); if (d && /fever dream/i.test(d.textContent)) dream = true; else if (d) d.click(); }
+    ok(dream, 'Max explains it was all a fever dream');
+    ok(s.xp === 0 && G.level() === 1 && s.money === 0, 'back to level 1 (no XP) with $0 (level ' + G.level() + ', $' + s.money + ')');
+    ok(!!s.owned.w_tshirt === before.tshirt && s.equip.weapon !== 'w_tshirt' && (s.rpg.loot || []).length === before.loot && JSON.stringify(s.stickers) === before.stickers && c('bonks') === before.bonks,
+      'nothing from the dream is kept: weapon, loot, stickers and counters are back to what they were');
     ok(!F.monsters.some(m => m.introFoe) && !K.storm && document.querySelector('.cft-intro').hidden && Math.abs(s.clock - 8) < 0.5, 'and the world is peaceful: no figments, no storm, a calm morning');
-    for (let i = 0; i < 40 && !document.querySelector('.cft-help'); i++) await sleep(100);
+    for (let i = 0; i < 80 && !document.querySelector('.cft-help'); i++) { await sleep(120); const d = document.querySelector('.cft-dlg'); if (d) { const o = d.querySelector('[data-k]:not(.lock)'); if (o) o.click(); else d.click(); } }
     ok(!!document.querySelector('.cft-help'), 'then the controls card welcomes you home');
     await ready();
     clear();

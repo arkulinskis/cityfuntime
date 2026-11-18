@@ -207,8 +207,9 @@ ranged attacks, mega monsters, a campaign that starts in chaos and then calms do
 extinguishers, water and lightning powers".
 - **The opening:** a new game starts with five minutes on a countdown, a few streets from home, where you **can't die** and
   every figment in town chases you: champions, King Blob, a MEGA figment, fires, a lightning storm, street events one after
-  another. When the clock hits zero everything stops, you're standing next to your home, it's a calm morning, and Max is
-  waiting with one mission.
+  another. When the clock hits zero you wake up at the address you typed, drenched in sweat: cousin Max explains it
+  was all a fever dream. Nothing from it is kept (no gear, loot, stickers, achievements or XP): you start at level 1 with $0
+  on a calm morning, and Max has one mission.
 - **Missions, a few at a time:** one mission on the map at first, three after it, and never more than five (open + active).
 - **The crazy list:** the world starts calm. Every story or side mission you finish switches on the next crazy thing, in
   order: animal neighbours, street toys, meme chatter, things in the sky, night figments, street events, fires, occupied

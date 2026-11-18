@@ -483,8 +483,12 @@ crazy thing. Everything jumpable and bouncy. Fire and extinguishers. Water power
   `G.travel(spot 220-360 m from home, message)`, clock 21.8, `cft-panic` class, the countdown `.cft-intro`, a storm for the
   whole opening. `introTick`: figments with `{aggro: 999, event, introFoe: true}` (14 / low 8), champion packs, King Blob, a
   MEGA at ~75 s (one third health, no rewards), an event every 22 s, fires, panic ticker lines. `F.hurt` returns 0 while
-  `G.camp.immortal()` (`K.shrug` pops IMMORTAL!). Ammo and powers are free (∞). `endIntro`: clears everything, travels home,
-  clock 8, banner, then `U.help(true)`. A reload mid-opening resumes it (with the time left).
+  `G.camp.immortal()` (`K.shrug` pops IMMORTAL!). Ammo and powers are free (∞). `endIntro`: clears everything, travels to `save.home`
+  (the typed address, nearest pavement), clock 8, then **the fever dream** (user, 2026-11-18): `wakeUp` puts back
+  `DREAM_KEYS` (bag, owned, equip, rpg, stickers, counters, hero, chaos, fun, m, track, jobs, dyn) from `save.camp.snap` (taken
+  at the first `startIntro`), sets xp 0 (= level 1, the lowest), money/savings 0, rested 0, full energy/health, starting
+  ammo/powers, refreshes look/weapon/ride, removes the dream's pickups; Max's dialog says it was a fever dream; banner;
+  `U.help(true)`. A reload mid-opening resumes it (with the time left).
 - **Ammo:** `F.attack` asks `G.camp.useAmmo(w)` for `ranged: 'proj' | 'shot'`; cost `weapon.ammo` (1 by default: heavy
   launchers 2-4); out = the weapon becomes a melee bonk. Crates: `manageCrates` keeps `ammoCrates` between `crateMin` and
   `crateMax`; orbs; extinguishers near fires. Kill drops via a `G.hero.event` wrapper. Older test suites shoot for free
