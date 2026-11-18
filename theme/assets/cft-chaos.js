@@ -40,7 +40,7 @@ function attach(G, api) {
   let alive = true, fartCd = 0, chatT = 6, rotT = 20, toyT = 0, skyT = 0, critT = 0, airAcc = 0, fuel = 1, flying = null, hideT = 0, hideAt = null, lagT = 0, wasDying = false, swoopT = 0;
   const calm = () => !!(window.CFT_TEST && window.CFT_TEST.calm);
   const quiet = () => G.rt.busy || U.isOpen() || G.state() !== 'play';
-  const onStory = () => { const m = save().m['c1-couch']; return !!(m && m.s === 'done'); };
+  const onStory = () => G.storyOn ? G.storyOn() : !!(save().m['c1-couch'] && save().m['c1-couch'].s === 'done');  // also true in the campaign's opening chaos
   const onFoot = () => W.ride().mode !== 'drive';
   const later = (ms, fn) => setTimeout(() => { if (alive) fn(); }, ms);
   const hype = () => G.hero;
@@ -392,8 +392,9 @@ function attach(G, api) {
         if (Math.hypot(o.x - p.x, o.z - p.z) < 0.85 && o.y > p.y - 0.2 && o.y < p.y + 2.1) shotHitsPlayer(s);
         continue;
       }
-      // yours: figments (also in the air), piñatas, balloons, balls, people, street furniture
+      // yours: a MEGA figment (cft-camp.js), figments (also in the air), piñatas, balloons, balls, people, street furniture
       let done = false;
+      if (G.camp && !s.hit.has('mega') && G.camp.shotHit(s, o)) { s.hit.add('mega'); if (s.w.splash || !(s.pierce > 0)) { impact(s); continue; } }
       for (const m of F.monsters) {
         if (m.dead || s.hit.has(m)) continue;
         const r = m.r + 0.55, my = monY(m), hh = (m.obj.userData.h || 1) * (m.obj.userData.size || 1) * 0.6 + 0.5;
@@ -623,7 +624,7 @@ function attach(G, api) {
     chatT -= dt;
     if (chatT > 0) return;
     chatT = rnd(T.chatter[0], T.chatter[1]);
-    if (calm() || quiet() || !onStory()) return;
+    if (calm() || quiet() || !onStory() || !G.allow('chatter')) return;
     const p = P(), list = W.life.peds.filter(q => !q.ctl && !(q.hold > 0) && q.obj.parent && Math.hypot(q.obj.position.x - p.x, q.obj.position.z - p.z) < 20);
     if (!list.length) return;
     const ped = pick(list), kid = W.isKid && W.isKid(ped.look, ped.type);
@@ -701,7 +702,7 @@ function attach(G, api) {
   function critterTick(dt) {
     const p = P(), night = save().clock >= 21 || save().clock < 5.5;
     critT -= dt;
-    if (critT <= 0 && !calm() && onStory()) {
+    if (critT <= 0 && !calm() && onStory() && G.allow('critters')) {
       critT = 2.5;
       for (const c of C.critters.slice()) if (Math.hypot(c.x - p.x, c.z - p.z) > 150) removeCritter(c);
       if (C.critters.length < (LOW ? T.crittersLow : T.critters)) {
@@ -710,7 +711,7 @@ function attach(G, api) {
       }
     }
     rotT -= dt;
-    if (rotT <= 0 && !calm() && onStory() && !quiet()) {
+    if (rotT <= 0 && !calm() && onStory() && !quiet() && G.allow('brainrot')) {
       rotT = rnd(T.brainrot[0], T.brainrot[1]);
       if (C.rot.length < 2) {
         const pool = CH.BRAINROT.filter(b => (!b.night || night)), w = b => b.rar === 'legendary' ? 0.06 : b.rar === 'rare' ? 0.35 : 1;
@@ -917,7 +918,7 @@ function attach(G, api) {
     toyT = 2;
     const p = P(), far = (o, r) => Math.hypot(o.x - p.x, o.z - p.z) > r;
     for (const [list, r] of [[C.pinatas, 220], [C.balls, 200], [C.holes, 200], [C.cushions, 200], [C.tubes, 170]]) for (let i = list.length - 1; i >= 0; i--) if (far(list[i], r)) { drop(list[i].obj); list.splice(i, 1); }
-    if (calm() || !onStory()) return;
+    if (calm() || !onStory() || !G.allow('toys')) return;
     if (C.pinatas.length < T.pinatas) {
       const a = W.findArea && Math.random() < 0.5 ? W.findArea(['park', 'plaza', 'playground', 'grass'], 300) : null;
       let s = a && Math.hypot(a.x - p.x, a.z - p.z) < 170 && Math.hypot(a.x - p.x, a.z - p.z) > 20 ? { x: a.x + rnd(-6, 6), z: a.z + rnd(-6, 6) } : rotSpot(30, 150);
@@ -981,7 +982,7 @@ function attach(G, api) {
       if (s.kind === 'whale') { s.obj.rotation.z = Math.sin(s.t * 0.5) * 0.08; if (Math.random() < dt * 0.15) W.burst(s.x, s.y + 6, s.z, '💦', 8, { spread: 2, up: 9, size: 1.4, life: 2, grav: 6 }); }
       if (Math.hypot(s.x - p.x, s.z - p.z) > 520) { drop(s.obj); C.sky.splice(i, 1); }
     }
-    if (skyT > 0 || calm()) return;
+    if (skyT > 0 || calm() || !G.allow('sky')) return;
     skyT = 3;
     const count = k => C.sky.filter(s => s.kind === k).length;
     const add = (kind, obj, y, speed) => {

@@ -6,6 +6,8 @@
     python -I tools/live/game_test.py --hero [OUTDIR]     only herotest.js (speed, block/parry, smashing, borrowed cars, outposts, hype, blips)
     python -I tools/live/game_test.py --heroshots [OUTDIR] no tests: the main character update (graphics, a parry, the hype, an outpost, a wreck, blips, night)
     python -I tools/live/game_test.py --chaos [OUTDIR]    only chaostest.js (decor, mayhem, ranged weapons + figments, flying, the Dex, toys, events)
+    python -I tools/live/game_test.py --camp [OUTDIR]     only camptest.js (HUD + map size, crazy list + mission cap, the opening, ammo, powers, fire, storms, MEGA figments, secrets, bouncy world)
+    python -I tools/live/game_test.py --campshots [OUTDIR] no tests: pictures of the campaign update (HUD desktop + phone, the opening, a MEGA figment, fire, a storm, a secret)
     python -I tools/live/game_test.py --chaosshots [OUTDIR] no tests: the chaos update (decor, critters, brainrot, toys, the sky, a jetpack, ranged fights)
     python -I tools/live/game_test.py --boro [OUTDIR]     only borotest.js (borough names, looks, HUD chip, banners, discovery)
     python -I tools/live/game_test.py --boroshots [OUTDIR] no tests: two boroughs side by side, the chip + banner, the big map with names
@@ -233,8 +235,27 @@ CHAOS = (
     + scene("c9-night", CHAOS_PRE + "G.ui.closeAll(); s.clock = 23; const a = W.findArea(['park', 'grass', 'plaza'], 800) || { x: 0, z: 0 }; W.teleport(a.x, a.z); G.fun.spawnMonster('wifi', a.x + 5, a.z - 6, { event: 300 }); C.spawnRot('lampo', a.x - 3, a.z - 7); W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 14;", 60)
 )
 
+# The campaign update (2026-11-18): the new HUD, the opening, a MEGA figment, fire, a secret in a gap, a roof, the phone app
+CAMP_PRE = "const K = G.camp; s.m['c1-couch'] = { s: 'done', done: 1 }; s.money = 1234; s.clock = 11.5; window.CFT_TEST.calm = true; window.CFT_TEST.campaign = true; "            "const fx = -Math.sin(W.player.face), fz = -Math.cos(W.player.face), sx = -fz, sz = fx;"
+CAMPSHOTS = (
+    scene("k1-hud", CAMP_PRE + "for (const m of CFT_DATA.MISSIONS.slice(0, 3)) s.m[m.id] = { s: 'done', done: 1 }; G.stepSim(70); const o = G.openMissions()[0]; if (o) G.accept(o); s.owned.w_balloon = true; s.equip.weapon = 'w_balloon'; G.rpg.unequip('weapon'); s.camp.ammo = 14; s.camp.water = 7; s.camp.volt = 3; s.camp.foam = 40;"
+          "const q = W.randomWalkSpot(0, 0, 60, 220, (x, z, sg) => sg.car && sg.w >= 9) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.22; G.stepSim(200); G.ui.hud.frame(1);", 2)
+    + scene("k2-opening", CAMP_PRE + "window.CFT_TEST.calm = false; s.camp.intro = 'run'; s.camp.left = 247; s.clock = 21.8; document.querySelector('.cft').classList.add('cft-panic'); document.querySelector('.cft-intro').hidden = false; K.test.startStorm(60, true);"
+          "for (let i = 0; i < 6; i++) K.spawnFire(p.x + fx * (6 + i * 2) + sx * (i % 2 ? 4 : -4), p.z + fz * (6 + i * 2) + sz * (i % 2 ? 4 : -4), 1.2); W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 12; G.stepSim(150); G.ui.hud.frame(1);", 2)
+    + scene("k3-mega", CAMP_PRE + "window.CFT_TEST.calm = true; s.camp.intro = 'done'; K.test.stopStorm(); for (const m of G.fun.monsters.slice()) G.fun.removeMonster(m); for (const f of K.fires.slice()) K.test.douse(f, 1e9); document.querySelector('.cft').classList.remove('cft-panic'); document.querySelector('.cft-intro').hidden = true; s.clock = 15;"
+          "const q = W.randomWalkSpot(0, 0, 80, 260, (x, z, sg) => sg.car && sg.w >= 10) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); const ax = -Math.sin(q.yaw), az = -Math.cos(q.yaw); const m = K.spawnMega(p.x + ax * 30, p.z + az * 30, CFT_DATA.CAMPAIGN.MEGA[0]); m.cd = 99; G.stepSim(3); m.state = 'dizzy'; m.expose = 30; p.set(m.x - ax * 42, p.y, m.z - az * 42); look(m.x, m.z, 6, -0.38); G.ui.hud.frame(1);", 6)
+    + scene("k4-fire", CAMP_PRE + "for (const m of K.megas.slice()) K.test.removeMega(m); const q = W.randomWalkSpot(0, 0, 40, 200, (x, z, sg) => sg.car && sg.w >= 8) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); const ax = -Math.sin(q.yaw), az = -Math.cos(q.yaw);"
+          "for (let i = 0; i < 7; i++) K.spawnFire(p.x + ax * (4 + i * 1.6) + az * (i % 3 - 1) * 1.5, p.z + az * (4 + i * 1.6) - ax * (i % 3 - 1) * 1.5, 1.3); G.stepSim(20); s.camp.foam = 100; K.power('foam', true); W.cam.pitch = 0.25; W.cam.dist = W.cam.cur = 8;", 12)
+    + scene("k5-secret", CAMP_PRE + "K.power('foam', false); for (const f of K.fires.slice()) K.test.douse(f, 1e9); for (const sb of W.subsNear(p.x, p.z, 260)) if (!K.test.analysed.has(sb)) { K.test.analysed.add(sb); K.analyse(sb); }"
+          "const sp = K.spots.slice().sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0]; if (sp) { const ax = -sp.uz, az = sp.ux; const d = Math.min(6, (sp.out || 4) * 0.8); W.teleport(sp.x + ax * d, sp.z + az * d); G.stepSim(20); look(sp.x, sp.z, 5, 0.25); }", 20)
+    + scene("k6-roof", CAMP_PRE + "let r = null; for (let d = 6; d < 120 && !r; d += 4) for (let a = 0; a < 6.28 && !r; a += 0.5) { const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = W.roofAt(x, z); if (y != null && y > 8) r = { x, z, y }; } if (r) { p.set(r.x, r.y + 0.5, r.z); W.player.vy = 0; } W.cam.pitch = 0.35; W.cam.dist = W.cam.cur = 10;", 30)
+    + scene("k7-phone", CAMP_PRE + "G.ui.phone('camp');", 3, 2000)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
+elif "--campshots" in flags:
+    steps = START + CAMPSHOTS
 elif "--chaosshots" in flags:
     steps = START + CHAOS
 elif "--boroshots" in flags:
@@ -265,6 +286,8 @@ else:
         steps += script("borotest.js", "__boroDone", "__boroOut", 300000)
     elif "--chaos" in flags:
         steps += script("chaostest.js", "__chaosDone", "__chaosOut", 600000)
+    elif "--camp" in flags:
+        steps += script("camptest.js", "__campDone", "__campOut", 900000)
     else:
         if "--fun" not in flags:
             steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
@@ -275,12 +298,13 @@ else:
             steps += script("herotest.js", "__heroDone", "__heroOut", 600000)
             steps += script("borotest.js", "__boroDone", "__boroOut", 300000)
             steps += script("chaostest.js", "__chaosDone", "__chaosOut", 600000)
+            steps += script("camptest.js", "__campDone", "__campOut", 900000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"
 sf.write_text(json.dumps(steps), encoding="utf-8")
 env = dict(__import__("os").environ, WINDOW=__import__("os").environ.get("WINDOW", "1280,800"))
-r = subprocess.run(["node", str(HERE / "gldrive.mjs"), "http://127.0.0.1:%d/?fresh=1&music=0" % port, str(sf), str(out)],
+r = subprocess.run(["node", str(HERE / "gldrive.mjs"), "http://127.0.0.1:%d/?fresh=1&music=0&nointro=1" % port, str(sf), str(out)],
                    capture_output=True, text=True, env=env, encoding="utf-8", errors="replace", timeout=3000)
 fails = passes = 0
 for line in r.stdout.splitlines():
@@ -291,13 +315,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

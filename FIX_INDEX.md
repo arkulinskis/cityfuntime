@@ -65,7 +65,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | People and traffic | "streets empty", "cars stuck" | cft-world `updateLife` `spawnPed` `spawnCar` | `D.TUNE.world` | --shots |
 | Shops, buying | "can't buy", "price" | cft-ui `U.shopPanel`, cft-game `G.buy` | `D.ITEMS`, `D.KINDS[kind].sells` | gametest |
 | Businesses, turf, homes | | cft-game (`G.buyBiz`, turf: `updateTurf`, homes: `U.homePanel`) | `D.BUSINESSES`, `D.CREWS`, `D.APARTMENTS` | gametest |
-| HUD chips, buttons | "button too small on phone" | cft-ui markup at the top of `create`, `U.hud.frame`; CSS `/* ===== play.html` block | | ui_test --shots |
+| HUD chips, buttons | "button too small on phone" | cft-ui markup at the top of `create`, `U.hud.frame`; CSS `/* ===== the HUD redesign` block (end of app.css) | | --campshots, ui_test --shots |
 | Phone apps | "Street life card wrong" | cft-ui `render` + `VIEWS.<app>` (e.g. `VIEWS.street`) | | --heroshots |
 | Buildings, roads, pavements | "pavement over the road", "roof ledge odd" | cft-world `buildSub` `addWalls` `cornice` `gable` `roofClutter`; constants `KERB_Y` `paveCol` | | --heroshots |
 | Ground textures (road, pavement, grass, plaza look) | "grass too yellow", "tiles too big", "cracks too strong" | cft-world `TEX` (m = size, k = detail, real = photo colour), `TL`, `groundify` (shader), `loadGround`; which surface gets which photo: `AREA[k][3]`, `ROAD_STYLE.*.l`, `TERRAIN_COL`; photos: `tools/ground_textures.py` | | --ground |
@@ -87,6 +87,16 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Chaos street events (Ohio, glitch, cats & dogs, cheese, 6-7, balloons) | "glitch too long" | cft-chaos `C.startEvent` `C.updateEvent` `C.endEvent` (via cft-fun startEvent) | `D.EVENTS` (chaos: true) | --chaos |
 | Sky (blimps, balloons, whale) | "blimp text" | cft-chaos `skyTick` `blimpModel` | `D.CHAOS.BLIMPS` | --chaosshots |
 | Hit-stop | "game freezes on hits" | cft-game `frame` (`rt.hitstop`), cft-chaos `hitstop` | `D.TUNE.chaos.hitstop` | --chaos |
+| The opening (5 immortal minutes) | "too long", "too few figments", "lands too far from home" | cft-camp `K.startIntro` `introTick` `endIntro` `K.shrug`, cft-game `startWorld` (introPending) | `D.CAMPAIGN.INTRO_SECS`, `D.TUNE.camp.introFoes` | --camp |
+| Crazy list (one more per mission), mission cap | "storms too early", "show 4 missions" | cft-camp `K.allow` `tierTick` `K.capOpen`, cft-game `G.allow` `G.openMissions` | order of `D.CAMPAIGN.WILD`, `D.CAMPAIGN.CAP` | --camp |
+| Ammo, crates | "runs out too fast", "crates too far" | cft-camp `K.useAmmo` `manageCrates` `K.collect`, cft-fun `F.attack` (useAmmo) | `D.TUNE.camp.ammo*`, `crate*`, weapon `ammo` in `D.ITEMS` | --camp |
+| Water / lightning / extinguisher | "zap too weak", "water knocks too far" | cft-camp `K.power` `waterBlast` `zap` `bolt` `sprayTick` `aimDir`, cft-ui keys 1/2/3 + `[data-pw]` | `D.TUNE.camp.water*`, `volt*`, `wetMul`, `foamMax` | --camp |
+| Fire | "spreads too fast", "hurts too much" | cft-camp `K.spawnFire` `fireTick` `douse`, cft-world `W.onWreckFire` (hitProp) | `D.TUNE.camp.fire*` | --camp |
+| Lightning storms | "too many strikes" | cft-camp `startStorm` `stormTick`, CSS `.cft-stormfx` | `D.TUNE.camp.storm*`, `strikeEvery` | --camp |
+| MEGA figments | "too tanky", "stomp unfair", "heart too high" | cft-camp `K.spawnMega` `megaTick` `startAttack` `dizzy` `hitMega` `killMega` `K.meleeHit` `K.shotHit` `megaSpawner`, CSS `.cft-boss` | `D.TUNE.camp.mega*`, `D.CAMPAIGN.MEGA` | --camp --campshots |
+| Secrets in tight gaps | "secret in a wall", "can't reach it", "too few" | cft-camp `K.analyse` `reachable` `enclosure` `secretTick` `openSecret` `K.interaction` | `D.TUNE.camp.secret*`, `D.CAMPAIGN.SECRET_LOOT/NOTES` | --camp |
+| Bouncy world, roofs, wall jumps | "bounce too high", "can't climb", "stuck on a roof" | cft-world `updatePlayer` (wall jump, mantle, prop bounce, roof landing), `collide` (footY), `W.roofAt`; cft-camp `W.stompHook` `W.onPropBounce` | numbers in updatePlayer (×1.55 wall jump, 11.5 bounce) | --camp |
+| The HUD layout, map size | "chip covers the map", "hotbar too big on phone" | cft-ui markup at the top of `create`, `U.hud.frame` `missionList` `U.mapSize`; cft-camp `hud()` (hotbar counts, mission count, boss bar); CSS `/* ===== the HUD redesign` (end of app.css) | `--mm` sizes in the CSS | --camp --campshots |
 | Play-test panel | | cft-debug.js (`?debug=1`) | | |
 
 ## Tests (pick the narrowest)
@@ -97,6 +107,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | `python tools/check.py` | Anvil validate, JS syntax, asset hashes, server tests, design check | ~1 min |
 | `python -I tools/live/game_test.py --hero` | speed, combat, smashing, cars, outposts, hype, blips, shields | ~2 min |
 | `python -I tools/live/game_test.py --chaos` | decor, mayhem, ranged weapons + figments, flying, Dex, toys, chaos events | ~2 min |
+| `python -I tools/live/game_test.py --camp` | HUD + map size, crazy list + mission cap, the opening, ammo, powers, fire, storms, MEGA figments, secrets, bouncy world | ~2 min |
 | `python -I tools/live/game_test.py --boro` | borough names, looks, HUD chip, banners, discovery | ~1 min |
 | `... --fun` / `--combat` / `--rpg` | street life / monsters, health, guardians / loot, talents | 2-3 min each |
 | `... ` (no flag) | everything (gametest + fun + rpg + combat + hero) | 5-7 min |

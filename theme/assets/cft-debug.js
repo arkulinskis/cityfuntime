@@ -62,6 +62,15 @@ function attach(G) {
       ['🪅 Toys', () => { story(); if (!G.chaos) return; const p = P(), f = facing(); G.chaos.spawnPinata(p.x + f.x * 5 + f.z * 3, p.z + f.z * 5 - f.x * 3); G.chaos.spawnBall(p.x + f.x * 4 - f.z * 2, p.z + f.z * 4 + f.x * 2); G.chaos.spawnHole(p.x + f.x * 8, p.z + f.z * 8); G.chaos.spawnCushion(p.x + f.x * 2.5, p.z + f.z * 2.5); }],
       ['🌀 Chaos event', () => { story(); const ids = D.EVENTS.filter(e => e.chaos).map(e => e.id); if (G.fun.event) { G.fun.event.t = 1e9; } setTimeout(() => { const id = ids[Math.floor(Math.random() * ids.length)]; U.toast('🐞 ' + (G.fun.startEvent(id) ? id : id + ' could not start here')); }, 300); }],
     ]],
+    ['Campaign', [   // the campaign update (cft-camp.js)
+      ['⏭️ Skip the opening', () => { if (G.camp) { G.camp.skipIntro(); U.toast('🐞 Opening skipped'); } }],
+      ['🦖 MEGA', () => { story(); if (!G.camp) return; const p = P(), f = facing(); G.camp.spawnMega(p.x + f.x * 40, p.z + f.z * 40); }],
+      ['🔥 Fire', () => { story(); if (!G.camp) return; const p = P(), f = facing(); for (let i = 0; i < 4; i++) G.camp.spawnFire(p.x + f.x * (5 + i * 1.5), p.z + f.z * (5 + i * 1.5), 1.2); }],
+      ['⛈️ Storm', () => { story(); if (G.camp) G.camp.test.startStorm(40); }],
+      ['🎒 Refill', () => { if (!G.camp) return; const c = s().camp; c.ammo = 60; c.water = 30; c.volt = 20; c.foam = 100; U.toast('🐞 Ammo and powers full'); }],
+      ['🌀 Next crazy thing', () => { const next = D.MISSIONS.find(m => !s().m[m.id] || s().m[m.id].s !== 'done'); if (next) { s().m[next.id] = { s: 'done', done: s().day }; U.toast('🐞 Marked done: ' + next.title); } }],
+      ['🔍 Nearest secret', () => { if (!G.camp) return; const p = P(), q = G.camp.spots.filter(x => !s().camp.secrets[x.id]).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0]; if (q) { W.teleport(q.x - q.uz * 3, q.z + q.ux * 3); U.toast('🐞 Secret ' + q.id + ' (gap ' + q.gap.toFixed(1) + ' m)'); } else U.toast('🐞 No secret found yet: walk around'); }],
+    ]],
     ['Go to', [
       ['🍩 Tom Hearton\'s', () => { const pl = near(W.places.filter(q => q.kind === 'hearton'), q => q.pin); if (pl) goTo(pl.pin.x, pl.pin.z, pl.name); else U.toast('🐞 None loaded here'); }],
       ['🛒 Grocery', () => { const pl = near(W.places.filter(q => q.kind === 'grocery' && !(s().hero.out || {})[q.id]), q => q.pin); if (pl) goTo(pl.pin.x, pl.pin.z, pl.name); }],

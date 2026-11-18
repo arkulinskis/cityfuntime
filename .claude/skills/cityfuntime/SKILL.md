@@ -1,6 +1,6 @@
 ---
 name: cityfuntime
-description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 178 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events) and the main character update (blocks and parries, compliments and hype, Tom Hearton's and grocery outposts, smashing things, borrowed cars, GTA mission letters) and the chaos update (decor everywhere, mayhem meter, ranged weapons and shooters, flying, the Dex, toys, meme humour). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
+description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 178 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events) and the main character update (blocks and parries, compliments and hype, Tom Hearton's and grocery outposts, smashing things, borrowed cars, GTA mission letters) and the chaos update (decor everywhere, mayhem meter, ranged weapons and shooters, flying, the Dex, toys, meme humour) and the campaign update (a 5-minute immortal opening, a crazy list switched on mission by mission, at most 5 missions on the map, ammo, water/lightning/extinguisher powers, fire, storms, MEGA figments, secrets in tight gaps, a bouncy world, a redesigned HUD with map size). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
 ---
 
 # City Fun Time: working on the app
@@ -93,6 +93,9 @@ theme/assets/
   cft-fun.js          window.CFTFun.attach(G, api) -> G.fun: street life + combat (see below)
   cft-rpg.js          window.CFTRpg.attach(G, api) -> G.rpg: the long game (loot, talents, reputation...)
   cft-hero.js         window.CFTHero.attach(G, api) -> G.hero: the main character update (hype, swagger, outposts, mission blips, borrowed cars)
+  cft-chaos.js        window.CFTChaos.attach(G, api) -> G.chaos: the chaos update (decor toys, mayhem, ranged, flying, the Dex)
+  cft-camp.js         window.CFTCamp.attach(G, api) -> G.camp: the campaign update (opening, crazy list, mission cap, ammo, powers, fire,
+                      storms, MEGA figments, secrets, bouncy-world hooks, HUD counts)
   cft-debug.js        window.CFTDebug.attach(G) -> G.debug: the play-test panel (?debug=1 only)
   cft-ui.js           window.CFTUI.create(G, root) -> U: HUD, feed, banners, dialogue, U.choose, phone + 12 apps, panels, minigames, start screen
   app.css             all styles; the game's are the `/* ===== play.html =====` block (.cft-*)
@@ -453,6 +456,82 @@ the sky), and silly-but-kind humour.
 - **Not verified on a real GPU/phone:** frame rate with the decor layer (thousands of instanced pieces; small ones only
   within 140 m), the critters and the sky. If it stutters: raise the `d +=` step in layDecor (pavements), the `AREA_DECOR`
   rates, lower the `D.TUNE.chaos` counts, or drop bunting (`flag`).
+
+## The campaign update (cft-camp.js + HUD redesign + bouncy world, 2026-11-18)
+
+The user: "leave little secrets around town: analyse the map and find where there are tight locations between buildings, so
+nosy people can get them. Redesign the HUD completely; add ability to change map size. Ranged attacks limited in quantity,
+run around town to get more. Mega monsters bigger than buildings, hard to kill, weak spots temporarily exposed, scaled to
+your level, gear helps. A campaign: first 5 minutes a countdown, immortal, every monster chases you, complete chaos; then
+next to home, peaceful, 1 mission, then 3, never more than 5 on the map; the world starts calm and every mission adds a
+crazy thing. Everything jumpable and bouncy. Fire and extinguishers. Water powers and lightning powers."
+- **cft-camp.js** (`G.camp`, attached after G.chaos; api {bump, bumpTo, spawnPickup, setBusy, travel, setState}); data
+  `D.CAMPAIGN` (INTRO_SECS, CAP, WILD = the crazy list, MEGA, SECRET_LOOT, NOTES, PANIC), knobs `D.TUNE.camp`, pickups
+  `ammo` / `water` / `volt` / `foam` (`camp: true` -> `G.camp.collect`); state `save.camp` {intro 'todo'|'run'|'ending'|'done',
+  left, ammo, water, volt, foam, secrets {id: day}, shown [], seen, megaT}. **Only new games get `camp.intro = 'todo'`**
+  (U.onReady); `st()` creates a missing camp as `{intro: 'done', veteran: true}`: older saves never see the opening and keep the whole crazy world (`allow` is always true for them; the mission cap still applies).
+- **The crazy list:** `G.allow(id)` (cft-game.js) = `G.camp.allow`: true in the opening, or when the WILD index < number of
+  finished story/side missions (`tier`), or a mission counts it (`fires_out` -> fire, `megas` -> mega). Gates: cft-chaos
+  critters/brainrot (`critterTick`), toys (`toyTick`), chatter, sky; cft-fun night/day spawns, shooters/flyers out of the pool,
+  champions, events (`updateEvent`), chaos events (pool); cft-hero outposts; cft-rpg rares; camp fire/storms/mega. Guardians,
+  King Blob, folk and rivals are not gated. `tierTick` banners each newly switched-on thing (old saves: quietly).
+- **The mission cap:** `G.openMissions()` -> `G.camp.capOpen(all)`: story/side missions only, cap `D.CAMPAIGN.CAP[min(tier, 2)]`
+  minus active ones; `save.camp.shown` keeps the chosen ones sticky; ordered by `D.MISSIONS`. Odd jobs pass through. The
+  opening shows none.
+- **`G.storyOn()`** replaces the "c1-couch done" check (`onStory`) in cft-fun / cft-chaos / cft-hero: also true in the opening.
+- **The opening:** `startWorld` calls `G.camp.startIntro()` when `introPending()` (the harness URL `nointro=1` skips it):
+  `G.travel(spot 220-360 m from home, message)`, clock 21.8, `cft-panic` class, the countdown `.cft-intro`, a storm for the
+  whole opening. `introTick`: figments with `{aggro: 999, event, introFoe: true}` (14 / low 8), champion packs, King Blob, a
+  MEGA at ~75 s (one third health, no rewards), an event every 22 s, fires, panic ticker lines. `F.hurt` returns 0 while
+  `G.camp.immortal()` (`K.shrug` pops IMMORTAL!). Ammo and powers are free (∞). `endIntro`: clears everything, travels home,
+  clock 8, banner, then `U.help(true)`. A reload mid-opening resumes it (with the time left).
+- **Ammo:** `F.attack` asks `G.camp.useAmmo(w)` for `ranged: 'proj' | 'shot'`; cost `weapon.ammo` (1 by default: heavy
+  launchers 2-4); out = the weapon becomes a melee bonk. Crates: `manageCrates` keeps `ammoCrates` between `crateMin` and
+  `crateMax`; orbs; extinguishers near fires. Kill drops via a `G.hero.event` wrapper. Older test suites shoot for free
+  (`bypass()` = CFT_TEST without `campaign`; `CFT_TEST.ammo` turns ammo on).
+- **Powers:** `G.camp.power(kind, down)`: keys 1 / 2 / 3 (held), hotbar `[data-pw]`. `aimDir` (camera when captured, else
+  facing nudged to a target). Water `waterBlast` (cone: `m.wet`, knock, douse fires, peds react); lightning `zap` (sky bolt =
+  additive box segments `bolt()`, chain `voltChain`, ×`wetMul` on wet, mega heart first, a wet mega short-circuits = dizzy,
+  ground strike smashes and may start a fire); extinguisher `sprayTick` (foam per second). Lightning is free during storms.
+- **Fire:** `K.spawnFire(x, z, size)` (merges within 1.8 m; cap `fireMax`), `fireTick` (grows, flickers, spreads when fire is
+  on, burns props via `F.smashProp`, hits figments, hurts you every 0.5 s), `douse` (counter `fires_out`, XP). Random fires
+  every `fireEvery` s; `W.onWreckFire` (cft-world hitProp) turns car wrecks into real fires.
+- **Storms:** `startStorm(secs)` / `stormTick`: a yellow ring tightens for 1.1 s, then a bolt (`U.flash`); 22% aim where you
+  are (keep moving). `.cft-stormfx` = CSS rain.
+- **MEGA figments:** `K.spawnMega(x, z, def)`: `W.monster(kind)` at `def.size` (h = model h × size, 15-27 m), a heart group
+  and two labels in the scene. **Health = `megaHits` × (slap 0.5 × 1.6 × your level growth) × `megaWeak`**: the same number of
+  basic hits on the heart at any level; gear/talents/main character mode make it faster. Attack = `megaAtk` × base max
+  health at your level. States: walk (flattens props under it with `W.hitProp(e, 99)`), stomp (red ring 9.5 m at your spot,
+  1.4 s; in the air = JUMPED IT), throw (lobbed boulder + orange ring), breath (fire line for `breath: 'fire'`, else a
+  shockwave ring to jump), dizzy (5.5 s: the heart sits between it and you at 1.5 m height). Hits: `K.meleeHit` (F.attack,
+  melee only), `K.shotHit` (cft-chaos updateShots, before figments), powers. Off the heart = ×`megaArmor`. Kill: coins, 2
+  boss drops, XP, money, counter `megas`, `G.hero.event('kill', {m: {def: {boss: true}}})`. One at a time, spawns 90-140 m
+  away every `megaEvery` s (not within 150 m of home), leaves beyond 480 m. HUD `.cft-boss` (boss bar + hint).
+- **Secrets:** `K.analyse(sub)` (one block per 0.3 s within 260 m, `analysed` WeakSet): every building pair within
+  `secretGap[1]`, sampled every 1.5 m along the first one's walls; the other's nearest wall `secretGap` away and the middle
+  open = a gap (`ux, uz` across it). `reachable` follows the gap along its length (30 m both ways) until it opens onto
+  ground with nothing built 3 m either side (sealed slits / light wells are dropped). Score = tightness ×1.2 + walls (of 8 rays,
+  10 m) ×0.6 + street distance ×0.12; keep enc ≥ 4, > 4 m from a street, best `secretsPerTile` 30 m apart. Id from lat/lon
+  (`q<lat×20000>:<lon×20000>`). `secretTick` places crates (`stashMesh`, visible within `secretSee`) at the 14 nearest;
+  E (`K.interaction`) = `openSecret` (loot table `SECRET_LOOT`, a note, counter `secrets`). Hydrants: E fills water (90 s
+  per hydrant). Measured in the Plateau: 14-16 spots in the loaded blocks, gaps ~1.3 m, walls on ~7.8 of 8 sides, walk-in ~7.6 m.
+- **Bouncy world (cft-world.js updatePlayer):** `collide(pos, R, footY)` skips buildings whose roof is below your feet;
+  `W.roofAt(x, z)` = `b.base + b.h`; standing on roofs; wall jump (in the air, pushed by a wall, jump: vy ×1.55 + push away)
+  and mantle (a roof edge < 1.7 m above, moving); falling onto props (not trees/lamps) bounces (×1.12 per bounce in a row,
+  `player.chain`); hard roof landings bounce; `W.stompHook` (camp: figment heads = STOMP, a mega's head = dizzy). Hooks
+  `W.onPropBounce`, `W.onWallJump`, `W.onMantle`. Counters bounces, bestchain, stomps, walljumps, mantles.
+- **HUD (cft-ui.js markup + `/* ===== the HUD redesign` block at the end of app.css):** `.cft-tl` = `.cft-hcard.cft-me`
+  (level button, name, money, XP) + `.cft-hcard.cft-vitals[data-meters]` (health, energy, mood; cft-hero appends swagger) +
+  `.cft-missions` (`.cft-quest`, `[data-mlist]` from `missionList()`, `[data-mcount]` filled by camp `hud()`); `.cft-tc` (clock,
+  borough, street, chaos's mayhem + fuel); `.cft-tr` minimap `[data-mmwrap][data-size=s|m|l]` with `[data-mmz]` zoom and
+  `[data-mms]` size; `--mm` on `.cft-hud` (`:has`) drives the minimap size and the feed's top; `.cft-hotbar` (`[data-bonk]` +
+  `[data-bonkicon]` + `[data-ammo]`, `[data-pw]` + `[data-pwn]`, `[data-quaff]`); `.cft-br` (E prompt, block, ride, fart,
+  phone, jump). `U.mapSize(sz?)` cycles/sets and saves `settings.mapSize`; `U.applySettings()` at start. Phone portrait
+  (≤ 720 px): two columns (you + missions left, map + clock right), hotbar above the buttons on the right, foe/boss bars low;
+  landscape phones (height ≤ 500): no mission rows, hotbar bottom centre. Phone app 🌀 Campaign (`VIEWS.camp`).
+- **Tests:** `game_test.py --camp` (camptest.js, 54 checks, also last in the full run); pictures `--campshots DIR`.
+- **Not verified on a real device:** frame rate with many fires (each is 5 additive cones) and a MEGA (a 15-27 m model with
+  shadows), touch feel of the hotbar, wall jumps on a phone. If fires stutter: lower `fireMax` / `fireMaxLow`.
 
 ## Recipes
 

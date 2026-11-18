@@ -27,32 +27,55 @@ function create(G, root) {
   <div class="cft">
     <canvas class="cft-canvas"></canvas>
     <div class="cft-hud" hidden>
+      <!-- HUD redesign (2026-11-18): you (top left) · where and when (top centre) · the map (top right) · missions (left)
+           · the hotbar: attack + ammo, water, lightning, extinguisher, heal (bottom centre) · actions (bottom right) -->
       <div class="cft-tl">
-        <div class="cft-chip cft-meter cft-hp" title="Health"><span>❤️</span><div class="cft-bar hp"><i data-hpbar></i></div><b data-hptext></b></div>
-        <div class="cft-chip cft-money" data-money-chip><span>💵</span><b data-money>$0</b></div>
-        <button type="button" class="cft-chip cft-lvl" title="Level: open your Character (talents, charms)"><span class="cft-star">⭐</span><b data-lvl>1</b><div class="cft-bar xp"><s data-restbar></s><i data-xpbar></i></div><i class="cft-pts" data-pts hidden></i></button>
-        <div class="cft-chip cft-meter" title="Energy"><span>⚡</span><div class="cft-bar e"><i data-ebar></i></div></div>
-        <div class="cft-chip cft-meter" title="Happiness"><span data-hface>😊</span><div class="cft-bar h"><i data-hbar></i></div></div>
+        <div class="cft-hcard cft-me">
+          <button type="button" class="cft-lvl" title="Level: open your Character (talents, charms)"><span class="cft-star">⭐</span><b data-lvl>1</b><i class="cft-pts" data-pts hidden></i></button>
+          <div class="cft-me-main">
+            <div class="cft-me-top"><b class="cft-me-name" data-name></b><span class="cft-money" data-money-chip><span>💵</span><b data-money>$0</b></span></div>
+            <div class="cft-bar xp" title="Experience (blue = rested bonus)"><s data-restbar></s><i data-xpbar></i></div>
+          </div>
+        </div>
+        <div class="cft-hcard cft-vitals" data-meters>
+          <div class="cft-meter cft-hp" title="Health"><span>❤️</span><div class="cft-bar hp"><i data-hpbar></i></div><b data-hptext></b></div>
+          <div class="cft-meter" title="Energy"><span>⚡</span><div class="cft-bar e"><i data-ebar></i></div></div>
+          <div class="cft-meter" title="Happiness"><span data-hface>😊</span><div class="cft-bar h"><i data-hbar></i></div></div>
+        </div>
+        <div class="cft-missions">
+          <button class="cft-quest" data-quest type="button">
+            <span class="cft-qarrow"><svg viewBox="0 0 24 24" data-qarrow><path d="M12 2 20 21 12 16.5 4 21z"/></svg></span>
+            <span class="cft-qtext"><b data-qtitle></b><span data-qstep></span></span><em data-qdist></em>
+          </button>
+          <div class="cft-mlist" data-mlist></div>
+          <button type="button" class="cft-mcount" data-mcount title="Missions on the map, and how weird the city has become (open the Campaign app)"></button>
+        </div>
       </div>
-      <div class="cft-tc"><div class="cft-clock" data-clock></div><div class="cft-boro" data-boro hidden title="The borough you're in: each one has its own colours, banners and road lines"><i></i><b></b></div><div class="cft-street" data-street></div></div>
+      <div class="cft-tc"><div class="cft-where"><div class="cft-clock" data-clock></div><div class="cft-boro" data-boro hidden title="The borough you're in: each one has its own colours, banners and road lines"><i></i><b></b></div></div><div class="cft-street" data-street></div></div>
       <div class="cft-tr">
-        <button class="cft-quest" data-quest type="button">
-          <span class="cft-qarrow"><svg viewBox="0 0 24 24" data-qarrow><path d="M12 2 20 21 12 16.5 4 21z"/></svg></span>
-          <span class="cft-qtext"><b data-qtitle></b><span data-qstep></span></span><em data-qdist></em>
-        </button>
+        <div class="cft-mmwrap" data-mmwrap data-size="m" title="Minimap: click for the big map">
+          <canvas class="cft-mm" data-mm></canvas><span data-mmzoom></span>
+          <button type="button" class="cft-mmb cft-mmz" data-mmz title="Zoom the minimap (M)" aria-label="Zoom the minimap">±</button>
+          <button type="button" class="cft-mmb cft-mms" data-mms title="Map size: small, medium, large (N)" aria-label="Change the map size">⤢</button>
+        </div>
       </div>
       <div class="cft-foe" data-foe hidden><b data-foename></b><div class="cft-bar foe"><i data-foebar></i></div></div>
+      <div class="cft-boss" data-boss hidden><b data-bossname></b><div class="cft-bar boss"><i data-bossbar></i></div><small data-bosshint></small></div>
       <div class="cft-feed" data-feed></div>
-      <div class="cft-mmwrap" data-mmwrap title="Minimap: click to zoom (M)"><canvas class="cft-mm" data-mm></canvas><span data-mmzoom></span></div>
+      <div class="cft-hotbar" data-hotbar>
+        <button type="button" class="cft-hb main" data-bonk title="Attack (F, or click with the mouse captured)" aria-label="Attack"><span data-bonkicon>🖐️</span><em data-ammo></em><kbd>F</kbd></button>
+        <button type="button" class="cft-hb water" data-pw="water" title="Water power (1): soaks and knocks back figments, puts out fires. Refill: water orbs, hydrants (E)" aria-label="Water power"><span>💧</span><em data-pwn="water"></em><kbd>1</kbd></button>
+        <button type="button" class="cft-hb volt" data-pw="volt" title="Lightning power (2): zaps and chains between figments, double on wet ones. Refill: lightning orbs, storms" aria-label="Lightning power"><span>🌩️</span><em data-pwn="volt"></em><kbd>2</kbd></button>
+        <button type="button" class="cft-hb foam" data-pw="foam" title="Fire extinguisher (hold 3): puts out fires fast. Found near fires" aria-label="Fire extinguisher"><span>🧯</span><em data-pwn="foam"></em><kbd>3</kbd></button>
+        <button type="button" class="cft-hb" data-quaff title="Eat or drink to heal (Q)" aria-label="Heal"><span>🍵</span><kbd>Q</kbd></button>
+      </div>
       <div class="cft-br">
         <button class="cft-act" data-act type="button" hidden><kbd>E</kbd><span data-acttext></span></button>
         <div class="cft-btns">
-          <button type="button" data-quaff title="Eat or drink to heal (Q)" aria-label="Heal">🍵</button>
           <button type="button" data-block title="Block: hold (G or right mouse). Time it just before a hit for a PERFECT PARRY" aria-label="Block">🛡️</button>
-          <button type="button" data-bonk title="Bonk (F)" aria-label="Bonk">🖐️</button>
-          <button type="button" data-ride title="Ride (V)">🛹</button>
-          <button type="button" data-phone title="Phone (P)">📱</button>
-          <button type="button" data-jump class="cft-touch" title="Jump">⤒</button>
+          <button type="button" data-ride title="Ride (V)" aria-label="Ride">🛹</button>
+          <button type="button" data-phone title="Phone (P)" aria-label="Phone">📱</button>
+          <button type="button" data-jump class="cft-touch" title="Jump (wall jump off walls, bounce off everything)" aria-label="Jump">⤒</button>
         </div>
       </div>
       <div class="cft-timer" data-timer hidden></div>
@@ -412,9 +435,9 @@ function create(G, root) {
     const t = shell.classList.contains('touch');
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
-      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone (👕 Wardrobe: what you wear)</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things)</div><div><kbd>G</kbd> or right mouse, held: block (time it for a PERFECT PARRY)</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>B</kbd> toot (yes, really)</div><div><kbd>Space</kbd> held in the air: jetpack / glide</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>M</kbd> minimap zoom · <kbd>Esc</kbd> pause</div>') +
-      '</div><p class="muted">Watch for the red <b>❗</b> over a figment: it is about to strike. When its ring turns gold, block. Big gold <b>letters</b> on the map are people with missions; E next to a parked car borrows it. The <b>gold arrow</b> over your head always points to your current goal. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
+      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone (👕 Wardrobe: what you wear)</div><div><kbd>💧 🌩️ 🧯</kbd> water, lightning, extinguisher (hold)</div><div><kbd>⤒</kbd> jump: off walls, onto roofs, bounce off everything</div>'
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things)</div><div><kbd>G</kbd> or right mouse, held: block (time it for a PERFECT PARRY)</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>B</kbd> toot (yes, really)</div><div><kbd>Space</kbd> held in the air: jetpack / glide</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>1</kbd> water power · <kbd>2</kbd> lightning · <kbd>3</kbd> held: extinguisher</div><div><kbd>Space</kbd> at a wall in the air: wall jump; benches, bins and heads are bouncy</div><div><kbd>M</kbd> minimap zoom · <kbd>N</kbd> map size · <kbd>Esc</kbd> pause</div>') +
+      '</div><p class="muted">Watch for the red <b>❗</b> over a figment: it is about to strike. When its ring turns gold, block. Big gold <b>letters</b> on the map are people with missions; E next to a parked car borrows it. The <b>gold arrow</b> over your head always points to your current goal. Ranged weapons need ammo 🎯 (crates around town); nosy people find ✨ secrets in the tight gaps between buildings. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
     ov.el.querySelector('[data-letsgo]').onclick = e => { e.stopPropagation(); ov.close(); if (G.W && !t) G.W.lock(); };
@@ -639,6 +662,7 @@ function create(G, root) {
       const s = save(); if (!s) return;
       const W = G.W;
       setText('money', '[data-money]', G.fmt$(s.money));
+      setText('name', '[data-name]', s.name || 'You');
       const lv = G.level(), a = G.xpAt(lv), b = G.xpAt(lv + 1);
       setText('lvl', '[data-lvl]', String(lv));
       $('[data-xpbar]').style.width = Math.round((s.xp - a) / (b - a) * 100) + '%';
@@ -673,7 +697,8 @@ function create(G, root) {
         $('[data-ride]').textContent = s.equip.ride ? D.ITEMS[s.equip.ride].e : '🚶';
         if (G.rpg) { const bd = G.rpg.badge(); setText('pts', '[data-pts]', bd ? '✨' + bd : ''); $('[data-pts]').hidden = !bd; }
         const lw = G.rpg && G.rpg.weapon();
-        setText('bonk', '[data-bonk]', lw ? lw.e : s.equip.weapon && D.ITEMS[s.equip.weapon] ? D.ITEMS[s.equip.weapon].e : '🖐️');
+        setText('bonk', '[data-bonkicon]', lw ? lw.e : s.equip.weapon && D.ITEMS[s.equip.weapon] ? D.ITEMS[s.equip.weapon].e : '🖐️');
+        missionList(id);
       }
       const goal = G.rt.goal;
       if (goal) {
@@ -718,6 +743,28 @@ function create(G, root) {
     G.W.drawMinimap(mm, { radius: mmRadius, markers: d.markers, rects: d.rects });
   }
   function toggleZoom() { mmRadius = mmRadius === 150 ? 380 : mmRadius === 380 ? 70 : 150; $('[data-mmzoom]').textContent = mmRadius === 150 ? '' : mmRadius + ' m'; }
+  // map size (2026-11-18): small / medium / large, saved in settings.mapSize (N, the ⤢ button, Settings)
+  const MAP_SIZES = ['s', 'm', 'l'], MAP_NAMES = { s: 'small', m: 'medium', l: 'large' };
+  U.mapSize = function (sz) {
+    const s = save(), w = $('[data-mmwrap]');
+    if (!sz) sz = MAP_SIZES[(MAP_SIZES.indexOf((s && s.settings.mapSize) || 'm') + 1) % 3];
+    if (s) { s.settings.mapSize = sz; G.dirty(); }
+    w.dataset.size = sz;
+    requestAnimationFrame(() => { sizeMinimap(); drawMinimap(); });
+    return sz;
+  };
+  // the other missions on the map (up to 4), under the tracked one: letter, title, distance. Click = track it / go there.
+  function missionList(tracked) {
+    const W = G.W, p = W.player.pos, el = $('[data-mlist]');
+    const rows = [];
+    for (const id of G.activeMissions()) if (id !== tracked && G.MISSION[id]) { const m = G.getM(id); rows.push({ id, act: 1, t: m.title, sub: G.stepText(id), who: m.giver }); }
+    for (const id of G.openMissions()) { const m = G.getM(id); if (!G.MISSION[id]) continue; const sp = G.spotOf(m.giver, m.at), q = sp ? G.xz(sp) : null; rows.push({ id, act: 0, t: m.title, sub: D.CAST[m.giver].n, who: m.giver, d: q ? Math.hypot(q.x - p.x, q.z - p.z) : null }); }
+    const key = rows.slice(0, 4).map(r => r.id + (r.d != null ? Math.round(r.d / 25) : '')).join('|') + rows.length;
+    if (el.dataset.k === key) return;
+    el.dataset.k = key;
+    el.innerHTML = rows.slice(0, 4).map(r => '<button type="button" class="cft-mrow' + (r.act ? ' act' : '') + '" data-mid="' + r.id + '"><i>' + (G.hero ? esc(G.hero.letterOf({ who: r.who })) : '!') + '</i><span><b>' + esc(r.t) + '</b><small>' + esc(r.sub) + '</small></span>' + (r.d != null ? '<em>' + fmtDist(r.d) + '</em>' : '') + '</button>').join('') +
+      (rows.length > 4 ? '<button type="button" class="cft-mrow more" data-mid="">+' + (rows.length - 4) + ' more</button>' : '');
+  }
 
   // ------------------------------------------------------------------ input
   function onKey(e) {
@@ -738,13 +785,17 @@ function create(G, root) {
     else if (e.code === 'KeyG') { if (!e.repeat && G.fun) G.fun.setBlock(true); }
     else if (e.code === 'KeyQ') { if (!e.repeat && G.fun) G.fun.quaff(); }
     else if (e.code === 'KeyM') toggleZoom();
+    else if (e.code === 'KeyN') U.mapSize();
+    else if (e.code === 'Digit1' || e.code === 'Numpad1') { if (!e.repeat && G.camp) G.camp.power('water', true); }
+    else if (e.code === 'Digit2' || e.code === 'Numpad2') { if (!e.repeat && G.camp) G.camp.power('volt', true); }
+    else if (e.code === 'Digit3' || e.code === 'Numpad3') { if (!e.repeat && G.camp) G.camp.power('foam', true); }
     else if (e.code === 'KeyH') U.help();
     else if (e.code === 'KeyI') U.wardrobe();
     else if (e.code === 'KeyB') { if (!e.repeat && G.chaos) G.chaos.fart(); }
   }
   document.addEventListener('keydown', onKey);
   const unblock = () => { if (G.fun && G.fun.blocking) G.fun.setBlock(false); };
-  function onKeyUp(e) { if (e.code === 'KeyG') unblock(); }
+  function onKeyUp(e) { if (e.code === 'KeyG') unblock(); if ((e.code === 'Digit3' || e.code === 'Numpad3') && G.camp) G.camp.power('foam', false); }
   document.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', unblock);
   // the right mouse button guards while held (anywhere on the game); the 🛡️ button too (touch: hold it)
@@ -763,7 +814,16 @@ function create(G, root) {
   $('.cft-lvl').addEventListener('click', () => U.phone('hero'));
   // with the mouse captured, a left click bonks
   U.canvas.addEventListener('mousedown', e => { if (e.button === 0 && G.W && G.W.isLocked() && G.state() === 'play' && !stack.length) G.attack(); });
-  $('[data-mmwrap]').addEventListener('click', () => U.phone('map'));
+  $('[data-mmwrap]').addEventListener('click', e => { if (e.target.closest('[data-mmz],[data-mms]')) return; U.phone('map'); });
+  $('[data-mmz]').addEventListener('click', () => toggleZoom());
+  $('[data-mms]').addEventListener('click', () => U.mapSize());
+  $('[data-mcount]').addEventListener('click', () => U.phone('camp'));
+  $('[data-mlist]').addEventListener('click', e => { const r = e.target.closest('[data-mid]'); if (!r) return; const id = r.dataset.mid, s = save(); if (id && s.m[id] && s.m[id].s === 'active') { G.track(id); U.toast('🎯 Tracking: ' + G.getM(id).title); } else U.phone('quests'); });
+  for (const b of shell.querySelectorAll('[data-pw]')) { // the hotbar powers: tap (water, lightning), hold (extinguisher)
+    const k = b.dataset.pw;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); if (G.camp && G.state() === 'play' && !stack.length) G.camp.power(k, true); });
+    if (k === 'foam') for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { if (G.camp) G.camp.power('foam', false); });
+  }
   $('[data-quest]').addEventListener('click', () => U.phone('quests'));
   $('[data-jump]').addEventListener('touchstart', e => { if (G.W) { G.W.input.jump = true; G.W.input.hold = true; } e.preventDefault(); }, { passive: false });
   for (const ev of ['touchend', 'touchcancel']) $('[data-jump]').addEventListener(ev, () => { if (G.W) G.W.input.hold = false; });  // held: jetpack thrust, gliding
@@ -772,7 +832,7 @@ function create(G, root) {
   // ------------------------------------------------------------------ the phone
   const APPS = [
     ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['wardrobe', '👕', 'Wardrobe'], ['hero', '🧙', 'Character'], ['rep', '🤝', 'Reputation'], ['ach', '🏆', 'Achievements'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
-    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['chaos', '🤪', 'Chaos'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
+    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['chaos', '🤪', 'Chaos'], ['camp', '🌀', 'Campaign'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
   ];
   let phoneOv = null, phoneApp = null;
   U.phone = function (app) {
@@ -975,6 +1035,24 @@ function create(G, root) {
       '<div class="cft-sec"><h4>🛩️ Flying</h4><p class="muted small">' + fly + '</p></div>' +
       '<div class="cft-sec"><h4>Chaos so far</h4><div class="cft-grid2">' + v.stats.map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
   };
+  // ---- the campaign (cft-camp.js, 2026-11-18): the crazy list, missions on the map, secrets, ammo and powers, mega figments
+  VIEWS.camp = function () {
+    if (!G.camp) return '<div class="cft-empty">🌀<p>The campaign is still loading.</p></div>';
+    const v = G.camp.summary();
+    const mood = v.tier === 0 ? 'calm' : v.tier < 5 ? 'a bit weird' : v.tier < 10 ? 'properly weird' : v.tier < v.wild.length ? 'absolutely unhinged' : 'FULLY UNHINGED';
+    const head = v.intro !== 'done' ? '<div class="cft-pcard cft-aura"><b>🌀 The opening: ' + Math.floor(v.left / 60) + ':' + String(v.left % 60).padStart(2, '0') + ' left</b><span>You can\'t die. Everything is chasing you. Survive, then go home.</span></div>'
+      : '<div class="cft-pcard"><b>🌀 The city is ' + mood + '</b><span>' + Math.min(v.tier, v.wild.length) + ' of ' + v.wild.length + ' crazy things switched on · up to ' + v.cap + ' missions on the map at once</span>' +
+        '<small>Every mission you finish switches on the next crazy thing below. The map never shows more than ' + v.cap + ' missions, so you always know what to do next.</small></div>';
+    return head + '<div class="cft-sec"><h4>🤪 The crazy list</h4>' + v.wild.map(w => '<div class="cft-li ' + (w.on ? '' : 'locked') + '"><span>' + (w.on ? w.e : w.next ? '⏭️' : '🔒') + '</span><div><b>' + esc(w.n) + (w.next ? ' · after your next mission' : '') + '</b><small>' + esc(w.on || w.next ? w.d : '???') + '</small></div></div>').join('') + '</div>' +
+      '<div class="cft-sec"><h4>🎒 Ammo and powers</h4><div class="cft-grid2">' +
+      '<div class="cft-mini"><small>🎯 Ammo (ranged weapons)</small><b>' + v.ammo + ' / ' + v.max.ammo + '</b></div><div class="cft-mini"><small>💧 Water power (1)</small><b>' + v.water + ' / ' + v.max.water + '</b></div>' +
+      '<div class="cft-mini"><small>🌩️ Lightning (2)</small><b>' + v.volt + ' / ' + v.max.volt + '</b></div><div class="cft-mini"><small>🧯 Extinguisher (hold 3)</small><b>' + v.foam + '%</b></div></div>' +
+      '<p class="muted small">Ammo crates 🎯 sit around town (orange beams): run for them. Water orbs 💧 and lightning orbs 🌩️ float about; hydrants fill your water (E). Extinguishers 🧯 turn up near fires. Wet figments take double from lightning.</p></div>' +
+      '<div class="cft-sec"><h4>Your story so far</h4><div class="cft-grid2">' +
+      '<div class="cft-mini"><small>🔍 Secrets found</small><b>' + v.secrets + '</b></div><div class="cft-mini"><small>🦖 MEGA figments beaten</small><b>' + v.megas + '</b></div>' +
+      '<div class="cft-mini"><small>🔥 Fires put out</small><b>' + v.fires + '</b></div><div class="cft-mini"><small>🦘 Best bounce chain</small><b>' + (save().counters.bestchain || 0) + '</b></div></div>' +
+      '<p class="muted small">Secrets hide in the tight gaps between buildings: alleys you can barely fit into. Squeeze in and look for a ✨. Walls can be wall-jumped and roofs walked on.</p></div>';
+  };
   // ---- the long game (cft-rpg.js): Character, Reputation, Achievements
   const lootRow = (v, it, btns, label) => '<div class="cft-li cft-loot q' + it.q + '"><span>' + it.e + '</span><div><b>' + esc(it.n) + (it.fresh ? ' <i class="cft-new">new</i>' : '') + '</b><small>' + (label || (it.slot && it.slot !== 'charm' ? v.slotNames[it.slot] : 'Charm')) + ' · ' +
     v.quality[it.q].n + ' · item level ' + it.il + ' · ' + esc(v.statLine(it)) + '</small></div>' + (btns || '') + '</div>';
@@ -1035,6 +1113,7 @@ function create(G, root) {
       '<label class="cft-check"><input type="checkbox" data-set="music" ' + (st.music !== false ? 'checked' : '') + '> Music</label>' +
       '<div class="cft-row"><span>Compliments and hype</span><div class="cft-chips">' + [['max', 'Max'], ['some', 'Some'], ['off', 'Off']].map(q => '<button type="button" class="cft-chipb ' + ((st.hype || 'max') === q[0] ? 'on' : '') + '" data-act="hype" data-id="' + q[0] + '">' + q[1] + '</button>').join('') + '</div></div>' +
       '<div class="cft-row"><span>Graphics</span><div class="cft-chips">' + ['auto', 'high', 'low'].map(q => '<button type="button" class="cft-chipb ' + (st.quality === q ? 'on' : '') + '" data-act="quality" data-id="' + q + '">' + q + '</button>').join('') + '</div></div>' +
+      '<div class="cft-row"><span>Map size (N)</span><div class="cft-chips">' + MAP_SIZES.map(q => '<button type="button" class="cft-chipb ' + ((st.mapSize || 'm') === q ? 'on' : '') + '" data-act="mapsize" data-id="' + q + '">' + MAP_NAMES[q] + '</button>').join('') + '</div></div>' +
       '<p class="muted small">Graphics changes apply next time you open the game. "low" turns off shadows and draws fewer people, for phones and older laptops.</p></div>' +
       '<div class="cft-sec"><h4>Home address</h4><p class="muted small">Your world is built around ' + esc(s.home.short || s.home.label) + '. To live somewhere else, start a new life.</p><button type="button" class="cft-btn danger" data-act="reset">Start a new life…</button></div>' +
       '<div class="cft-sec"><p class="muted small">Map data © OpenStreetMap contributors · tiles by OpenFreeMap / OpenMapTiles · hills © <a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener">Mapterhorn</a> (open elevation data, shown 1.5× taller)</p></div>';
@@ -1056,6 +1135,7 @@ function create(G, root) {
     const s = save(), id = b.dataset.id, act = b.dataset.act;
     switch (act) {
       case 'track': G.track(id); U.refreshPhone(); break;
+      case 'mapsize': U.mapSize(id); U.refreshPhone(); break;
       case 'abandon': if (await U.confirm('Drop "' + G.getM(id).title + '"? You can pick it up again later.', 'Drop it')) { G.abandon(id); U.refreshPhone(); } break;
       case 'goto': { const m = G.getM(id), sp = G.spotOf(m.giver, m.at); s.track = null; phoneOv.close(); U.toast('🎯 ' + D.CAST[m.giver].n + ' is at ' + (sp ? sp.name : 'their spot') + '. Follow the arrow!'); G.rt.pinGoal = sp; break; }
       case 'job': G.takeJob(+id); phoneOv.close(); U.toast('💼 Job taken. Follow the arrow!'); break;
@@ -1197,6 +1277,7 @@ function create(G, root) {
   };
 
   U.init = function () { sizeMinimap(); setTimeout(() => U.onReady && U.onReady(), 0); };
+  U.applySettings = function () { const s = save(); if (s && s.settings.mapSize) { $('[data-mmwrap]').dataset.size = s.settings.mapSize; requestAnimationFrame(sizeMinimap); } };
   U.destroy = function () {
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('keyup', onKeyUp);

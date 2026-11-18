@@ -34,7 +34,7 @@ function attach(G, api) {
   const LOW = !W.renderer.shadowMap.enabled;
   const calm = () => !!(window.CFT_TEST && window.CFT_TEST.calm);
   const quiet = () => G.rt.busy || U.isOpen() || G.state() !== 'play';
-  const onStory = () => { const m = save().m['c1-couch']; return !!(m && m.s === 'done'); };
+  const onStory = () => G.storyOn ? G.storyOn() : !!(save().m['c1-couch'] && save().m['c1-couch'].s === 'done');  // also true in the campaign's opening chaos
   const H = {};
   let alive = true, compT = 9, fanT = 70 + Math.random() * 60, giftT = 150 + Math.random() * 90, slowT = 0, outT = 0, blipT = 0, mainT = 0, mainFx = 0, swagUi = 0;
   let killStreak = 0, killT = -99, smashStreak = 0, smashT = -99, mainLight = null, fan = null;
@@ -64,9 +64,9 @@ function attach(G, api) {
   const hypeBox = layer.querySelector('[data-hype]'), tickBox = layer.querySelector('[data-ticker]'), blipBox = layer.querySelector('[data-blips]');
   const tl = shell.querySelector('.cft-tl');
   const swagEl = document.createElement('button');
-  swagEl.type = 'button'; swagEl.className = 'cft-chip cft-meter cft-swag'; swagEl.title = 'Swagger: fill it up for MAIN CHARACTER MODE';
+  swagEl.type = 'button'; swagEl.className = 'cft-meter cft-swag'; swagEl.title = 'Swagger: fill it up for MAIN CHARACTER MODE';
   swagEl.innerHTML = '<span>✨</span><div class="cft-bar sw"><i data-swbar></i></div><b data-swtext></b>';
-  if (tl) tl.insertBefore(swagEl, tl.children[1] || null);
+  { const mt = shell.querySelector('[data-meters]'); if (mt) mt.appendChild(swagEl); else if (tl) tl.insertBefore(swagEl, tl.children[1] || null); }  // the HUD's vitals card (2026-11-18)
   swagEl.addEventListener('click', () => U.toast(H.mainOn() ? '✨ MAIN CHARACTER MODE! Everyone is watching.' : '✨ Swagger ' + Math.round(st().swag) + '/100. Fight, parry, smash and get adored. Full = MAIN CHARACTER MODE.'));
 
   // H.word('UNSTOPPABLE!', 'gold' | 'pink' | 'mint' | 'red' | 'violet', 'a smaller line')
@@ -263,7 +263,7 @@ function attach(G, api) {
   H.energyBonus = () => Math.min(OUT.hearton.cap || 1e9, freed('hearton') * OUT.hearton.bonus);
   H.hpBonus = () => Math.min(OUT.grocery.cap || 1e9, freed('grocery') * OUT.grocery.bonus);
   function outpostTick() {
-    if (!onStory() || calm() || (window.CFT_TEST && window.CFT_TEST.outposts === false)) return;  // older test suites switch them off
+    if (!onStory() || calm() || !G.allow('outposts') || (window.CFT_TEST && window.CFT_TEST.outposts === false)) return;  // older test suites switch them off; the campaign switches them on
     const p = P(), home = G.homeSpot();
     for (const pl of W.places) {
       if (!isOutpost(pl) || st().out[pl.id] || packs.has(pl.id)) continue;
@@ -435,6 +435,23 @@ function attach(G, api) {
     if (!ptrs[i]) { const el = document.createElement('div'); el.className = 'cft-blip'; el.innerHTML = '<i class="cft-blip-arrow"></i><b></b><small></small>'; blipBox.appendChild(el); ptrs[i] = el; }
     return ptrs[i];
   }
+  // the HUD's boxes (cards, minimap, hotbar, buttons), refreshed twice a second; a pointer inside one slides out to its nearest side
+  let hudRects = [], hudRectT = 0;
+  function avoidHud(x, y, w, h) {
+    const now = performance.now();
+    if (now - hudRectT > 500) {
+      hudRectT = now;
+      const sr = shell.getBoundingClientRect();
+      hudRects = ['.cft-tl', '.cft-mmwrap', '.cft-tc', '.cft-hotbar', '.cft-br', '.cft-boss:not([hidden])'].map(q => shell.querySelector(q)).filter(e => e && e.offsetParent !== null)
+        .map(e => { const r = e.getBoundingClientRect(); return { l: r.left - sr.left - 24, t: r.top - sr.top - 24, r: r.right - sr.left + 24, b: r.bottom - sr.top + 30 }; }).filter(r => r.r > r.l && r.b > r.t);
+    }
+    for (let k = 0; k < 2; k++) for (const r of hudRects) {
+      if (x < r.l || x > r.r || y < r.t || y > r.b) continue;
+      const opts = [[r.r, y, r.r - x], [r.l, y, x - r.l], [x, r.b, r.b - y], [x, r.t, y - r.t]].filter(o => o[0] > 20 && o[0] < w - 20 && o[1] > 20 && o[1] < h - 20).sort((a, b) => a[2] - b[2]);
+      if (opts.length) { x = opts[0][0]; y = opts[0][1]; }
+    }
+    return { x, y };
+  }
   function updatePointers() {
     const p = P(), list = [];
     const goal = G.rt.goal;
@@ -455,6 +472,7 @@ function attach(G, api) {
         x = cx + dx * k; y = cy + dy * k;
         el.style.setProperty('--a', Math.atan2(dy, dx) + 'rad');
       }
+      ({ x, y } = avoidHud(x, y, q.w, q.h));   // never on top of the HUD's cards, map or hotbar (2026-11-18)
       el.hidden = false;
       el.className = 'cft-blip' + (o.goal ? ' goal' : '') + (off ? ' off' : '');
       el.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';

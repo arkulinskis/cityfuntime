@@ -1516,11 +1516,11 @@ Object.assign(D.ITEMS, {
   w_confetti: { n: 'Confetti cannon', e: '🎉', p: 280, type: 'gear', slot: 'weapon', weapon: { dmg: 0.7, reach: 15, knock: 3, ranged: 'proj', proj: 'confetti', pellets: 6, spread: 0.35, rate: 0.7, speed: 26, mesh: 'popper', word: 'PARTY!', puff: '🎊' } },
   w_boomerang: { n: 'Banana boomerang', e: '🍌', p: 240, type: 'gear', slot: 'weapon', weapon: { dmg: 1.6, reach: 18, knock: 4, ranged: 'proj', proj: 'boomerang', rate: 0.9, speed: 20, back: true, mesh: 'boomer', word: 'BANANA!', puff: '🍌' } },
   w_whoopee: { n: 'Whoopee grenades', e: '💨', p: 220, type: 'gear', slot: 'weapon', weapon: { dmg: 1.0, reach: 18, knock: 2, stun: 2.5, ranged: 'proj', proj: 'whoopee', rate: 1.0, speed: 15, lob: true, splash: 4.5, mesh: 'grenade', word: 'BRAAAP!', puff: '💨' } },
-  w_tshirt: { n: 'T-shirt cannon', e: '👕', p: 420, type: 'gear', slot: 'weapon', weapon: { dmg: 2.2, reach: 26, knock: 14, ranged: 'proj', proj: 'tshirt', rate: 0.8, speed: 28, mesh: 'cannon', word: 'FREE MERCH!', puff: '👕' } },
-  w_chickenl: { n: 'Rubber chicken launcher', e: '🐔', p: 520, type: 'gear', slot: 'weapon', req: { lvl: 3 }, weapon: { dmg: 1.8, reach: 20, knock: 6, stun: 1.5, ranged: 'proj', proj: 'chicken', bounce: 3, rate: 0.75, speed: 20, lob: true, mesh: 'chickenl', word: 'BAWK!', puff: '🪶' } },
-  w_mustard: { n: 'Mustard sniper', e: '🌭', p: 700, type: 'gear', slot: 'weapon', req: { lvl: 4 }, weapon: { dmg: 4.5, reach: 45, knock: 6, ranged: 'proj', proj: 'mustard', rate: 1.1, speed: 60, pierce: 3, mesh: 'sniper', word: 'MUSTARD!', puff: '🌭' } },
-  w_potato: { n: 'Potato cannon', e: '🥔', p: 600, type: 'gear', slot: 'weapon', weapon: { dmg: 3, reach: 30, knock: 12, stun: 1, ranged: 'proj', proj: 'potato', rate: 1.1, speed: 24, lob: true, splash: 3.5, mesh: 'potato', word: 'KA-SPUD!', puff: '🥔' } },
-  w_gnome: { n: 'Gnome bazooka', e: '🍄', p: 1500, type: 'gear', slot: 'weapon', req: { lvl: 8 }, weapon: { dmg: 6, reach: 35, knock: 16, stun: 1.5, ranged: 'proj', proj: 'gnome', rate: 1.6, speed: 22, lob: true, splash: 5.5, mesh: 'gnomezooka', word: 'GNOMED!', puff: '🍄' } },
+  w_tshirt: { n: 'T-shirt cannon', e: '👕', p: 420, type: 'gear', slot: 'weapon', weapon: { ammo: 2, dmg: 2.2, reach: 26, knock: 14, ranged: 'proj', proj: 'tshirt', rate: 0.8, speed: 28, mesh: 'cannon', word: 'FREE MERCH!', puff: '👕' } },
+  w_chickenl: { n: 'Rubber chicken launcher', e: '🐔', p: 520, type: 'gear', slot: 'weapon', req: { lvl: 3 }, weapon: { ammo: 2, dmg: 1.8, reach: 20, knock: 6, stun: 1.5, ranged: 'proj', proj: 'chicken', bounce: 3, rate: 0.75, speed: 20, lob: true, mesh: 'chickenl', word: 'BAWK!', puff: '🪶' } },
+  w_mustard: { n: 'Mustard sniper', e: '🌭', p: 700, type: 'gear', slot: 'weapon', req: { lvl: 4 }, weapon: { ammo: 2, dmg: 4.5, reach: 45, knock: 6, ranged: 'proj', proj: 'mustard', rate: 1.1, speed: 60, pierce: 3, mesh: 'sniper', word: 'MUSTARD!', puff: '🌭' } },
+  w_potato: { n: 'Potato cannon', e: '🥔', p: 600, type: 'gear', slot: 'weapon', weapon: { ammo: 2, dmg: 3, reach: 30, knock: 12, stun: 1, ranged: 'proj', proj: 'potato', rate: 1.1, speed: 24, lob: true, splash: 3.5, mesh: 'potato', word: 'KA-SPUD!', puff: '🥔' } },
+  w_gnome: { n: 'Gnome bazooka', e: '🍄', p: 1500, type: 'gear', slot: 'weapon', req: { lvl: 8 }, weapon: { ammo: 4, dmg: 6, reach: 35, knock: 16, stun: 1.5, ranged: 'proj', proj: 'gnome', rate: 1.6, speed: 22, lob: true, splash: 5.5, mesh: 'gnomezooka', word: 'GNOMED!', puff: '🍄' } },
   // flying (back slot, so it's a choice against a backpack or a lucky sock): hold Space in the air
   jetpack: { n: 'Bean jetpack', e: '🫘', p: 900, type: 'gear', slot: 'back', req: { lvl: 3 }, fly: 'jet', stats: { style: 1 } },
   glidebrella: { n: 'Glide-brella', e: '☂️', p: 180, type: 'gear', slot: 'back', fly: 'glide', stats: { style: 1 } },
@@ -1645,6 +1645,80 @@ D.RPG.ACH.push(
   { id: 'gnomes', cat: 'Chaos', e: '🍄', n: 'Gnome Liberation Front', d: 'Smash 25 garden gnomes', k: 'smash_gnome', c: 25, pts: 10 },
 );
 
+// ======================================================== the campaign update (2026-11-18, cft-camp.js)
+// The user: "leave little secrets around town in the tight gaps between buildings; redesign the HUD; ranged attacks limited
+// in quantity; mega monsters bigger than buildings with weak spots, scaled to your level; a campaign: 5 immortal minutes of
+// total chaos, then home to a peaceful world, 1 mission, then 3, never more than 5; the world starts calm and every mission
+// adds a crazy thing; everything jumpable and bouncy; fire and extinguishers; water and lightning powers."
+D.CAMPAIGN = {
+  INTRO_SECS: 300,                // the opening: five immortal minutes of everything chasing you
+  CAP: [1, 3, 5],                 // missions on the map after 0 / 1 / 2+ missions done (never more than the last)
+  // the crazy list: every story or side mission you finish switches on the next one (the world starts calm)
+  WILD: [
+    { id: 'critters', e: '🐿️', n: 'Animal neighbours', d: 'Squirrels, ducks, a snail that never stops following you. Snap them for the Dex (E).' },
+    { id: 'toys', e: '🪅', n: 'Street toys', d: 'Piñatas, giant beach balls, sewer launchers, whoopee cushions and tube men.' },
+    { id: 'chatter', e: '💬', n: 'Meme chatter', d: 'Passers-by have started saying things. Six seven.' },
+    { id: 'sky', e: '🎈', n: 'Things in the sky', d: 'Blimps with banners, hot-air balloons, and something that might be a whale.' },
+    { id: 'night', e: '🌙', n: 'Night figments', d: 'After 21:30 the Static takes shape. Bonk them (F), block (G), parry.' },
+    { id: 'events', e: '🎉', n: 'Street events', d: 'Money rain, flash mobs, UFOs, geese. Every minute or two, something.' },
+    { id: 'fire', e: '🔥', n: 'Fires', d: 'Fires start around town and SPREAD. Water power (1), extinguishers (hold 3) or hydrants put them out.' },
+    { id: 'outposts', e: '😈', n: 'Occupied outposts', d: 'Figments took over Tom Hearton\'s and the groceries. Free them for max energy and health.' },
+    { id: 'day', e: '☀️', n: 'Daytime figments', d: 'Now they\'re out by day too (never near home). Champions in packs of three.' },
+    { id: 'shooters', e: '🎯', n: 'Shooters and flyers', d: 'Figments that spit, throw tomatoes and dive-bomb. Parry their shots right back.' },
+    { id: 'brainrot', e: '❓', n: 'Street brainrot', d: 'Rare creatures nobody can explain. Photograph them.' },
+    { id: 'rares', e: '💀', n: 'Named rares', d: 'Unique figments with names and great loot.' },
+    { id: 'storms', e: '⛈️', n: 'Lightning storms', d: 'Thunderstorms roll in. Lightning hits anything that stands still. Your lightning power is free while it lasts.' },
+    { id: 'chaosEvents', e: '🌀', n: 'Reality glitches', d: 'Low gravity, T-pose glitches, cheese meteors, SIX SEVEN.' },
+    { id: 'mega', e: '🦖', n: 'MEGA figments', d: 'Figments taller than buildings. Hit the glowing weak spot when it shows.' },
+  ],
+  // mega figments: a normal model blown up; weak spot = a glowing heart that pops out after a stomp
+  MEGA: [
+    { id: 'honk', kind: 'goose', size: 13, n: 'Honkzilla', e: '🪿', breath: 'honk', line: 'HONK. (The windows rattle.)' },
+    { id: 'wobble', kind: 'slime', size: 15, n: 'The Wobble Mountain', e: '🟢', breath: 'slime', line: 'Bloop. (A whole street wobbles.)' },
+    { id: 'titan', kind: 'brute', size: 10, n: 'The Construction Titan', e: '🧱', breath: 'fire', line: 'ROAD WORK AHEAD. FOREVER.' },
+    { id: 'wyrm', kind: 'worm', size: 12, n: 'The Pothole Wyrm', e: '🪱', breath: 'fire', line: 'Every pothole is a little bit me.' },
+    { id: 'cart', kind: 'cart', size: 12, n: 'Shopping Cart Colossus', e: '🛒', breath: 'honk', line: 'One wobbly wheel. FOREVER.' },
+    { id: 'gargoyle', kind: 'gargoyle', size: 11, n: 'The Cathedral Gargoyle', e: '🗿', breath: 'fire', line: 'I have watched this city for three hundred years. It is LOUD.' },
+  ],
+  // what a secret stash in a tight gap between buildings can hold (weights), and notes people left there
+  SECRET_LOOT: [['money', 30], ['chest', 18], ['ammo', 16], ['powers', 14], ['sticker', 8], ['xp', 14]],
+  NOTES: [
+    'A note, carved into the brick: "the pigeons are organizing."', 'A note: "If you found this, you are nosy. Respect."',
+    'A tiny painting of this exact alley. Signed "a cat".', 'A note: "Rent is too high. — the raccoons"', 'Someone\'s grandma\'s cookie recipe. Too much butter. Perfect.',
+    'A note: "I hid here during the goose incident of last summer."', 'A love letter to a bike that was stolen in 2009.', 'A note: "Six seven." Just that.',
+    'A map of every good bench in the neighbourhood.', 'A note: "Dear finder, you have excellent instincts and questionable hobbies."',
+    'A polaroid of a squirrel wearing a tiny hat.', 'A note: "The gap between buildings is where the city keeps its secrets."',
+  ],
+  PANIC: ['WHY IS EVERYTHING CHASING ME', 'is this... normal??', 'I CAN\'T DIE?? OKAY THEN', 'RUN. NO WAIT. FIGHT. NO, RUN!', 'the goose has friends now',
+    'I just moved here!!', 'nothing can hurt you. GO WILD.', 'is that building... walking??', 'the sky is ON FIRE', 'zero stars on the welcome wagon'],
+};
+D.PICKUPS.ammo = { e: '🎯', n: 'Ammo crate', bg: '#ffb26b', w: 0, camp: true, beam: true };
+D.PICKUPS.water = { e: '💧', n: 'Water orb', bg: '#9fdcff', w: 0, camp: true };
+D.PICKUPS.volt = { e: '🌩️', n: 'Lightning orb', bg: '#fff07a', w: 0, camp: true };
+D.PICKUPS.foam = { e: '🧯', n: 'Fire extinguisher', bg: '#ff9a8a', w: 0, camp: true, beam: true };
+D.RPG.ACH.push(
+  { id: 'nosy3', cat: 'Campaign', e: '🔍', n: 'A Bit Nosy', d: 'Find 3 secrets in the tight gaps between buildings', k: 'secrets', c: 3, pts: 10 },
+  { id: 'nosy15', cat: 'Campaign', e: '🕵️', n: 'Professionally Nosy', d: 'Find 15 secrets', k: 'secrets', c: 15, pts: 25, title: 'the Nosy Neighbour' },
+  { id: 'fires10', cat: 'Campaign', e: '🧯', n: 'Hero of the Hydrant', d: 'Put out 10 fires', k: 'fires_out', c: 10, pts: 10 },
+  { id: 'mega1', cat: 'Campaign', e: '🦖', n: 'Kaiju Hour', d: 'Beat a MEGA figment', k: 'megas', c: 1, pts: 25 },
+  { id: 'mega5', cat: 'Campaign', e: '🏙️', n: 'Bigger Than Buildings', d: 'Beat 5 MEGA figments', k: 'megas', c: 5, pts: 50, title: 'the Kaiju Whisperer' },
+  { id: 'zaps', cat: 'Campaign', e: '⚡', n: 'Unlimited Power (Limited)', d: 'Hit 50 things with lightning', k: 'zaps', c: 50, pts: 10 },
+  { id: 'walls', cat: 'Campaign', e: '🧗', n: 'Parkour!', d: 'Wall-jump 25 times', k: 'walljumps', c: 25, pts: 10 },
+  { id: 'chain5', cat: 'Campaign', e: '🦘', n: 'Boing Boing Boing', d: 'Bounce 5 times in a row without touching the ground', k: 'bestchain', c: 5, pts: 10 },
+);
+S('s-nosy', 'Nosy Parker', 'max', 'home', { m: ['c1-couch'] }, ['Max: Okay, so. Between the buildings there are these tiny gaps. Alleys you can barely fit in.',
+  'Max: People hide things there. Notes. Cash. Weird little treasures. Go be nosy. Find three.'],
+  [{ do: 'count', key: 'secrets', n: 3, text: 'Find 3 secrets hidden in the tight gaps between buildings (squeeze in and look for a ✨)' }],
+  ['Max: You found a note about the pigeons? I KNEW IT.'], { money: 120, xp: 260, stats: { smarts: 1 }, rel: { max: 8 } });
+S('s-firefighter', 'Smoke Signals', 'max', 'home', { m: ['c1-couch'], lvl: 3 }, ['Max: Something is burning. Again. This city, I swear.',
+  'Max: Grab a fire extinguisher 🧯 (they turn up near fires) or use your water power (1). Put out three fires before they spread.'],
+  [{ do: 'count', key: 'fires_out', n: 3, text: 'Put out 3 fires: water power (1), an extinguisher (hold 3) or splash them from a hydrant' }],
+  ['Max: You smell like a campfire and a hero. Mostly campfire.'], { money: 220, xp: 420, stats: { fit: 1, cred: 1 }, rel: { max: 8 } });
+S('s-kaiju', 'Kaiju Hour', 'max', 'home', { m: ['s-firefighter'], lvl: 5 }, ['Max: Don\'t panic. But there is a figment the size of an office tower walking down the street.',
+  'Max: Big things have a weak spot. When it stomps and gets dizzy, a glowing heart pops out. HIT THAT. Jump over the shockwave.'],
+  [{ do: 'count', key: 'megas', n: 1, text: 'Beat a MEGA figment: jump its stomp, then hit the glowing weak spot while it\'s dizzy' }],
+  ['Max: You... you beat a building. A building with a FACE. I need to sit down.'], { money: 600, xp: 1200, stats: { fit: 2, cred: 2 }, rel: { max: 12 } });
+
 // ======================================================== D.TUNE: the knobs (2026-11-17)
 // Every balance number a play-test note is likely to touch lives here: change it here, not in the engine files.
 // (Speeds of you and your rides: D.WALK / D.VEHICLES above. Prices: D.ITEMS. Monster stats: D.MONSTERS.)
@@ -1703,6 +1777,19 @@ D.TUNE = {
     enemyShots: 1,                // enemy projectile damage multiplier
   },
   world: { peds: 44, pedsLow: 22, cars: 20, carsLow: 9 },   // people and traffic around you (cft-world.js)
+  camp: {                         // cft-camp.js (2026-11-18): the campaign, secrets, ammo, powers, fire, storms, mega figments
+    introFoes: 14, introFoesLow: 8,   // figments chasing you at once in the opening five minutes
+    ammoStart: 20, ammoMax: 60, ammoCrate: 12,   // shots for ranged weapons (heavy ones cost more: weapon.ammo)
+    ammoCrates: 6, crateMin: 70, crateMax: 320,  // ammo crates kept around you, between these distances (so you run for them)
+    waterMax: 30, voltMax: 20, foamMax: 100,     // power charges (foam = seconds x 10 of extinguisher spray)
+    waterStart: 10, voltStart: 4, waterOrb: 6, voltOrb: 4, foamPick: 100, hydrant: 10,   // starting charges, orb / pickup / hydrant refills
+    orbs: 5,                      // water + lightning orbs kept around you
+    waterRange: 14, waterKnock: 14, voltRange: 24, voltDmg: 3.2, voltChain: 3, wetMul: 2.5,   // powers (dmg x your level growth)
+    fireMax: 28, fireMaxLow: 14, fireSpread: [2.5, 5], fireHurt: 6, fireEvery: [70, 140],   // fires at once, seconds between spreads, damage/s, random fires (when on)
+    stormEvery: [240, 420], stormSecs: 45, strikeEvery: [1.6, 3.2],   // lightning storms
+    megaEvery: [420, 720], megaHits: 36, megaWeak: 3, megaArmor: 0.15, megaAtk: 0.17, megaSpeed: 3.4,   // mega: hits of a basic weapon on the weak spot to kill, damage x on it, x off it, hit = share of base health
+    secretsPerTile: 2, secretSee: 38, secretGap: [1.0, 4.2],   // secrets: best spots per block, metres you can see one from, gap widths that count as tight
+  },
 };
 D.COMBAT = D.TUNE.combat;
 

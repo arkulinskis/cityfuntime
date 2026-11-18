@@ -202,6 +202,46 @@ Goose Game, combo ranks like Tony Hawk and Devil May Cry):
   Researcher, The Brainrot Thesis, Beans of Glory, Absolutely Unhinged) and twelve achievements (titles: the Aura Farmer,
   the Unhinged, the Brainrot Professor, the Sixty-Seven).
 
+**The campaign update (2026-11-18):** "secrets in the tight gaps between buildings, a redesigned HUD with a map size, limited
+ranged attacks, mega monsters, a campaign that starts in chaos and then calms down, everything jumpable and bouncy, fire,
+extinguishers, water and lightning powers".
+- **The opening:** a new game starts with five minutes on a countdown, a few streets from home, where you **can't die** and
+  every figment in town chases you: champions, King Blob, a MEGA figment, fires, a lightning storm, street events one after
+  another. When the clock hits zero everything stops, you're standing next to your home, it's a calm morning, and Max is
+  waiting with one mission.
+- **Missions, a few at a time:** one mission on the map at first, three after it, and never more than five (open + active).
+- **The crazy list:** the world starts calm. Every story or side mission you finish switches on the next crazy thing, in
+  order: animal neighbours, street toys, meme chatter, things in the sky, night figments, street events, fires, occupied
+  outposts, daytime figments, shooters and flyers, street brainrot, named rares, lightning storms, reality glitches, MEGA
+  figments. A banner says what just changed; phone → 🌀 Campaign shows the list. Games started before this update keep their whole crazy world (and skip the opening).
+- **Secrets:** the game reads every block's building outlines and finds the tightest gaps between buildings (1-4 m wide,
+  walled in on most sides, away from the street, but leading out to open ground so you can walk in). The best one or two per
+  block hide a little crate with a ✨: coins, gear, ammo, powers, a sticker or XP, and always a note someone left there.
+  Each secret is found once, ever.
+- **Ammo:** ranged weapons use ammo (heavy ones more). Ammo crates (orange beams) wait 70-320 m away, so you run around town
+  for them; figments and secrets drop some. Out of ammo, you bonk with the launcher.
+- **Powers:** 💧 water (1): soaks and knocks figments back, puts out fires; 🌩️ lightning (2): a bolt from the sky that chains
+  between figments, double damage on wet ones, can start fires; 🧯 extinguisher (hold 3): foam for fires. Charges come from
+  orbs around town, hydrants (E fills your water) and storms; extinguishers turn up near fires.
+- **Fire:** fires start around town (barbecues, bins, car wrecks, lightning, a fire-breathing mega) and spread, burn street
+  furniture, toast figments and hurt you if you stand in them. Put them out for XP.
+- **Lightning storms:** rain and a darker sky; lightning strikes figments, things and sometimes where you're standing (a
+  yellow ring: move!). Your lightning power is free while it lasts.
+- **MEGA figments:** Honkzilla, the Wobble Mountain, the Construction Titan, the Pothole Wyrm, the Shopping Cart Colossus and
+  the Cathedral Gargoyle, taller than the buildings, flattening what they step on. Their health is always the same number of
+  hits for your level (gear and talents make it faster). They stomp (red ring: jump!), throw boulders, breathe fire or send
+  shockwaves; after a stomp they're dizzy and a glowing heart pops out: hit that. Water then lightning stuns them, and
+  landing on one's head from a roof does too. Epic loot.
+- **Everything is jumpable and bouncy:** roofs are walkable, walls can be wall-jumped (and a roof edge pulls you up),
+  benches, bins, hydrants and decor bounce you higher with every bounce in a row, landing on a figment's head stomps it.
+- **The new HUD:** you top left (level, name, money, XP; health, energy, mood, swagger), then the missions (the tracked one
+  with its arrow, up to four more with their letters and distance, "missions on the map · how weird the city is"); clock and
+  borough top centre; the minimap top right with zoom (M) and **map size** (N, the ⤢ button, Settings: small / medium /
+  large); a hotbar at the bottom (attack with ammo count, water, lightning, extinguisher, heal); actions bottom right; a boss
+  bar for MEGA figments. Phones get the same pieces packed into two columns.
+- Three new missions (Nosy Parker, Smoke Signals, Kaiju Hour) and eight achievements (titles: the Nosy Neighbour, the
+  Kaiju Whisperer).
+
 **For members:** the same game saved to the server (and still in the browser), the **Life** page (`#life`, home after sign-in):
 level, money, net worth, stats, home, love & family, friends, businesses, blocks, stickers, the current mission and the diary.
 A game played as a guest is kept when you sign up.

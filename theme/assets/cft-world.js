@@ -1722,6 +1722,7 @@ varying float vGL; varying vec2 vGUV;
       if (e.loose) { e.loose.traverse(o => { if (o.isMesh && o.material && o.material.vertexColors) { o.material = MAT.wreck; } }); e.loose.rotation.z = 0.12; e.loose.position.y -= 0.18; }
       else setInstance(e, im => { im.getMatrixAt(e.i, _sm); _sm.decompose(_sp, _sq, _ss); _sq.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.12))); _sp.y -= 0.18; _sm.compose(_sp, _sq, _ss); im.setMatrixAt(e.i, _sm); im.setColorAt(e.i, _c.setHex(WRECK_COL)); });
       fires.push({ x: e.x, z: e.z, t: 0, life: 9 });
+      if (W.onWreckFire) W.onWreckFire(e.x, e.z);  // the campaign's real fire (it spreads; put it out)
       debris(e.x, y + 1.2, e.z, e.k, 14, dir);
     } else {
       setInstance(e, im => { im.getMatrixAt(e.i, _sm); _sm.decompose(_sp, _sq, _ss); _sm.compose(_sp, _sq, ZERO3); im.setMatrixAt(e.i, _sm); });
@@ -2329,7 +2330,8 @@ varying float vGL; varying vec2 vGUV;
   }
 
   // ---------------------------------------------------------------- queries
-  function collide(pos, R) {
+  // footY (the campaign update, 2026-11-18: "everything jumpable"): feet above a building's roof walk over it, not into it
+  function collide(pos, R, footY) {
     R = R || ride.radius;
     let hit = false;
     for (let it = 0; it < 3; it++) {
@@ -2338,6 +2340,7 @@ varying float vGL; varying vec2 vGUV;
       let moved = false;
       for (const b of list) {
         if (pos.x < b.x0 - R || pos.x > b.x1 + R || pos.z < b.z0 - R || pos.z > b.z1 + R) continue;
+        if (footY != null && b.base != null && footY > b.base + b.h - 0.45) continue;
         let inside = false, best = Infinity, bx = 0, bz = 0;
         for (const p of b.rings) {
           const n = p.length / 2;
@@ -2359,6 +2362,19 @@ varying float vGL; varying vec2 vGUV;
     }
     return hit;
   }
+  // The flat roof height of the building at (x, z), or null (open ground / not built yet). Roofs are walkable (campaign update).
+  function roofAt(x, z) {
+    const list = buckets.get(bkey(x, z));
+    if (!list) return null;
+    for (const b of list) {
+      if (b.base == null || x < b.x0 || x > b.x1 || z < b.z0 || z > b.z1) continue;
+      if (inRings(b.rings, x, z)) return b.base + b.h;
+    }
+    return null;
+  }
+  W.roofAt = roofAt;
+  // registered sub-tiles (buildings, roads) within r of (x, z): the campaign's secret finder reads their footprints
+  W.subsNear = (x, z, r) => allSubs.filter(s => s.reg && s.buildings && rectDist(s, x, z) < r);
   function streetAt(x, z) {
     const list = nameBuckets.get(bkey(x, z));
     if (!list) return '';
@@ -3390,7 +3406,24 @@ varying float vGL; varying vec2 vGUV;
       const k = 1 - Math.exp(-(player.grounded ? (ride.mode === 'ride' ? 5.5 : 15) : 3.5) * dt);
       player.vel.x += (tx - player.vel.x) * k; player.vel.z += (tz - player.vel.z) * k;
       player.pos.x += player.vel.x * dt; player.pos.z += player.vel.z * dt;
-      collide(player.pos, ride.radius);
+      const preX = player.pos.x, preZ = player.pos.z;
+      const wallHit = collide(player.pos, ride.radius, player.pos.y);
+      // everything is jumpable (campaign update): a wall you run into in the air can be kicked off (wall jump), and a roof
+      // edge within reach pulls you up (mantle). Roofs are walkable (roofAt below).
+      let wnx = player.pos.x - preX, wnz = player.pos.z - preZ;
+      const wnl = Math.hypot(wnx, wnz);
+      if (wallHit && wnl > 1e-4 && !player.grounded) {
+        wnx /= wnl; wnz /= wnl;
+        const rf = roofAt(player.pos.x - wnx * 0.7, player.pos.z - wnz * 0.7);
+        if (rf != null && rf - player.pos.y < 1.7 && rf - player.pos.y > -0.5 && player.vy > -6 && ctl && (fwdIn || sideIn)) { // mantle onto the roof
+          player.pos.x -= wnx * 0.75; player.pos.z -= wnz * 0.75; player.pos.y = rf + 0.05; player.vy = 2; player.jumps = 1;
+          if (W.onMantle) W.onMantle();
+        } else if (ctl && input.jump && ride.jump > 0) { // wall jump: up and away from the wall, as often as you like
+          player.vy = ride.jump * 1.55; player.vel.x += wnx * 7; player.vel.z += wnz * 7; player.jumps = 1; input.jump = false;
+          W.burst(player.pos.x, player.pos.y + 1, player.pos.z, '💨', 4, { up: 0.5, spread: 1.4, size: 0.5, life: 0.5 });
+          if (W.onWallJump) W.onWallJump();
+        }
+      }
       if (ctl && input.jump && ride.jump > 0) {
         if (player.grounded) { player.vy = ride.jump; player.grounded = false; player.jumps = 1; }
         else if ((player.jumps || 0) < 2) { // a second jump in the air
@@ -3405,7 +3438,29 @@ varying float vGL; varying vec2 vGUV;
       player.vy -= grav * dt;
       player.pos.y += player.vy * dt;
       // stay on the ground going downhill (instead of hopping), land when falling onto it
-      const gy = surfaceAt(player.pos.x, player.pos.z, player.pos.y + 0.6), hs0 = Math.hypot(player.vel.x, player.vel.z);
+      let gy = surfaceAt(player.pos.x, player.pos.z, player.pos.y + 0.6);
+      const hs0 = Math.hypot(player.vel.x, player.vel.z);
+      const roofY = roofAt(player.pos.x, player.pos.z), onRoof = roofY != null && player.pos.y > roofY - 0.6;
+      if (onRoof) gy = Math.max(gy, roofY);
+      // bouncy (campaign update): falling onto a figment's head stomps it, onto a bench / bin / hydrant / gnome... bounces you
+      // higher with every bounce in a row; a hard landing on a roof bounces too. The ground stays solid.
+      if (player.vy < -2 && !player.grounded) {
+        const st = W.stompHook && W.stompHook(player.pos.x, player.pos.y, player.pos.z);
+        if (st) { player.chain = (player.chain || 0) + 1; player.vy = st * Math.min(1.5, 1 + 0.1 * player.chain); player.jumps = 1; }
+        else if (player.pos.y - gy < 1.5 && player.pos.y - gy > 0.25) {
+          const e = W.propNear(player.pos.x, player.pos.z, 0.75);
+          if (e && e.k !== 'tree' && e.k !== 'lamp') {
+            player.chain = (player.chain || 0) + 1;
+            player.vy = Math.max(11.5, -player.vy * 0.8) * Math.min(1.6, 1 + 0.12 * player.chain); player.jumps = 1;
+            W.burst(player.pos.x, player.pos.y, player.pos.z, '⭐', 4, { spread: 2, size: 0.4 });
+            if (W.onPropBounce) W.onPropBounce(e, player.chain);
+          }
+        }
+      }
+      if (onRoof && player.vy < -11 && player.pos.y <= gy) { // a hard landing on a roof: BOING
+        player.chain = (player.chain || 0) + 1; player.vy = -player.vy * 0.55; player.pos.y = gy + 0.05; player.jumps = 1;
+        if (W.onPropBounce) W.onPropBounce({ k: 'roof', x: player.pos.x, z: player.pos.z }, player.chain);
+      }
       // parked cars: walk around them, or land on the roof and bounce
       const pc = carAt(player.pos.x, player.pos.z, 0.3);
       if (pc) {
@@ -3421,7 +3476,7 @@ varying float vGL; varying vec2 vGUV;
       const wasAir = !player.grounded;
       if (player.pos.y <= gy || (player.grounded && player.vy <= 0 && player.pos.y - gy < 0.35 + hs0 * dt * 2)) { player.pos.y = gy; player.vy = 0; player.grounded = true; }
       else player.grounded = false;
-      if (wasAir && player.grounded) { player.jumps = 0; if (player.fell > 0.45) W.burst(player.pos.x, gy + 0.1, player.pos.z, '💨', 3, { up: 0.3, spread: 2, size: 0.45, life: 0.45 }); player.fell = 0; }
+      if (wasAir && player.grounded) { player.jumps = 0; player.chain = 0; if (player.fell > 0.45) W.burst(player.pos.x, gy + 0.1, player.pos.z, '💨', 3, { up: 0.3, spread: 2, size: 0.45, life: 0.45 }); player.fell = 0; }
       if (!player.grounded) player.fell = (player.fell || 0) + dt;
       const tilt = ride.mode === 'ride' && player.grounded ? Math.atan(slopeAlong(-Math.sin(player.face), -Math.cos(player.face))) : 0;
       player.pitch += (tilt - player.pitch) * Math.min(1, dt * 8);

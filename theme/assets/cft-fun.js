@@ -132,7 +132,11 @@ function attach(G, api) {
     const f = facing();
     w.dmg *= 1 + 0.15 * (G.level() - 1);  // you grow stronger with every level (monsters do too)
     if (G.hero) w.dmg *= G.hero.dmgMul();  // main character mode
+    // ranged weapons need ammo (cft-camp.js): crates around town, figment drops, secrets
+    if ((w.ranged === 'proj' || w.ranged === 'shot') && G.camp && !G.camp.useAmmo(w)) { cool = 0.45; return false; }
     if (w.ranged === 'proj' && G.chaos) { cool = w.rate || 0.5; return G.chaos.fire(w); }  // real projectiles (cft-chaos.js)
+    // a MEGA figment's weak spot (or its huge body) in reach (cft-camp.js)
+    if (!w.ranged && G.camp && G.camp.meleeHit(p, f, w, lined)) { cool = 0.42; W.swing(); G.sfx.swing(); return true; }
     cool = w.ranged === 'shot' ? 0.32 : 0.42;
     W.swing();
     G.sfx.swing();
@@ -328,15 +332,16 @@ function attach(G, api) {
     if (slow <= 0 && onStory() && !calm()) {
       // who is out: more at night, a couple by day (never close to home), fewer when you're happy, more when you're not
       const wild = F.monsters.filter(m => !m.event && !m.def.boss && !m.guard).length, mood = s.happy >= 75 ? 0.6 : s.happy < 30 ? 1.4 : 1;
-      const want = Math.round((night ? (LOW ? TM.nightLow : TM.night) : (LOW ? TM.dayLow : TM.day)) * mood);
+      // the campaign switches these on one by one (G.allow): night figments, then daytime ones, then shooters and flyers
+      const want = Math.round((night ? (G.allow('night') ? (LOW ? TM.nightLow : TM.night) : 0) : (G.allow('day') ? (LOW ? TM.dayLow : TM.day) : 0)) * mood);
       if (wild < want && !quiet()) {
         const sp = W.randomWalkSpot(p.x, p.z, 30, 85, (x, z) => Math.hypot(x - home.x, z - home.z) > (night ? 30 : 90));
         if (sp) {
-          const pool = Object.keys(D.MONSTERS).filter(k => D.MONSTERS[k].w > 0 && (night || !D.MONSTERS[k].night));
+          const pool = Object.keys(D.MONSTERS).filter(k => D.MONSTERS[k].w > 0 && (night || !D.MONSTERS[k].night) && (G.allow('shooters') || !(D.MONSTERS[k].ranged || D.MONSTERS[k].fly)));
           let tot = 0; for (const k of pool) tot += D.MONSTERS[k].w;
           let r = Math.random() * tot, kind = pool[0];
           for (const k of pool) { if (r < D.MONSTERS[k].w) { kind = k; break; } r -= D.MONSTERS[k].w; }
-          if (G.level() >= 2 && Math.random() < TM.champChance) { // a champion pack: three, tougher, blue name tags, better pay
+          if (G.level() >= 2 && G.allow('day') && Math.random() < TM.champChance) { // a champion pack: three, tougher, blue name tags, better pay
             for (let i = 0; i < 3; i++) spawnMonster(kind, sp.x + rnd(-2, 2), sp.z + rnd(-2, 2), { champ: true, nightBorn: night });
             U.banner('🔵 Champions nearby', 'Three ' + F.localName(kind) + 's, tougher than usual. Worth it.', 'fail');
           } else spawnMonster(kind, sp.x, sp.z, { nightBorn: night });
@@ -499,6 +504,7 @@ function attach(G, api) {
   F.armor = () => Math.round(G.rpg ? G.rpg.bonus('armor') : 0);
   F.hurt = function (n, src) {
     if (F.dying || !alive || G.debugGod) return 0;  // G.debugGod: the play-test panel's god mode
+    if (G.camp && G.camp.immortal()) { G.camp.shrug(n); return 0; }  // the campaign's opening: you can't be hurt
     const f = fun(), dmg = Math.max(1, n * 100 / (100 + F.armor()));
     f.hp = Math.max(0, hp() - dmg); lastHurt = G.rt.t;
     const p = P();
@@ -621,7 +627,7 @@ function attach(G, api) {
     if (!m) { let bd = 14; for (const q of F.monsters) { const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < bd && !q.dead) { bd = d; m = q; } } }
     U.foe(m ? { name: m.def.n, lvl: m.lvl || 1, pct: Math.max(0, m.hp / (m.mhp || m.hp || 1)), rank: m.guard ? 'guard' : m.def.boss ? 'boss' : m.def.rare ? 'rare' : m.champ ? 'champ' : '' } : null);
   }
-  const onStory = () => { const m = save().m['c1-couch']; return !!(m && m.s === 'done'); };
+  const onStory = () => G.storyOn ? G.storyOn() : !!(save().m['c1-couch'] && save().m['c1-couch'].s === 'done');  // also true in the campaign's opening chaos
 
   // ------------------------------------------------------------------ strangers: hi, jokes, flirting
   // No flirting with someone who looks like a child, nor while your own character looks like one.
@@ -1173,6 +1179,7 @@ function attach(G, api) {
     return true;
   }
   F.startEvent = startEvent;
+  F.endEvent = () => endEvent();
   function endEvent() {
     const ev = F.event; if (!ev) return;
     if (ev.chaos && G.chaos) G.chaos.endEvent(ev);
@@ -1184,14 +1191,14 @@ function attach(G, api) {
   function updateEvent(dt) {
     const s = save(), p = P();
     if (!F.event) {
-      if (quiet() || calm() || !onStory() || G.rt.race || G.rt.chase || F.chasers.length) return;
+      if (quiet() || calm() || !onStory() || !G.allow('events') || G.rt.race || G.rt.chase || F.chasers.length) return;
       eventT -= dt;
       if (eventT > 0) return;
       eventT = 12; // try again soon if nothing could start here
       const night = isNight(), lv = G.level();
       const wantUfo = s.m['s-ufo'] && s.m['s-ufo'].s === 'active' && !(s.counters.ufos > (s.m['s-ufo'].b || 0));
       if (wantUfo && startEvent('ufo')) return;
-      const pool = D.EVENTS.filter(e => (!e.day || !night) && (!e.lvl || lv >= e.lvl) && (!e.chaos || G.chaos));
+      const pool = D.EVENTS.filter(e => (!e.day || !night) && (!e.lvl || lv >= e.lvl) && (!e.chaos || (G.chaos && G.allow('chaosEvents'))));
       let tot = 0; for (const e of pool) tot += e.w;
       let r = Math.random() * tot;
       for (const e of pool) { if (r < e.w) { startEvent(e.id); return; } r -= e.w; }

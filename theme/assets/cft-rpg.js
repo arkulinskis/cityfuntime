@@ -419,7 +419,7 @@ function attach(G, api) {
 
   // ------------------------------------------------------------------ rare monsters
   function rareTick() {
-    if (!G.fun || calm()) return;
+    if (!G.fun || calm() || !G.allow('rares')) return;
     const s = save(), m0 = s.m['c1-couch'];
     if (!m0 || m0.s !== 'done' || W.ride().mode === 'drive') return;
     if (G.fun.monsters.some(m => m.def.rare)) return;

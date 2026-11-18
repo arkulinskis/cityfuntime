@@ -502,7 +502,12 @@ function mount(root, opts) {
   function getM(id) { return MISSION[id] || save.dyn[id]; }
   G.getM = getM;
   G.activeMissions = () => Object.keys(save.m).filter(id => save.m[id].s === 'active' && getM(id));
-  G.openMissions = () => Object.keys(save.m).filter(id => save.m[id].s === 'open' && getM(id));
+  // the campaign (cft-camp.js) keeps the map tidy: 1 mission first, then 3, never more than 5 on the map (open + active)
+  G.openMissions = () => { const all = Object.keys(save.m).filter(id => save.m[id].s === 'open' && getM(id)); return G.camp ? G.camp.capOpen(all) : all; };
+  // the story has started (the first mission is done), or the campaign's opening chaos is running
+  G.storyOn = () => !!((save.m['c1-couch'] && save.m['c1-couch'].s === 'done') || (G.camp && G.camp.inIntro()));
+  // a crazy thing from the campaign's list (D.CAMPAIGN.WILD) is switched on: every finished mission adds one
+  G.allow = f => !G.camp || G.camp.allow(f);
   function refreshAvailability() {
     let added = 0;
     for (const m of D.MISSIONS) if (!save.m[m.id] && reqMet(save, m)) { save.m[m.id] = { s: 'open' }; added++; }
@@ -1079,6 +1084,7 @@ function mount(root, opts) {
     if (pk.xp) { addXp(pk.xp); U.feed(pk.e, '+' + pk.xp + ' XP'); G.sfx.pick(); }
     if (pk.sticker) { addSticker(); G.sfx.pick(); }
     if (pk.happy) addHappy(pk.happy);
+    if (pk.camp && G.camp) G.camp.collect(k);  // ammo crates, water and lightning orbs, extinguishers (cft-camp.js)
     if (!pk.xp) save.xp += 1;
     dirty();
   }
@@ -1840,9 +1846,9 @@ function mount(root, opts) {
     save.money -= fare;
     await travel(xz(st));
   };
-  async function travel(q) {
+  async function travel(q, msg) {
     state = 'loading';
-    U.loading('🚇 Riding the metro...');
+    U.loading(msg || '🚇 Riding the metro...');
     W.teleport(q.x, q.z);
     const t0 = performance.now();
     while (alive) {
@@ -1995,6 +2001,8 @@ function mount(root, opts) {
     for (const f of rt.followers) { if (D.CAST[f.who] && !D.CAST[f.who].animal && Math.hypot(f.obj.position.x - p.x, f.obj.position.z - p.z) < 2.6) { const fw = f.who; return { t: '💬 Talk to ' + D.CAST[fw].n, fn: () => talkTo({ who: fw, open: G.openMissions().filter(id => getM(id).giver === fw), active: G.activeMissions().filter(id => { const s = curStep(id); return s && s.who === fw && s.do === 'talk'; }) }) }; } }
     // a creature to photograph, a porta-potty to hide in, the six-seven crew (cft-chaos.js): after shops, people with
     // missions and cars, so a passing crab never steals E from a shop door
+    const ki = G.camp && G.camp.interaction(p);  // hydrants (water), secrets (cft-camp.js)
+    if (ki) return ki;
     const ci = G.chaos && G.chaos.interaction(p);
     if (ci) return ci;
     // people on the street
@@ -2124,6 +2132,7 @@ function mount(root, opts) {
     if (G.rpg) G.rpg.tick(dt, paused || rt.busy);
     if (G.hero) G.hero.tick(dt, paused || rt.busy);
     if (G.chaos) G.chaos.tick(dt, paused || rt.busy);
+    if (G.camp) G.camp.tick(dt, paused || rt.busy);
     rt.promptTimer -= dt;
     if (rt.promptTimer <= 0) { rt.promptTimer = 0.15; rt.interact = (paused || rt.busy) ? null : findInteraction(); U.prompt(rt.interact ? rt.interact.t : null); }
     // goal beam + arrow
@@ -2208,6 +2217,7 @@ function mount(root, opts) {
     if (window.CFTRpg) G.rpg = window.CFTRpg.attach(G, { spawnPickup });
     if (window.CFTHero) G.hero = window.CFTHero.attach(G, { bump, spawnPickup });
     if (window.CFTChaos && G.fun) G.chaos = window.CFTChaos.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the chaos update (cft-chaos.js)
+    if (window.CFTCamp && G.fun) G.camp = window.CFTCamp.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; }, travel, setState: v => { state = v; } });  // the campaign update (cft-camp.js)
     if (window.CFTDebug) G.debug = window.CFTDebug.attach(G);  // the play-test panel: only with ?debug=1
     // driving into things smashes them (borrowed cars and your own rides alike)
     W.onDriveHit = (e, speed, dir) => { if (G.fun) G.fun.smashProp(e, speed > 9 ? 99 : speed * 0.5, dir, true); };
@@ -2225,8 +2235,11 @@ function mount(root, opts) {
     U.loading(null);
     state = 'play';
     W.resize();
+    if (U.applySettings) U.applySettings();  // the saved map size
     if (off > 1) { save.money += off; U.banner('🧑‍💼 Welcome back!', 'Your managers earned ' + fmt$(off) + ' while you were away.', 'done'); }
-    if (!save.m['c1-couch'] || save.m['c1-couch'].s === 'open') U.help(true);
+    if (save.camp && save.camp.intro === 'todo' && /[?&]nointro=1/.test(location.search)) save.camp.intro = 'done';  // the test harness skips the opening
+    if (G.camp && G.camp.introPending()) G.camp.startIntro();   // a new game: five immortal minutes of chaos first
+    else if (!save.m['c1-couch'] || save.m['c1-couch'].s === 'open') U.help(true);
     else U.banner('☀️ Day ' + save.day, 'Welcome back, ' + save.name + '!', 'day');
     dirty();
   }
@@ -2237,6 +2250,7 @@ function mount(root, opts) {
       const r = await U.startScreen(opts.me);
       if (!r || !alive) return;
       save = G.save = newSave(r);
+      save.camp = { intro: 'todo' };   // only new games get the campaign's opening (old saves start with it done)
       log('Arrived in the city with $20 and a backpack', '🧳');
     }
     startWorld();
@@ -2257,6 +2271,7 @@ function mount(root, opts) {
       if (G.rpg) G.rpg.destroy();
       if (G.hero) G.hero.destroy();
       if (G.chaos) G.chaos.destroy();
+      if (G.camp) G.camp.destroy();
       if (G.debug) G.debug.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();

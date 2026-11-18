@@ -16,7 +16,8 @@ const TARGETS = ['giver', 'who', 'home', 'here', 'addr', 'tall', 'water', 'spot'
 const STICKER_IDS = new Set();
 for (const s of D.STICKER_SETS) for (const [id] of s.items) { if (STICKER_IDS.has(id)) bad.push('duplicate sticker id ' + id); STICKER_IDS.add(id); }
 const DOS = new Set(['go', 'talk', 'collect', 'deliver', 'buy', 'have', 'stat', 'level', 'own', 'pay', 'escort', 'chase', 'race', 'photo', 'visit', 'dance', 'quiz', 'sleep', 'walk', 'chat', 'tag', 'defend', 'rush', 'count']);
-const COUNTERS = new Set(['shots', 'bonk_gull', 'dex', 'airtime', 'hoops', 'rankA', 'rankS', 'rankSS', 'rankSSS', 'farts', 'pinatas', 'launches', 'reflects', 'cushions', 'aura',  // the chaos update
+const COUNTERS = new Set(['secrets', 'fires_out', 'megas', 'zaps', 'walljumps', 'bestchain', 'stomps',  // the campaign update
+  'shots', 'bonk_gull', 'dex', 'airtime', 'hoops', 'rankA', 'rankS', 'rankSS', 'rankSSS', 'farts', 'pinatas', 'launches', 'reflects', 'cushions', 'aura',  // the chaos update
   'bonks', 'helped', 'flirts', 'escapes', 'slides', 'bounces', 'ufos', 'boss', 'sweet', 'crowned', 'weapons', 'pranks', 'dates', 'jokes',
   'blocks', 'parries', 'lib_hearton', 'lib_grocery', 'liberated', 'smash', 'borrowed', 'carsmash', 'maincharacter']);
 const OWN = new Set(['apt', 'biz', 'bizid', 'turf', 'friends', 'kids', 'managers', 'upgrades', 'stickers', 'sets']);
