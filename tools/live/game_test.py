@@ -8,6 +8,8 @@
     python -I tools/live/game_test.py --chaos [OUTDIR]    only chaostest.js (decor, mayhem, ranged weapons + figments, flying, the Dex, toys, events)
     python -I tools/live/game_test.py --camp [OUTDIR]     only camptest.js (HUD + map size, crazy list + mission cap, the opening, ammo, powers, fire, storms, MEGA figments, secrets, bouncy world)
     python -I tools/live/game_test.py --wild [OUTDIR]     only wildtest.js (four-corner HUD, pavement footing, climbing + stamina, umbrella + updrafts, perfect dodge + flurry, air slow-mo, chemistry, rooftop antennas)
+    python -I tools/live/game_test.py --aim [OUTDIR]      only aimtest.js (right-mouse sight, slots 1-4, the web, weapon reach + arcs, gabled roofs, scaling figments, no level cap, rainbow guides, the Dex gallery)
+    python -I tools/live/game_test.py --aimshots [OUTDIR] no tests: the sight on a wall, the web pulling, a 360° swing, a rainbow guide, the Dex gallery
     python -I tools/live/game_test.py --campshots [OUTDIR] no tests: pictures of the campaign update (HUD desktop + phone, the opening, a MEGA figment, fire, a storm, a secret)
     python -I tools/live/game_test.py --chaosshots [OUTDIR] no tests: the chaos update (decor, critters, brainrot, toys, the sky, a jetpack, ranged fights)
     python -I tools/live/game_test.py --boro [OUTDIR]     only borotest.js (borough names, looks, HUD chip, banners, discovery)
@@ -273,10 +275,22 @@ GFX = (
 )
 
 
+# The aim update (2026-11-19): the sight on a wall, the web pulling, a 360° swing, a rainbow guide, the Dex gallery
+AIM_PRE = "const A = G.aim, K = G.camp; s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11.5; window.CFT_TEST.calm = true;"           "const wallSetup = () => { for (const b of W.buildingsNear(p.x, p.z, 200).filter(b => b.base != null && b.h >= 8 && b.area > 150)) { const q = b.p, n = q.length / 2; for (let i = 0, k = n - 1; i < n; k = i++) { const x1 = q[2 * k], z1 = q[2 * k + 1], x2 = q[2 * i], z2 = q[2 * i + 1], L = Math.hypot(x2 - x1, z2 - z1); if (L < 10) continue; const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2; let nx = (z2 - z1) / L, nz = -(x2 - x1) / L; if (W.roofAt(mx + nx * 1.5, mz + nz * 1.5) != null) { nx = -nx; nz = -nz; } let open = true; for (let t = 1.5; t < 17; t += 1) if (W.roofAt(mx + nx * t, mz + nz * t) != null) open = false; if (open) return { mx, mz, nx, nz }; } } return null; };"
+AIMSHOTS = (
+    scene("a1-sight-web", AIM_PRE + "const w = wallSetup(); window.__w = w; W.teleport(w.mx + w.nx * 16, w.mz + w.nz * 16); G.stepSim(10); look(w.mx, w.mz, 7.5, -0.05); A.select('web'); A.setAim(true); G.stepSim(12); A.test.aimTick(); G.ui.hud.frame(1);", 2)
+    + scene("a2-web-pull", AIM_PRE + "A.test.aimTick(); A.fire(true); G.stepSim(9); A.setAim(false); G.rt.slowmo = 30; G.rt.slowK = 0.02;", 0)
+    + scene("a3-swing-360", AIM_PRE + "G.rt.slowmo = 0; W.tether = null; W.player.climb = null; const q = W.randomWalkSpot(0, 0, 40, 200, (x, z, sg) => sg.car && sg.w >= 9) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); G.stepSim(30); s.owned.w_tether = 1; G.wearShop('w_tether'); G.stepSim(60); W.cam.pitch = 0.6; W.cam.dist = W.cam.cur = 9; G.stepSim(3); G.attack(); G.rt.slowmo = 30; G.rt.slowK = 0.01;", 0)
+    + scene("a4-rainbow-guide", AIM_PRE + "G.rt.slowmo = 0; G.stepSim(30); const fx = -Math.sin(W.player.face), fz = -Math.cos(W.player.face); const m = F.spawnMonster('brute', p.x + fx * 34, p.z + fz * 34, { event: 300 }); m.aggro = 0; A.test.guideCd = 0; W.cam.pitch = 0.55; W.cam.dist = W.cam.cur = 11; G.stepSim(26); G.rt.slowmo = 30; G.rt.slowK = 0.03;", 0)
+    + scene("a5-dex", AIM_PRE + "G.rt.slowmo = 0; const ids = CFT_DATA.CHAOS.CRITTERS.slice(0, 5).map(c => c.id).concat([CFT_DATA.CHAOS.BRAINROT[0].id]); s.chaos.dex = {}; ids.forEach((id, i) => s.chaos.dex[id] = i + 1); G.ui.phone('dex');", 2)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
 elif "--campshots" in flags:
     steps = START + CAMPSHOTS
+elif "--aimshots" in flags:
+    steps = START + AIMSHOTS
 elif "--chaosshots" in flags:
     steps = START + CHAOS
 elif "--boroshots" in flags:
@@ -313,6 +327,8 @@ else:
         steps += script("camptest.js", "__campDone", "__campOut", 900000)
     elif "--wild" in flags:
         steps += script("wildtest.js", "__wildDone", "__wildOut", 900000)
+    elif "--aim" in flags:
+        steps += script("aimtest.js", "__aimDone", "__aimOut", 600000)
     else:
         if "--fun" not in flags:
             steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
@@ -325,6 +341,7 @@ else:
             steps += script("chaostest.js", "__chaosDone", "__chaosOut", 600000)
             steps += script("camptest.js", "__campDone", "__campOut", 900000)
             steps += script("wildtest.js", "__wildDone", "__wildOut", 900000)
+            steps += script("aimtest.js", "__aimDone", "__aimOut", 600000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"
@@ -341,13 +358,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

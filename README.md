@@ -264,6 +264,27 @@ extinguishers, water and lightning powers".
   words and compliments, which sit near the top. **No more legs in the ground:** people on pavements stand on them.
 - Mission Signal Boost; achievements Wall Crawler, Mary Poppins Who?, Too Slow, Five Bars, Conductor.
 
+**The aim update (2026-11-19):**
+- **Right mouse = a sight.** Hold it: the camera slides over your shoulder, a crosshair appears and you face where it points.
+  Left click uses the slot you chose with **1–4** (💧 water, 🌩️ lightning, 🧯 extinguisher (hold), 🕸️ web), aimed exactly at
+  the crosshair; let go of the right button and left click bonks again. Blocking is **G** / the 🛡️ button only. Ranged
+  weapons (F) also fire at the crosshair while you aim. On touch, a hotbar button chooses and uses its slot.
+- **The web shooter** 🕸️ (slot 4): the strand sticks to a wall (the sight turns green within 42 m) and reels you in; you cling
+  to the wall (push forward to climb) or flip onto the roof if it caught near the top; Space lets go with a hop. Anything
+  but a wall = "NO WALL!". A figment under the sight gets webbed (stuck for 2 s).
+- **Bonk weapons with very different reach,** drawn as a crescent on every swing (and a gold ring when you pick one up): a
+  frying pan (1.8 m, heavy), selfie stick (4.6 m, narrow poke), garden rake (4 m, wide), giant yo-yo (6.2 m, one target),
+  tetherball on a rope (4.8 m, all round you), and the old ones spread out (pillow wide and short, noodle long, plunger a poke).
+- **Rainbow guides:** when a figment, a MEGA, a weird creature or an animal missing from your Dex comes near, a wave of
+  rainbow chevrons runs along the ground toward it (missions keep the gold arrow).
+- **The Dex gallery** (phone → 📸 Dex): every creature you can snap, your photo of each (also in the Album), what's left and
+  the next reward; animals and creatures you haven't snapped wear a "📸 NEW" tag.
+- **No level cap,** and **figments scale with you:** their health follows your level and part of your weapon power, their
+  hits follow your health and armour, so fights stay a challenge at every level (gear still helps).
+- **Gabled roofs are solid:** you walk on the slope instead of sinking into it.
+- Fixed: a console error ("Cannot read properties of null (reading 'appendChild')") when a banner or dialog arrived after
+  leaving the game.
+
 **For members:** the same game saved to the server (and still in the browser), the **Life** page (`#life`, home after sign-in):
 level, money, net worth, stats, home, love & family, friends, businesses, blocks, stickers, the current mission and the diary.
 A game played as a guest is kept when you sign up.

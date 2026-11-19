@@ -1443,3 +1443,31 @@ anvil-dropzone { display: contents; }
   .cft-intro b { font-size: 1.5rem; }
 }
 @media (prefers-reduced-motion: reduce) { .cft-panic::after, .cft-stormfx, .cft-intro.low b, .cft-timer b.low, .cft-donut.low { animation: none; } }
+
+/* ===== the aim update (2026-11-19, cft-aim.js): the right-mouse sight, the chosen slot, the web, the Dex gallery ===== */
+.cft-sight { position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; pointer-events: none; z-index: 4; display: grid; place-items: center; }
+.cft-sight[hidden] { display: none; }
+.cft-sight > i { position: absolute; inset: 0; border: 2.5px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1.5px rgba(31, 26, 61, .7), inset 0 0 0 1.5px rgba(31, 26, 61, .5); transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) ease; }
+.cft-sight > i::before, .cft-sight > i::after { content: ""; position: absolute; left: 50%; top: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(31, 26, 61, .7); }
+.cft-sight > i::before { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; }
+.cft-sight > i::after { width: 2px; height: 52px; margin: -26px 0 0 -1px; clip-path: polygon(0 0, 100% 0, 100% 22%, 0 22%, 0 78%, 100% 78%, 100% 100%, 0 100%); }
+.cft-sight > b { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); white-space: nowrap; font: 800 .74rem/1 var(--font-body); color: #fff; background: rgba(31, 26, 61, .72); padding: 3px 7px; border-radius: 999px; }
+.cft-sight > b:empty { display: none; }
+.cft-sight.foe > i { border-color: #ff5c5c; transform: scale(.82); } .cft-sight.foe > i::before { background: #ff5c5c; }
+.cft-sight.wall > i { border-color: #35e06a; transform: scale(.9); } .cft-sight.wall > i::before { background: #35e06a; }
+.cft-sight.miss > i { border-color: #b0a9c8; border-style: dashed; }
+.cft-hb.sel { box-shadow: 0 0 0 3px #ffc21f, 3px 3px 0 #1f1a3d; }
+.cft-hb.web { background: #f1f0f6; }
+.cft-aiming .cft-hb.sel { transform: translateY(-3px); }
+.cft-dexhead small { display: block; margin-top: 6px; line-height: 1.4; }
+.cft-dexhead .cft-bar { width: 100%; margin-top: 6px; }
+.cft-dexg { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 9px; margin-top: 10px; }
+.cft-dexp { display: grid; justify-items: center; text-align: center; gap: 3px; padding: 6px; border: 2px dashed #b9b2cf; border-radius: 12px; background: #f6f3ff; color: #8a86a8; min-width: 0; }
+.cft-dexp > img { width: 100%; aspect-ratio: 8 / 5; object-fit: cover; border-radius: 8px; border: 2px solid #1f1a3d; background: #ddd; }
+.cft-dexp > span { display: grid; place-items: center; width: 100%; aspect-ratio: 8 / 5; font-size: 2rem; border-radius: 8px; background: rgba(31, 26, 61, .05); }
+.cft-dexp > b { font: 700 .76rem/1.15 var(--font-body); overflow-wrap: anywhere; }
+.cft-dexp > small { font-size: .72rem; }
+.cft-dexp.got { border-style: solid; border-color: #1f1a3d; background: #fff; color: #1f1a3d; }
+.cft-dexp.got.rare { border-color: #38bdf8; box-shadow: 2px 2px 0 #38bdf8; }
+.cft-dexp.got.legendary { border-color: #e8a317; background: #fff7d6; box-shadow: 2px 2px 0 #e8a317; }
+@media (max-width: 720px) { .cft-hotbar { grid-template-columns: repeat(3, 44px); } }

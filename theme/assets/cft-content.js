@@ -951,16 +951,25 @@ D.KINDS.fortune = { e: '🔮', n: 'Fortune teller', fake: ['Madame Zaza', 'The T
 
 // Weapons are gear for the "weapon" slot. dmg = hit points per bonk, reach in metres, knock = how far things fly,
 // stun = seconds a monster stays dizzy, ranged: 'cone' (a blast in front) or 'shot' (flies until it hits).
+// arc = how wide a swing sweeps (degrees, default 160; 360 = all round you), cd = seconds between swings (default 0.42),
+// hits = most figments one swing hits (default 3). A swing draws its reach and arc (2026-11-19: "I want to see them have
+// different ranges"): short and heavy (pan), long and narrow (yo-yo, selfie stick), wide (pillow, guitar), all round (tetherball).
 Object.assign(D.ITEMS, {
-  w_baguette: { n: 'Stale baguette', e: '🥖', p: 12, type: 'gear', slot: 'weapon', weapon: { dmg: 1, reach: 2.7, knock: 3, mesh: 'baguette', word: 'BONK!' } },
-  w_chicken: { n: 'Rubber chicken', e: '🐔', p: 35, type: 'gear', slot: 'weapon', weapon: { dmg: 1, reach: 2.5, knock: 3, stun: 2.5, mesh: 'chicken', word: 'SQUEAK!' } },
-  w_pillow: { n: 'Feather pillow', e: '🪶', p: 30, type: 'gear', slot: 'weapon', weapon: { dmg: 1, reach: 2.6, knock: 8, mesh: 'pillow', word: 'FLOOF!', puff: '🪶' } },
-  w_noodle: { n: 'Pool noodle', e: '🏖️', p: 45, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 3.6, knock: 4, mesh: 'noodle', word: 'THWAP!' } },
-  w_fish: { n: 'Frozen fish', e: '🐟', p: 60, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 2.6, knock: 4, mesh: 'fish', word: 'SLAP!' } },
-  w_plunger: { n: 'Plunger of destiny', e: '🪠', p: 90, type: 'gear', slot: 'weapon', stats: { cred: 1 }, weapon: { dmg: 2, reach: 2.8, knock: 2, stun: 3, mesh: 'plunger', word: 'SHLOP!' } },
+  w_baguette: { n: 'Stale baguette', e: '🥖', p: 12, type: 'gear', slot: 'weapon', weapon: { dmg: 1, reach: 2.7, arc: 150, knock: 3, mesh: 'baguette', word: 'BONK!' } },
+  w_chicken: { n: 'Rubber chicken', e: '🐔', p: 35, type: 'gear', slot: 'weapon', weapon: { dmg: 1, reach: 2.5, arc: 170, knock: 3, stun: 2.5, mesh: 'chicken', word: 'SQUEAK!' } },
+  w_pillow: { n: 'Feather pillow', e: '🪶', p: 30, type: 'gear', slot: 'weapon', weapon: { dmg: 1, reach: 2.3, arc: 220, knock: 8, mesh: 'pillow', word: 'FLOOF!', puff: '🪶' } },
+  w_noodle: { n: 'Pool noodle', e: '🏖️', p: 45, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 4.0, arc: 120, knock: 4, mesh: 'noodle', word: 'THWAP!' } },
+  w_fish: { n: 'Frozen fish', e: '🐟', p: 60, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 2.2, arc: 140, knock: 4, mesh: 'fish', word: 'SLAP!' } },
+  w_plunger: { n: 'Plunger of destiny', e: '🪠', p: 90, type: 'gear', slot: 'weapon', stats: { cred: 1 }, weapon: { dmg: 2, reach: 3.1, arc: 60, hits: 1, knock: 2, stun: 3, mesh: 'plunger', word: 'SHLOP!' } },
   w_blower: { n: 'Leaf blower', e: '🍃', p: 380, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 9, knock: 11, ranged: 'cone', mesh: 'blower', word: 'WHOOSH!', puff: '🍃' } },
-  w_guitar: { n: 'Smashing guitar', e: '🎸', p: 650, type: 'gear', slot: 'weapon', stats: { cred: 1, style: 1 }, weapon: { dmg: 4, reach: 2.9, knock: 5, mesh: 'guitar', word: 'KERRANG!', puff: '🎵' } },
+  w_guitar: { n: 'Smashing guitar', e: '🎸', p: 650, type: 'gear', slot: 'weapon', stats: { cred: 1, style: 1 }, weapon: { dmg: 4, reach: 3.0, arc: 200, cd: 0.55, knock: 5, mesh: 'guitar', word: 'KERRANG!', puff: '🎵' } },
   w_bubble: { n: 'Bubble blaster', e: '🫧', p: 900, type: 'gear', slot: 'weapon', req: { lvl: 6 }, weapon: { dmg: 3, reach: 18, knock: 4, ranged: 'shot', mesh: 'bubble', word: 'BLOOP!', puff: '🫧' } },
+  // more bonkers with very different reach (2026-11-19)
+  w_pan: { n: 'Cast-iron frying pan', e: '🍳', p: 70, type: 'gear', slot: 'weapon', weapon: { dmg: 3, reach: 1.8, arc: 110, cd: 0.5, knock: 7, stun: 0.8, mesh: 'pan', word: 'BONNNG!' } },
+  w_selfie: { n: 'Selfie stick', e: '🤳', p: 55, type: 'gear', slot: 'weapon', stats: { style: 1 }, weapon: { dmg: 1.3, reach: 4.6, arc: 40, hits: 2, knock: 3, stun: 0.6, mesh: 'selfie', word: 'CLICK!', puff: '✨' } },
+  w_rake: { n: 'Garden rake', e: '🍂', p: 85, type: 'gear', slot: 'weapon', weapon: { dmg: 2, reach: 4.0, arc: 150, cd: 0.5, knock: 5, mesh: 'rake', word: 'SCRAAAPE!', puff: '🍂' } },
+  w_yoyo: { n: 'Giant yo-yo', e: '🪀', p: 140, type: 'gear', slot: 'weapon', weapon: { dmg: 1.8, reach: 6.2, arc: 24, hits: 1, cd: 0.38, knock: 4, stun: 1.2, mesh: 'yoyo', word: 'YO-YO!' } },
+  w_tether: { n: 'Tetherball on a rope', e: '🏐', p: 320, type: 'gear', slot: 'weapon', req: { lvl: 3 }, weapon: { dmg: 1.7, reach: 4.8, arc: 360, cd: 0.6, knock: 9, mesh: 'tether', word: 'WHIRL!' } },
   fakenose: { n: 'Fake nose and glasses', e: '🥸', p: 20, type: 'gear', slot: 'face', stats: { charm: 1, cred: 1 } },
   whoopee: { n: 'Whoopee cushion', e: '🎈', p: 8, type: 'gift', rel: 6 },
   fortune: { n: 'Your fortune', e: '🔮', p: 10, type: 'service', fortune: true },
@@ -972,7 +981,10 @@ D.KINDS.furniture.sells.unshift('w_pillow');
 D.KINDS.grocery.sells.push('w_fish');
 D.KINDS.hardware.sells.push('w_plunger', 'w_blower');
 D.KINDS.music.sells.push('w_guitar');
-D.KINDS.tech.sells.push('w_bubble');
+D.KINDS.tech.sells.push('w_bubble', 'w_selfie');
+D.KINDS.hardware.sells.push('w_pan');
+D.KINDS.flowers.sells.push('w_rake');
+D.KINDS.toys.sells.push('w_yoyo', 'w_tether');
 D.SLAP = { dmg: 0.5, reach: 2.1, knock: 2, mesh: null, word: 'SLAP!' };   // bare hands
 
 // Monsters ("figments": the city's noise taking shape, only you see them). hp, speed (m/s; your sprint beats all of them),
@@ -1347,7 +1359,8 @@ Object.assign(D.RPG, {
   SLOT_NAMES: { weapon: 'Weapon', head: 'Head', body: 'Body', feet: 'Feet', c1: 'Charm', c2: 'Charm', c3: 'Charm' },
   GEAR: {
     weapon: [{ id: 'w_baguette', n: 'Baguette' }, { id: 'w_chicken', n: 'Rubber Chicken' }, { id: 'w_pillow', n: 'Pillow' }, { id: 'w_noodle', n: 'Pool Noodle' },
-      { id: 'w_fish', n: 'Frozen Fish' }, { id: 'w_plunger', n: 'Plunger' }, { id: 'w_guitar', n: 'Guitar' }],
+      { id: 'w_fish', n: 'Frozen Fish' }, { id: 'w_plunger', n: 'Plunger' }, { id: 'w_guitar', n: 'Guitar' },
+      { id: 'w_pan', n: 'Frying Pan' }, { id: 'w_selfie', n: 'Selfie Stick' }, { id: 'w_rake', n: 'Rake' }, { id: 'w_yoyo', n: 'Yo-Yo' }, { id: 'w_tether', n: 'Tetherball' }],
     head: [{ id: 'cap', n: 'Ball Cap', e: '🧢', look: 'hat' }, { id: 'beanie', n: 'Beanie', e: '🧶', look: 'beanie' }, { id: 'helmet', n: 'Bike Helmet', e: '⛑️', look: 'hat' },
       { id: 'bucket', n: 'Bucket Hat', e: '👒', look: 'hat' }, { id: 'hardhat', n: 'Hard Hat', e: '👷', look: 'hat' }],
     body: [{ id: 'hoodie', n: 'Hoodie', e: '🧥', look: {} }, { id: 'denim', n: 'Denim Jacket', e: '🧥', look: { collar: true } }, { id: 'leather', n: 'Leather Jacket', e: '🧥', look: { collar: true } },
@@ -1753,7 +1766,10 @@ D.TUNE = {
     day: 3, dayLow: 2,            // ... by day (never near home)
     champChance: 0.07,            // chance a spawn is a champion pack of three
     aggro: 17,                    // metres at which a figment notices you
-    hpPerLevel: 0.18, atkPerLevel: 0.1,   // growth per monster level
+    hpPerLevel: 0.18, atkPerLevel: 0.1,   // growth per monster level above (or below) yours
+    gearShare: 0.5,               // how much of your weapon + damage bonus figment health follows (0 = none, 1 = all of it)
+    lifeShare: 0.85, armorShare: 0.6,     // how much of your max health / armour their hits follow
+    challenge: 0.03, challengeMax: 0.3,   // extra toughness per level of yours (from level 2), capped
     levelEvery: 400,              // metres from home per extra monster level
     regenDelay: 5, regen: 0.025,  // you heal regen x max health per second, after regenDelay seconds out of a fight
   },
@@ -1797,6 +1813,14 @@ D.TUNE = {
     dodgeWindow: 0.38, flurrySecs: 1.6, flurryHits: 6, slowK: 0.25,   // perfect dodge: seconds before a hit, slow motion, free hits
     arcRange: 4.5, arcHit: 2.6, steamR: 4.5, steamBlind: 3,           // chemistry: metal arcs, steam
     viewCell: 400, viewMinH: 10, giggleR: 10,                          // rooftop antennas (one per 400 m square), secret giggles
+  },
+  aim: {                          // cft-aim.js (2026-11-19): the right-mouse sight, the web, rainbow guides
+    range: 70,                    // metres the sight looks for a figment / wall / ground
+    webRange: 42, webCd: 0.45, webSpeed: 170,   // web: how far it sticks, seconds between shots, how fast the strand flies (m/s)
+    webV0: 9, webAcc: 70, webMax: 30, webLife: 3.2,   // the pull: start speed, speed gained per second, top speed, give up after (s)
+    webStun: 2.2,                 // seconds a webbed figment is stuck
+    guideR: 48, megaR: 260, rotR: 110, critterR: 26,  // how near something is when its rainbow guide runs (figment, MEGA, weird creature, new animal)
+    guideCd: 7, guideMax: 80,     // seconds between ordinary guides (special ones always run), longest trail (m)
   },
   camp: {                         // cft-camp.js (2026-11-18): the campaign, secrets, ammo, powers, fire, storms, mega figments
     introFoes: 14, introFoesLow: 8,   // figments chasing you at once in the opening five minutes

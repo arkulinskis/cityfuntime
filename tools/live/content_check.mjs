@@ -55,7 +55,7 @@ for (const m of D.MISSIONS) {
 for (const k of Object.keys(D.KINDS)) for (const it of D.KINDS[k].sells) if (!D.ITEMS[it]) bad.push('KINDS.' + k + ' sells unknown ' + it);
 for (const [id, it] of Object.entries(D.ITEMS)) if (it.type === 'vehicle' && !D.VEHICLES[id]) bad.push('vehicle without speeds: ' + id);
 // the wacky update: weapons, monsters, made-up shops, signs, events, street folk
-const MESHES = new Set(['baguette', 'chicken', 'pillow', 'noodle', 'fish', 'plunger', 'guitar', 'blower', 'bubble',
+const MESHES = new Set(['baguette', 'chicken', 'pillow', 'noodle', 'fish', 'plunger', 'guitar', 'blower', 'bubble', 'pan', 'selfie', 'rake', 'yoyo', 'tether',
   'straw', 'launcher', 'cannon', 'boomer', 'sniper', 'popper', 'grenade', 'potato', 'chickenl', 'gnomezooka']);  // the chaos update's ranged weapons
 const PROJ = new Set(['spit', 'balloon', 'confetti', 'boomerang', 'whoopee', 'tshirt', 'chicken', 'mustard', 'potato', 'gnome', 'tomato', 'poop', 'lag']);  // cft-chaos.js projMesh
 for (const [id, it] of Object.entries(D.ITEMS)) {

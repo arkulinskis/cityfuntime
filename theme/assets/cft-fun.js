@@ -36,7 +36,7 @@ function attach(G, api) {
   const hype = (ev, o) => { if (G.hero) G.hero.event(ev, o || {}); };
   F.blocking = false; F.blockStart = -99; F.combo = 0; F.counter = 0;
   let lastHitT = -99;
-  let alive = true, cool = 0, slow = 0, propT = 0, eventT = 45 + Math.random() * 25, shopT = 0, rivalCool = 0, weaponOn, lastHurt = -99, foeT = 0, guardT = 0;
+  let alive = true, cool = 0, slow = 0, propT = 0, eventT = 45 + Math.random() * 25, shopT = 0, rivalCool = 0, weaponOn, weaponHeld, lastHurt = -99, foeT = 0, guardT = 0;
   F.guards = new Map();
 
   function fun() {
@@ -108,8 +108,11 @@ function attach(G, api) {
     weaponOn = id;
     const it = D.ITEMS[save().equip.weapon];
     W.setWeapon(!onFoot() ? null : lw ? lw.mesh : it && it.weapon ? it.weapon.mesh : null);
+    // a new weapon in hand shows how far it reaches: a gold ring on the ground (2026-11-19)
+    const wk = id.replace(':ride', ''), changed = weaponHeld !== undefined && wk !== weaponHeld; weaponHeld = wk;
+    if (changed && onFoot() && W.showReach) { const w = weapon(); W.showReach(w.reach); if (!w.ranged) W.pop(P().x, P().y + 2.3, P().z, 'REACH ' + w.reach.toFixed(1) + ' m', '#ffc21f', 0.7); }
   }
-  // Guarding: G, the right mouse button or the 🛡️ button, held. On foot only.
+  // Guarding: G or the 🛡️ button, held (the right mouse button aims since 2026-11-19: cft-aim.js). On foot only.
   F.setBlock = function (on) {
     on = !!on && alive && onFoot() && !F.dying;
     if (on && !F.blocking) F.blockStart = G.rt.t;
@@ -139,8 +142,9 @@ function attach(G, api) {
     if (!w.ranged && G.camp && G.camp.meleeHit(p, f, w, lined)) { cool = 0.42; W.swing(); G.sfx.swing(); return true; }
     const flurry = !w.ranged && G.wild && G.wild.flurryOn();   // after a perfect dodge: rapid, harder hits
     if (flurry) { w.dmg *= 1.6; w.word = pick(['FLURRY!', 'HIYAA!', 'ORA!', 'BOP BOP BOP!']); w.reach += 1.2; G.wild.flurryHit(); }
-    cool = (w.ranged === 'shot' ? 0.32 : 0.42) * (flurry ? 0.12 : 1);
-    W.swing();
+    cool = (w.ranged === 'shot' ? 0.32 : (w.cd || 0.42)) * (flurry ? 0.12 : 1);
+    const arc = w.arc || (w.ranged === 'cone' ? 66 : 160), arcDot = Math.cos(arc / 2 * Math.PI / 180), spin = arc >= 300;
+    W.swing(w.ranged ? 0 : w.reach, arc);
     G.sfx.swing();
     let hits = 0;
     if (w.ranged === 'shot') {
@@ -154,13 +158,13 @@ function attach(G, api) {
     const countered = F.counter > G.rt.t;
     for (const m of F.monsters) {
       const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
-      if (d > w.reach + m.r || (d > 0.8 && (dx * f.x + dz * f.z) / d < (cone ? 0.55 : 0.15)) || (!cone && high(m))) continue;
+      if (d > w.reach + m.r || (d > 0.8 && (dx * f.x + dz * f.z) / d < (cone ? 0.55 : arcDot)) || (!cone && high(m))) continue;
       const hw = Object.assign({}, w);
       if (countered) { hw.dmg *= CB.counter; hw.word = 'COUNTER!'; hw.stun = (hw.stun || 0) + 1; }
       else if (m.recover > 0) { hw.dmg *= CB.opening; hw.word = 'OPENING!'; }
       hw.dmg *= 1 + CB.comboStep * Math.min(10, F.combo);
       hitMonster(m, hw, f); hits++;
-      if (!cone && hits >= 3) break;
+      if (!cone && !spin && hits >= (w.hits || 3)) break;
     }
     if (hits) {
       if (countered) F.counter = 0;
@@ -169,7 +173,7 @@ function attach(G, api) {
     }
     for (const c of F.chasers) {
       const dx = c.x - p.x, dz = c.z - p.z, d = Math.hypot(dx, dz);
-      if (d > w.reach + 0.4 || (d > 0.8 && (dx * f.x + dz * f.z) / d < 0.15)) continue;
+      if (d > w.reach + 0.4 || (d > 0.8 && (dx * f.x + dz * f.z) / d < arcDot)) continue;
       c.stun = 1.6 + (w.stun || 0) * 0.4; hits++;
       W.pop(c.x, c.obj.position.y + 2.5, c.z, w.word, '#ffc21f');
       sayAt(c.obj, pick(['Oof!', 'My dignity!', 'Hey!!', 'Not the apron!']), 1.6);
@@ -255,6 +259,19 @@ function attach(G, api) {
   // A monster's level: yours near home, higher the further you roam (up to yours + 4). Diablo's areas, on your real streets.
   function monsterLevel(x, z) { const home = G.homeSpot(), L = G.level(); return Math.max(1, Math.min(L + 4, L - 1 + Math.floor(Math.hypot(x - home.x, z - home.z) / TM.levelEvery))); }
   F.monsterLevel = monsterLevel;
+  // City figments keep up with you (2026-11-19, the user: "remove the level cap and make the city enemies scale with you so
+  // they are actually a challenge to kill"). Health follows your damage (your level growth x a share of your weapon and
+  // damage bonuses: gear still helps, it just doesn't trivialise them) and their hits follow your health and armour, so the
+  // number of hits to win or lose stays about the same at every level. Further from home = stronger (monsterLevel).
+  F.scaleFor = function (lvl) {
+    const L = G.level(), rel = Math.max(-1, (lvl || L) - L), w = weapon();
+    const gear = clamp(w.dmg * (1 + (G.rpg ? G.rpg.bonus('dmg') : 0)) / D.SLAP.dmg, 1, 40);
+    const grow = 1 + 0.15 * (L - 1), push = 1 + Math.min(TM.challengeMax, TM.challenge * (L - 1));
+    const hpK = grow * Math.pow(gear, TM.gearShare) * (1 + TM.hpPerLevel * rel) * push;
+    const tough = Math.pow(Math.max(1, F.maxHp() / 71), TM.lifeShare) * Math.pow(1 + F.armor() / 100, TM.armorShare);
+    const atkK = tough * (1 + TM.atkPerLevel * rel) * push;
+    return { hp: hpK, atk: atkK };
+  };
   function spawnMonster(kind, x, z, o) {
     const base = D.MONSTERS[kind];
     if (!base) return null;
@@ -264,11 +281,12 @@ function attach(G, api) {
     const size = (o.size || def.size || 1) * (o.champ ? 1.15 : 1);
     const obj = W.monster(kind);
     obj.userData.size = size; obj.scale.setScalar(size);
-    const hp = (o.hp || def.hp) * (1 + TM.hpPerLevel * (lvl - 1)) * (o.champ ? 2.5 : 1);
-    const atk = (def.atk || 6) * (1 + TM.atkPerLevel * (lvl - 1)) * (o.champ ? 1.4 : 1) * (o.atkMul || 1);
+    const sc = F.scaleFor(lvl);
+    const hp = (o.hp || def.hp) * sc.hp * (o.champ ? 2.5 : 1);
+    const atk = (def.atk || 6) * sc.atk * (o.champ ? 1.4 : 1) * (o.atkMul || 1);
     const m = Object.assign({ kind, obj, x, z, carry: 0, state: 'idle', t: 0, stun: 0, kx: 0, kz: 0, grab: 0, wanderA: Math.random() * 6.28,
       r: (kind === 'blob' ? 1.6 : kind === 'brute' || kind === 'worm' ? 0.85 : 0.6) * size, born: G.rt.t, say: 2 + Math.random() * 6 }, o,
-      { def, hp, mhp: hp, atk, lvl, xpv: def.xp * (1 + 0.12 * (lvl - 1)) * (o.champ ? 2.5 : 1) });
+      { def, hp, mhp: hp, atk, atkK: sc.atk, lvl, xpv: def.xp * (1 + 0.12 * (lvl - 1)) * (o.champ ? 2.5 : 1) });
     place(obj, x, z, Math.random() * 6.28);
     W.scene.add(obj);
     if (def.boss) { const tag = nameTag(def.e + ' ' + def.n, 3.7); obj.add(tag); }

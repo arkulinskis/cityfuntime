@@ -15,7 +15,8 @@ const fmt$ = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString(
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[Math.floor(Math.random() * a.length)];
 function xpAt(l) { return Math.round(60 * Math.pow(Math.max(0, l - 1), 1.8)); }
-function levelOf(xp) { let l = 1; while (l < 99 && xpAt(l + 1) <= xp) l++; return l; }
+// no level cap (2026-11-19, the user: "remove level cap"): start from the closed form, then settle on the exact step
+function levelOf(xp) { xp = Math.max(0, +xp || 0); let l = Math.max(1, Math.floor(1 + Math.pow(xp / 60, 1 / 1.8)) - 1); while (xpAt(l + 1) <= xp) l++; while (l > 1 && xpAt(l) > xp) l--; return l; }
 const MISSION = {}; D.MISSIONS.forEach(m => { MISSION[m.id] = m; });
 const BIZ = {}; D.BUSINESSES.forEach(b => { BIZ[b.id] = b; });
 const CREW = {}; D.CREWS.forEach(c => { CREW[c.id] = c; });
@@ -1939,6 +1940,7 @@ function mount(root, opts) {
     const url = await W.snapshot(320, 200);
     setTimeout(() => { W.pose = null; }, 900);
     if (url && opts.onPhoto) opts.onPhoto(url, { caption, day: save.day, street: W.streetAt(P().x, P().z) });
+    return url;   // the Dex keeps its own copy (cft-chaos.js snap)
   }
   G.takePhoto = takePhoto;
 
@@ -2137,6 +2139,7 @@ function mount(root, opts) {
     if (G.chaos) G.chaos.tick(dt, paused || rt.busy);
     if (G.camp) G.camp.tick(dt, paused || rt.busy);
     if (G.wild) G.wild.tick(dt, paused || rt.busy);
+    if (G.aim) G.aim.tick(dt, paused || rt.busy);
     rt.promptTimer -= dt;
     if (rt.promptTimer <= 0) { rt.promptTimer = 0.15; rt.interact = (paused || rt.busy) ? null : findInteraction(); U.prompt(rt.interact ? rt.interact.t : null); }
     // goal beam + arrow
@@ -2224,6 +2227,7 @@ function mount(root, opts) {
     if (window.CFTChaos && G.fun) G.chaos = window.CFTChaos.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the chaos update (cft-chaos.js)
     if (window.CFTCamp && G.fun) G.camp = window.CFTCamp.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; }, travel, setState: v => { state = v; } });  // the campaign update (cft-camp.js)
     if (window.CFTWild && G.fun) G.wild = window.CFTWild.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the open-air update (cft-wild.js)
+    if (window.CFTAim && G.fun) G.aim = window.CFTAim.attach(G, { bump });  // the aim update (cft-aim.js): right-mouse sight, slots 1-4, the web, rainbow guides
     if (window.CFTDebug) G.debug = window.CFTDebug.attach(G);  // the play-test panel: only with ?debug=1
     // driving into things smashes them (borrowed cars and your own rides alike)
     W.onDriveHit = (e, speed, dir) => { if (G.fun) G.fun.smashProp(e, speed > 9 ? 99 : speed * 0.5, dir, true); };
@@ -2279,6 +2283,7 @@ function mount(root, opts) {
       if (G.chaos) G.chaos.destroy();
       if (G.camp) G.camp.destroy();
       if (G.wild) G.wild.destroy();
+      if (G.aim) G.aim.destroy();
       if (G.debug) G.debug.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();

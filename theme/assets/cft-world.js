@@ -849,7 +849,7 @@ varying float vGL; varying vec2 vGUV;
   let allSubs = [], inflight = 0;
   const buckets = new Map(), nameBuckets = new Map(), hchunks = new Map(), rchunks = new Map(), pchunks = new Map(), segBuckets = new Map(), bridgeBuckets = new Map();
   const player = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), vy: 0, grounded: true, face: 0, phase: 0, speed: 0, heading: 0, moved: 0, footMoved: 0, slope: 0, pitch: 0 };
-  const cam = { yaw: 0, pitch: 0.32, dist: 7.5, cur: 7.5, lookT: 0, shake: 0 };
+  const cam = { yaw: 0, pitch: 0.32, dist: 7.5, cur: 7.5, lookT: 0, shake: 0, aimK: 0 };
   const input = { f: 0, b: 0, l: 0, r: 0, sprint: false, jump: false, hold: false, jx: 0, jy: 0 };  // hold = Space (or the jump button) held down: jetpacks, gliding
   let ride = { mode: 'foot', walk: 6.2, run: 12.5, jump: 8.5, radius: 0.4, kind: null };
   W.player = player; W.cam = cam; W.input = input; W.controls = { enabled: true, look: true };
@@ -2466,7 +2466,7 @@ varying float vGL; varying vec2 vGUV;
       let moved = false;
       for (const b of list) {
         if (pos.x < b.x0 - R || pos.x > b.x1 + R || pos.z < b.z0 - R || pos.z > b.z1 + R) continue;
-        if (footY != null && b.base != null && footY > b.base + b.h - 0.45) continue;
+        if (footY != null && b.base != null && footY > roofTop(b, pos.x, pos.z) - 0.45) continue;
         let inside = false, best = Infinity, bx = 0, bz = 0;
         for (const p of b.rings) {
           const n = p.length / 2;
@@ -2488,13 +2488,27 @@ varying float vGL; varying vec2 vGUV;
     }
     return hit;
   }
-  // The flat roof height of the building at (x, z), or null (open ground / not built yet). Roofs are walkable (campaign update).
+  // The roof height of the building at (x, z), or null (open ground / not built yet). Roofs are walkable (campaign update).
+  // Gabled roofs (houses, b.g = the rise) follow their slope (2026-11-19, the user: "some angled roofs you can't walk on,
+  // they have no tangibleness"): before, they counted as flat at the eaves, so you sank into the slope.
+  function gableRise(b, x, z) {
+    const p = b.p, P = i => [p[2 * (i % 4)], p[2 * (i % 4) + 1]];
+    const s = Math.hypot(p[2] - p[0], p[3] - p[1]) >= Math.hypot(p[4] - p[2], p[5] - p[3]) ? 0 : 1;   // the same choice as gable()
+    const A = P(s), B = P(s + 1), C = P(s + 2), D = P(s + 3);
+    const m1x = (D[0] + A[0]) / 2, m1z = (D[1] + A[1]) / 2, m2x = (B[0] + C[0]) / 2, m2z = (B[1] + C[1]) / 2;
+    const ux = m2x - m1x, uz = m2z - m1z, L = Math.hypot(ux, uz) || 1;
+    const across = q => Math.abs(((q[0] - m1x) * uz - (q[1] - m1z) * ux) / L);   // distance from the ridge line
+    const half = Math.max(0.5, (across(A) + across(D)) / 2);
+    return b.g * Math.max(0, 1 - across([x, z]) / half);
+  }
+  function roofTop(b, x, z) { return b.base + b.h + (b.g && b.p.length === 8 ? gableRise(b, x, z) : 0); }
+  W.roofTop = roofTop;
   function roofAt(x, z) {
     const list = buckets.get(bkey(x, z));
     if (!list) return null;
     for (const b of list) {
       if (b.base == null || x < b.x0 || x > b.x1 || z < b.z0 || z > b.z1) continue;
-      if (inRings(b.rings, x, z)) return b.base + b.h;
+      if (inRings(b.rings, x, z)) return roofTop(b, x, z);
     }
     return null;
   }
@@ -3303,6 +3317,12 @@ varying float vGL; varying vec2 vGUV;
       case 'plunger': m.add(CYL, 0x9a6a3c, 0, 0, -0.45, Math.PI / 2, 0, 0, 0.06, 0.9, 0.06); m.add(CONE, 0xc0392b, 0, 0, -0.95, -Math.PI / 2, 0, 0, 0.34, 0.24, 0.34); break;
       case 'guitar': m.box(0.36, 0.08, 0.5, 0xe8453c, 0, 0, -0.75); m.box(0.08, 0.05, 0.75, 0x5b4636, 0, 0, -0.22); m.box(0.14, 0.06, 0.16, 0x1f1a3d, 0, 0, 0.18); break;
       case 'blower': m.box(0.24, 0.26, 0.4, 0xf2b134, 0, 0, -0.15); m.add(CYL, 0x33373f, 0, -0.02, -0.7, Math.PI / 2, 0, 0, 0.16, 0.8, 0.16); m.box(0.06, 0.16, 0.2, 0x1f1a3d, 0, 0.2, -0.1); break;
+      // bonkers with very different reach (2026-11-19): the shape says how far it goes
+      case 'pan': m.add(CYL, 0x2b2b30, 0, 0, -0.42, 0, 0, 0, 0.3, 0.06, 0.3); m.add(CYL, 0x4a4a52, 0, 0.03, -0.42, 0, 0, 0, 0.26, 0.02, 0.26); m.box(0.06, 0.05, 0.34, 0x1b1b1f, 0, 0, -0.06); break;
+      case 'selfie': m.add(CYL8, 0xc9ced6, 0, 0, -0.9, Math.PI / 2, 0, 0, 0.035, 1.8, 0.035); m.box(0.2, 0.36, 0.03, 0x1f1a3d, 0, 0.12, -1.8); m.box(0.18, 0.32, 0.01, 0x7cc4ff, 0, 0.12, -1.785); m.box(0.07, 0.07, 0.2, 0x1f1a3d, 0, 0, 0); break;
+      case 'rake': m.add(CYL8, 0x9a6a3c, 0, 0, -0.85, Math.PI / 2, 0, 0, 0.04, 1.7, 0.04); m.box(0.6, 0.05, 0.06, 0x6f7a86, 0, 0, -1.7); for (let k = 0; k < 7; k++) m.box(0.025, 0.16, 0.025, 0x6f7a86, -0.27 + k * 0.09, -0.08, -1.7); break;
+      case 'yoyo': m.add(CYL, 0xff5c8a, 0, 0, -0.08, 0, 0, Math.PI / 2, 0.24, 0.07, 0.24); m.add(CYL, 0xff5c8a, 0.1, 0, -0.08, 0, 0, Math.PI / 2, 0.24, 0.07, 0.24); m.add(CYL8, 0xffc21f, 0.05, 0, -0.08, 0, 0, Math.PI / 2, 0.08, 0.1, 0.08); break;
+      case 'tether': m.add(CYL8, 0xf4f1ea, 0, 0, -0.6, Math.PI / 2, 0, 0, 0.02, 1.2, 0.02); m.add(SPHERE, 0xffc21f, 0, 0, -1.3, 0, 0, 0, 0.26, 0.26, 0.26); m.box(0.53, 0.04, 0.04, 0x1f1a3d, 0, 0, -1.3); break;
       case 'bubble': m.box(0.12, 0.2, 0.34, 0xff5c8a, 0, 0, -0.18); m.add(CYL, 0x9fe3d0, 0, 0.04, -0.46, Math.PI / 2, 0, 0, 0.2, 0.24, 0.2); m.box(0.08, 0.2, 0.1, 0xff5c8a, 0, -0.14, -0.06); break;
       // ranged weapons (2026-11-18)
       case 'straw': m.add(CYL8, 0xffffff, 0, 0.02, -0.3, Math.PI / 2, 0, 0, 0.05, 0.6, 0.05); for (const z of [-0.1, -0.3, -0.5]) m.add(CYL8, 0xe8453c, 0, 0.02, z, Math.PI / 2, 0, 0, 0.055, 0.06, 0.055); break;
@@ -3509,7 +3529,63 @@ varying float vGL; varying vec2 vGUV;
     body.userData.handR.add(weaponMesh);
   }
   W.setWeapon = function (kind) { weaponKind = kind || null; holdWeapon(); };
-  W.swing = function () { swingT = 0.3; };
+  // A swing shows its reach (2026-11-19, the user: "different weapons to bonk with... I want to see them have different
+  // ranges"): a bright crescent as far out as the weapon reaches, as wide as its arc (degrees).
+  const arcGeos = new Map(), arcs = [];
+  function arcGeo(r, deg) {
+    const key = r.toFixed(1) + ':' + Math.round(deg);
+    let g = arcGeos.get(key);
+    if (!g) { const a = Math.min(Math.PI * 2, deg * Math.PI / 180); g = new THREE.RingGeometry(Math.max(0.3, r - Math.max(0.4, r * 0.3)), r, Math.max(8, Math.round(deg / 8)), 1, -a / 2, a); g.rotateX(-Math.PI / 2); arcGeos.set(key, g); }
+    return g;
+  }
+  function arcFx(r, deg, y, col, life, ground) {
+    const m = new THREE.Mesh(arcGeo(r, deg), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+    m.position.set(player.pos.x, y, player.pos.z); m.rotation.y = player.face + Math.PI / 2; m.renderOrder = 3;
+    scene.add(m); arcs.push({ m, t: 0, life, ground });
+  }
+  W.swing = function (reach, arc) { swingT = 0.3; if (reach) arcFx(reach, arc || 160, player.pos.y + 1.05, 0xfff6d0, 0.26); };
+  W.showReach = function (reach) { if (reach) arcFx(reach, 360, player.pos.y + 0.3, 0xffc21f, 1.6, true); };
+  W.arcCount = () => arcs.length;
+  // Rainbow light guides on the floor (2026-11-19, the user: "when a monster is nearby a little wave of rainbow energy
+  // emanates towards it on the floor... the arrow on the head is for missions"): chevrons run from you to (x, z) in two waves.
+  const CHEV = (() => { const g = new THREE.BufferGeometry(), v = [-0.9, 0, 0.35, 0, 0, -0.55, 0, 0, -0.05, -0.9, 0, 0.35, 0, 0, -0.05, -0.9, 0, 0.8, 0.9, 0, 0.35, 0, 0, -0.05, 0, 0, -0.55, 0.9, 0, 0.35, 0.9, 0, 0.8, 0, 0, -0.05];
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals(); return g; })();
+  const guides = [];
+  W.guide = function (x, z, o) {
+    o = o || {};
+    const px = player.pos.x, pz = player.pos.z, dx = x - px, dz = z - pz, d = Math.hypot(dx, dz);
+    if (d < 4) return null;
+    const ux = dx / d, uz = dz / d, end = Math.min(d - 1.5, o.max || 80), step = 2.4, list = [];
+    for (let s0 = 2.2, i = 0; s0 <= end && i < 34; s0 += step, i++) {
+      const cx = px + ux * s0, cz = pz + uz * s0;
+      const m = new THREE.Mesh(CHEV, new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL((i * 0.075 + (o.hue || 0)) % 1, 1, 0.6), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+      m.position.set(cx, Math.max(standAt(cx, cz), surfaceAt(cx, cz, player.pos.y + 2)) + 0.32, cz); m.rotation.y = Math.atan2(-ux, -uz); m.renderOrder = 5; m.scale.set(1.2, 1, 1.2);   // above the road drape (it sits a little over the terrain)
+      scene.add(m); list.push({ m, s: s0 });
+    }
+    const g = { list, t: 0, end, speed: o.speed || 34, waves: o.waves || 2 };
+    guides.push(g);
+    return g;
+  };
+  W.guides = () => guides.length;
+  function updateArcs(dt) {
+    for (let i = arcs.length - 1; i >= 0; i--) {
+      const a = arcs[i]; a.t += dt; const k = a.t / a.life;
+      if (k >= 1) { scene.remove(a.m); a.m.material.dispose(); arcs.splice(i, 1); continue; }
+      a.m.material.opacity = (a.ground ? 0.4 : 0.42) * (1 - k * k);
+      if (!a.ground) a.m.scale.setScalar(0.85 + 0.15 * Math.min(1, k * 3)); else a.m.position.set(player.pos.x, a.m.position.y, player.pos.z);
+    }
+    for (let i = guides.length - 1; i >= 0; i--) {
+      const g = guides[i]; g.t += dt;
+      let alive = false;
+      for (const c of g.list) {
+        let op = 0;
+        for (let w = 0; w < g.waves; w++) { const head = (g.t - w * 0.5) * g.speed, k = head - c.s; if (k > 0) op = Math.max(op, k < 3 ? k / 3 : Math.max(0, 1 - (k - 3) / 10)); if (head < c.s + 13) alive = true; }
+        c.m.material.opacity = op * 0.85;
+        const sc = 1 + op * 0.5; c.m.scale.set(sc, 1, sc);
+      }
+      if (!alive) { for (const c of g.list) { scene.remove(c.m); c.m.material.dispose(); } guides.splice(i, 1); }
+    }
+  }
   W.swinging = () => swingT > 0;
   function applyRidePose() {
     if (!body) return;
@@ -3617,7 +3693,7 @@ varying float vGL; varying vec2 vGUV;
       const running = ctl && !W.noRun && (input.sprint || Math.hypot(input.jx, input.jy) > 0.92);
       const dirX = -sy * fwd + cy * side, dirZ = -cy * fwd - sy * side;
       player.slope = slopeAlong(dirX, dirZ);
-      const speed = (running && !W.blocking ? ride.run : ride.walk) * (W.speedMul || 1) * slopeMul(player.slope) * (W.blocking ? 0.45 : 1);
+      const speed = (running && !W.blocking && !W.aiming ? ride.run : ride.walk) * (W.speedMul || 1) * slopeMul(player.slope) * (W.blocking ? 0.45 : W.aiming ? 0.75 : 1);
       const tx = dirX * speed, tz = dirZ * speed;
       const k = 1 - Math.exp(-(player.grounded ? (ride.mode === 'ride' ? 5.5 : 15) : 3.5) * dt);
       player.vel.x += (tx - player.vel.x) * k; player.vel.z += (tz - player.vel.z) * k;
@@ -3625,6 +3701,23 @@ varying float vGL; varying vec2 vGUV;
       // (W.stam, set by cft-wild.js). The wall normal comes from collide's push-back each frame.
       const cl = player.climb;
       if (cl) { const tgx = -cl.nz, tgz = cl.nx, sd = ctl ? sideIn : 0; player.vel.x = -cl.nx * 2.5 + tgx * sd * 1.5; player.vel.z = -cl.nz * 2.5 + tgz * sd * 1.5; }
+      // the web (2026-11-19, cft-aim.js sets W.tether = {x, y, z, v0, acc, max, life}): it reels you in toward where it stuck.
+      // Jump lets go with a hop; reaching the wall = grab it (climb) or pull up onto the roof.
+      const teth = !cl && ride.mode === 'foot' ? W.tether : null;
+      let tethD = Infinity;
+      if (teth) {
+        teth.t = (teth.t || 0) + dt;
+        const dx = teth.x - player.pos.x, dy = teth.y - (player.pos.y + 1.1), dz = teth.z - player.pos.z;
+        tethD = Math.hypot(dx, dy, dz) || 1e-6;
+        const sp = Math.min(teth.max || 30, (teth.v0 || 8) + (teth.acc || 60) * teth.t), sd = ctl ? sideIn * 2.5 : 0;
+        if (ctl && input.jump) { // let go: keep the speed, add a hop (web-swing style)
+          W.tether = null; player.vy = Math.max(player.vy, 9.5); player.jumps = 1; input.jump = false; player.grounded = false;
+          if (W.onTetherEnd) W.onTetherEnd('jump');
+        } else if (tethD > 1.5) {
+          player.vel.x = dx / tethD * sp + cy * sd; player.vel.z = dz / tethD * sp - sy * sd;
+          player.vy = dy / tethD * sp + 1.2; player.grounded = false;
+        }
+      }
       player.pos.x += player.vel.x * dt; player.pos.z += player.vel.z * dt;
       const preX = player.pos.x, preZ = player.pos.z;
       const wallHit = collide(player.pos, ride.radius, player.pos.y);
@@ -3635,6 +3728,18 @@ varying float vGL; varying vec2 vGUV;
       if (wnl > 1e-4) { wnx /= wnl; wnz /= wnl; }
       const into = wnl > 1e-4 ? -(dirX * wnx + dirZ * wnz) : 0;   // how hard you push into the wall (1 = straight at it)
       const stam = W.stam;
+      if (teth && W.tether === teth && (tethD < 1.6 || (wallHit && wnl > 1e-4 && tethD < 5.5) || teth.t > (teth.life || 3.2))) {
+        W.tether = null;
+        const nx = wallHit && wnl > 1e-4 ? wnx : 0, nz = wallHit && wnl > 1e-4 ? wnz : 0;
+        const rf = nx || nz ? roofAt(player.pos.x - nx * 0.7, player.pos.z - nz * 0.7) : null;
+        let how = 'drop';
+        if (rf != null && rf - player.pos.y < 2.4 && rf - player.pos.y > -1) { // the web stuck near the top: up and over
+          player.pos.x -= nx * 0.8; player.pos.z -= nz * 0.8; player.pos.y = rf + 0.05; player.vy = 2.5; player.jumps = 1; how = 'roof';
+        } else if ((nx || nz) && (!stam || stam.can('climb'))) { // stick to the wall, ready to climb
+          player.climb = { nx, nz, t: 0, lost: 0 }; player.vy = 0; player.vel.set(0, 0, 0); how = 'wall';
+        } else { player.vy = Math.max(player.vy * 0.3, 3); player.vel.x *= 0.4; player.vel.z *= 0.4; }
+        if (W.onTetherEnd) W.onTetherEnd(how);
+      }
       if (cl) {
         cl.t += dt;
         if (wallHit && wnl > 1e-4) { cl.nx = wnx; cl.nz = wnz; cl.lost = 0; } else cl.lost += dt;
@@ -3694,7 +3799,7 @@ varying float vGL; varying vec2 vGUV;
         }
       }
       // gravity: W.gravMul (a low-gravity street event), W.flyHook (cft-chaos.js: jetpack thrust, gliding) may change it
-      let grav = player.climb ? 0 : GRAV * (W.gravMul || 1);
+      let grav = player.climb || (W.tether && ride.mode === 'foot') ? 0 : GRAV * (W.gravMul || 1);
       if (W.flyHook && !player.climb) grav = W.flyHook(dt, player, input, grav, ctl);
       player.vy -= grav * dt;
       player.pos.y += player.vy * dt;
@@ -3744,7 +3849,8 @@ varying float vGL; varying vec2 vGUV;
       player.pitch += (tilt - player.pitch) * Math.min(1, dt * 8);
       const hs = Math.hypot(player.vel.x, player.vel.z);
       player.speed = hs;
-      if (hs > 0.3) { const da = angDiff(Math.atan2(-player.vel.x, -player.vel.z), player.face); player.face += da * Math.min(1, dt * (ride.mode === 'ride' ? 6 : 14)); }
+      if (W.aiming && ride.mode === 'foot' && !player.climb) player.face += angDiff(cam.yaw, player.face) * Math.min(1, dt * 22);   // aiming: you face the sight
+      else if (hs > 0.3) { const da = angDiff(Math.atan2(-player.vel.x, -player.vel.z), player.face); player.face += da * Math.min(1, dt * (ride.mode === 'ride' ? 6 : 14)); }
       player.running = running && hs > 1;
     }
     input.jump = false;
@@ -3771,7 +3877,15 @@ varying float vGL; varying vec2 vGUV;
         body.userData.armR.rotation.z = 0.08;
         body.userData.elbowR.rotation.x = t < 0.3 ? 1.0 : 0.15;
       }
-      // guarding (hold G / right mouse / the shield button): fists or shield up in front of the face
+      // aiming (hold the right mouse button, 2026-11-19): the arm points along the sight
+      const ak = body.userData.aimK = (body.userData.aimK || 0) + ((W.aiming && !ride.kind && !player.climb ? 1 : 0) - (body.userData.aimK || 0)) * Math.min(1, dt * 16);
+      if (ak > 0.02 && swingT <= 0) {
+        const u = body.userData, pr = Math.max(-0.5, Math.min(0.9, cam.pitch - 0.3));
+        u.armR.rotation.x += (1.55 - pr - u.armR.rotation.x) * ak; u.armR.rotation.z += (-0.12 - u.armR.rotation.z) * ak; u.elbowR.rotation.x += (0.08 - u.elbowR.rotation.x) * ak;
+        u.armL.rotation.x += (0.9 - u.armL.rotation.x) * ak; u.elbowL.rotation.x += (1.2 - u.elbowL.rotation.x) * ak;
+      }
+      if (W.tether && !ride.kind) { const u = body.userData; u.armR.rotation.x = 2.6; u.elbowR.rotation.x = 0.1; u.legL.rotation.x = 0.6; u.kneeL.rotation.x = -1.1; u.legR.rotation.x = -0.2; u.kneeR.rotation.x = -0.5; }
+      // guarding (hold G or the shield button): fists or shield up in front of the face
       const bk = body.userData.block = (body.userData.block || 0) + ((W.blocking && !ride.kind ? 1 : 0) - (body.userData.block || 0)) * Math.min(1, dt * 18);
       if (bk > 0.02) {
         const u = body.userData;
@@ -3811,9 +3925,28 @@ varying float vGL; varying vec2 vGUV;
     cam.cur = cam.dist;
   };
 
+  const aimDirV = new THREE.Vector3();
+  // Along a ray (the sight): the first building or ground it meets within maxD. {x, y, z, d, kind: 'wall' | 'ground'} or null.
+  // Steps 0.5 m, then halves the last step, so the point sits on the wall (good enough for a web to stick to).
+  W.rayCast = function (ox, oy, oz, dx, dy, dz, maxD, from) {
+    const hitAt = (x, y, z) => { const rf = roofAt(x, z); if (rf != null && y < rf) return 'wall'; if (y < surfaceAt(x, z, y + 0.5)) return 'ground'; return null; };
+    let prev = from || 0;
+    for (let t = prev + 0.5; t <= maxD; t += 0.5) {
+      const k = hitAt(ox + dx * t, oy + dy * t, oz + dz * t);
+      if (!k) { prev = t; continue; }
+      let a = prev, b = t;
+      for (let i = 0; i < 6; i++) { const m = (a + b) / 2; if (hitAt(ox + dx * m, oy + dy * m, oz + dz * m)) b = m; else a = m; }
+      return { x: ox + dx * a, y: oy + dy * a, z: oz + dz * a, d: a, kind: k };
+    }
+    return null;
+  };
   function updateCamera(dt) {
     const target = _v.set(player.pos.x, player.pos.y + (ride.mode === 'drive' ? 1.4 : 1.6), player.pos.z);
-    const dist = W.showOff ? 3.4 : cam.dist * (ride.mode === 'drive' ? 1.35 : 1);
+    // aiming (2026-11-19): the camera slides over your right shoulder and closes in; the screen centre is the sight
+    cam.aimK += ((W.aiming && ride.mode !== 'drive' && !W.showOff ? 1 : 0) - cam.aimK) * Math.min(1, dt * 12);
+    const ak = cam.aimK;
+    if (ak > 0.001) { target.x += Math.cos(cam.yaw) * 0.85 * ak; target.z -= Math.sin(cam.yaw) * 0.85 * ak; target.y += 0.15 * ak; }
+    const dist = W.showOff ? 3.4 : cam.dist * (ride.mode === 'drive' ? 1.35 : 1) * (1 - ak) + Math.min(cam.dist, 3.6) * ak;
     const cp = Math.cos(cam.pitch);
     const dx = Math.sin(cam.yaw) * cp, dy = Math.sin(cam.pitch), dz = Math.cos(cam.yaw) * cp;
     let maxD = dist;
@@ -3831,9 +3964,10 @@ varying float vGL; varying vec2 vGUV;
     camera.lookAt(target);
     // the view widens a little when you go fast
     const sp = Math.abs(ride.mode === 'drive' ? player.speed : Math.hypot(player.vel.x, player.vel.z));
-    const fov = 62 + Math.max(0, Math.min(13, (sp - 7) * 0.85));
+    const fov = (62 + Math.max(0, Math.min(13, (sp - 7) * 0.85))) * (1 - ak) + 50 * ak;
     if (Math.abs(fov - camera.fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
     avatar.visible = cam.cur > 1.1;
+    camera.getWorldDirection(aimDirV); W.aimRay = { ox: camera.position.x, oy: camera.position.y, oz: camera.position.z, dx: aimDirV.x, dy: aimDirV.y, dz: aimDirV.z, from: cam.cur };
     if (W.showOff) { avatar.rotation.y = cam.yaw + Math.PI + Math.sin(performance.now() / 1400) * 0.5; avatar.rotation.x = 0; if (body && !ride.kind) W.animate(body, 0, dt); }
     const snap = 240 / 2048;
     const px = Math.round(player.pos.x / snap) * snap, pz = Math.round(player.pos.z / snap) * snap, py = Math.round(player.pos.y / snap) * snap;
@@ -4387,6 +4521,7 @@ varying float vGL; varying vec2 vGUV;
     updateFollowers(dt);
     for (let i = bubbles.length - 1; i >= 0; i--) { const b = bubbles[i]; b.t -= dt; if (b.t <= 0) { b.obj.remove(b.sp); b.sp.material.dispose(); bubbles.splice(i, 1); } }
     updateFx(dt);
+    updateArcs(dt);
     updateSmash(dt);
     updateLod(dt);
     updateCamera(dt);

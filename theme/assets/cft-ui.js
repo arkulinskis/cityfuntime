@@ -73,17 +73,19 @@ function create(G, root) {
           <button type="button" class="cft-hb main" data-bonk title="Attack (F, or click with the mouse captured)" aria-label="Attack"><span data-bonkicon>🖐️</span><em data-ammo></em><kbd>F</kbd></button>
           <button type="button" class="cft-hb water" data-pw="water" title="Water power (1): soaks and knocks back figments, puts out fires. Refill: water orbs, hydrants (E)" aria-label="Water power"><span>💧</span><em data-pwn="water"></em><kbd>1</kbd></button>
           <button type="button" class="cft-hb volt" data-pw="volt" title="Lightning power (2): zaps and chains between figments, double on wet ones. Refill: lightning orbs, storms" aria-label="Lightning power"><span>🌩️</span><em data-pwn="volt"></em><kbd>2</kbd></button>
-          <button type="button" class="cft-hb foam" data-pw="foam" title="Fire extinguisher (hold 3): puts out fires fast. Found near fires" aria-label="Fire extinguisher"><span>🧯</span><em data-pwn="foam"></em><kbd>3</kbd></button>
+          <button type="button" class="cft-hb foam" data-pw="foam" title="Fire extinguisher (3, then hold right mouse + hold left click): puts out fires fast. Found near fires" aria-label="Fire extinguisher"><span>🧯</span><em data-pwn="foam"></em><kbd>3</kbd></button>
+          <button type="button" class="cft-hb web" data-pw="web" title="Web shooter (4, then hold right mouse + left click): sticks to a wall and pulls you to it. Jump to let go" aria-label="Web shooter"><span>🕸️</span><em data-pwn="web"></em><kbd>4</kbd></button>
           <button type="button" class="cft-hb" data-quaff title="Eat or drink to heal (Q)" aria-label="Heal"><span>🍵</span><kbd>Q</kbd></button>
         </div>
         <div class="cft-btns">
-          <button type="button" data-block title="Block: hold (G or right mouse). Time it just before a hit for a PERFECT PARRY" aria-label="Block">🛡️</button>
+          <button type="button" data-block title="Block: hold (G). Time it just before a hit for a PERFECT PARRY" aria-label="Block">🛡️</button>
           <button type="button" data-ride title="Ride (V)" aria-label="Ride">🛹</button>
           <button type="button" data-phone title="Phone (P)" aria-label="Phone">📱</button>
           <button type="button" data-jump class="cft-touch" title="Jump (wall jump off walls, bounce off everything)" aria-label="Jump">⤒</button>
         </div>
       </div>
     </div>
+    <div class="cft-sight" data-sight hidden aria-hidden="true"><i></i><b data-sightlbl></b></div>
     <div class="cft-joy" data-joy><div class="cft-knob" data-knob></div></div>
     <div class="cft-banners" data-banners></div>
     <div class="cft-toast" data-toast></div>
@@ -107,7 +109,8 @@ function create(G, root) {
     const el = document.createElement('div');
     el.className = 'cft-ov ' + (cls || '');
     el.innerHTML = html;
-    $('[data-layer]').appendChild(el);
+    const layer = $('[data-layer]');
+    if (layer) layer.appendChild(el);   // null once the game was torn down (U.destroy): the dialog just never shows
     const entry = { el, close: null, onEsc: o.onEsc };
     stack.push(entry);
     if (G.W) G.W.unlock();
@@ -121,11 +124,13 @@ function create(G, root) {
   let toastT = 0;
   U.toast = function (text) {
     const el = $('[data-toast]');
+    if (!el) return;
     el.textContent = text; el.classList.add('show');
     clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 3000);
   };
   U.feed = function (e, text) {
     const box = $('[data-feed]');
+    if (!box) return;
     const it = document.createElement('div');
     it.className = 'cft-fi';
     it.innerHTML = '<span>' + esc(e) + '</span>' + esc(text);
@@ -145,7 +150,9 @@ function create(G, root) {
     el.className = 'cft-banner ' + (b.kind || '');
     el.innerHTML = '<b>' + esc(b.title) + '</b>' + (b.sub ? '<span>' + esc(b.sub) + '</span>' : '');
     if (b.color) { el.style.setProperty('--boro', b.color.css || b.color); if (b.color.ink) el.style.setProperty('--boro-ink', b.color.ink); }  // borough banners wear the borough's colour
-    $('[data-banners]').appendChild(el);
+    const box = $('[data-banners]');
+    if (!box) { bannerQ.length = 0; bannerBusy = false; return; }   // the game was torn down while banners were queued
+    box.appendChild(el);
     const long = b.kind === 'done' || b.kind === 'level' || /^(loot|ach)/.test(b.kind || '');
     setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); nextBanner(); }, 350); }, bannerQ.length > 2 ? 1700 : long ? 3600 : 3000);  // a queue moves faster
   }
@@ -439,8 +446,8 @@ function create(G, root) {
     const t = shell.classList.contains('touch');
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
-      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone (👕 Wardrobe: what you wear)</div><div><kbd>💧 🌩️ 🧯</kbd> water, lightning, extinguisher (hold)</div><div><kbd>⤒</kbd> jump: off walls, onto roofs, bounce off everything</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things)</div><div><kbd>G</kbd> or right mouse, held: block (time it for a PERFECT PARRY)</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>B</kbd> toot (yes, really)</div><div><kbd>Space</kbd> held in the air: jetpack / glide</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>1</kbd> water power · <kbd>2</kbd> lightning · <kbd>3</kbd> held: extinguisher</div><div><kbd>Space</kbd> at a wall in the air: wall jump; benches, bins and heads are bouncy</div><div><kbd>M</kbd> minimap zoom · <kbd>N</kbd> map size · <kbd>Esc</kbd> pause</div>') +
+      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone (👕 Wardrobe: what you wear)</div><div><kbd>💧 🌩️ 🧯 🕸️</kbd> water, lightning, extinguisher (hold), web (pulls you to the wall you face)</div><div><kbd>⤒</kbd> jump: off walls, onto roofs, bounce off everything</div>'
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things)</div><div><kbd>G</kbd> held: block (time it for a PERFECT PARRY)</div><div><kbd>Right mouse</kbd> held: aim with the sight · <kbd>left click</kbd> uses the slot you chose with <kbd>1</kbd>–<kbd>4</kbd> (💧 water, 🌩️ lightning, 🧯 extinguisher, 🕸️ web: sticks to walls and pulls you in) · let go = back to bonking</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>B</kbd> toot (yes, really)</div><div><kbd>Space</kbd> held in the air: jetpack / glide</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>1</kbd> water power · <kbd>2</kbd> lightning · <kbd>3</kbd> held: extinguisher</div><div><kbd>Space</kbd> at a wall in the air: wall jump; benches, bins and heads are bouncy</div><div><kbd>M</kbd> minimap zoom · <kbd>N</kbd> map size · <kbd>Esc</kbd> pause</div>') +
       '</div><p class="muted">Watch for the red <b>❗</b> over a figment: it is about to strike. When its ring turns gold, block. Big gold <b>letters</b> on the map are people with missions; E next to a parked car borrows it. The <b>gold arrow</b> over your head always points to your current goal. Ranged weapons need ammo 🎯 (crates around town); nosy people find ✨ secrets in the tight gaps between buildings. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
@@ -792,22 +799,25 @@ function create(G, root) {
     else if (e.code === 'KeyQ') { if (!e.repeat && G.fun) G.fun.quaff(); }
     else if (e.code === 'KeyM') toggleZoom();
     else if (e.code === 'KeyN') U.mapSize();
-    else if (e.code === 'Digit1' || e.code === 'Numpad1') { if (!e.repeat && G.camp) G.camp.power('water', true); }
-    else if (e.code === 'Digit2' || e.code === 'Numpad2') { if (!e.repeat && G.camp) G.camp.power('volt', true); }
-    else if (e.code === 'Digit3' || e.code === 'Numpad3') { if (!e.repeat && G.camp) G.camp.power('foam', true); }
+    // 1-4 choose what the sight fires (2026-11-19): hold the right mouse button to aim, left click to use it
+    else if (/^(Digit|Numpad)[1-4]$/.test(e.code)) { if (!e.repeat) { const k = SLOT_KEYS[+e.code.slice(-1) - 1]; if (G.aim) G.aim.select(k); else if (G.camp && k !== 'web') G.camp.power(k, true); } }
     else if (e.code === 'KeyH') U.help();
     else if (e.code === 'KeyI') U.wardrobe();
     else if (e.code === 'KeyB') { if (!e.repeat && G.chaos) G.chaos.fart(); }
   }
   document.addEventListener('keydown', onKey);
   const unblock = () => { if (G.fun && G.fun.blocking) G.fun.setBlock(false); };
-  function onKeyUp(e) { if (e.code === 'KeyG') unblock(); if ((e.code === 'Digit3' || e.code === 'Numpad3') && G.camp) G.camp.power('foam', false); }
+  const SLOT_KEYS = ['water', 'volt', 'foam', 'web'];
+  function onKeyUp(e) { if (e.code === 'KeyG') unblock(); if ((e.code === 'Digit3' || e.code === 'Numpad3') && G.camp && !G.aim) G.camp.power('foam', false); }
   document.addEventListener('keyup', onKeyUp);
+  const unaim = () => { if (G.aim) { G.aim.fire(false); G.aim.setAim(false); } };
   window.addEventListener('blur', unblock);
-  // the right mouse button guards while held (anywhere on the game); the 🛡️ button too (touch: hold it)
+  window.addEventListener('blur', unaim);
+  // The right mouse button, held, aims (2026-11-19, the user: "remove block on right mouse... right mouse creates a sight;
+  // the left click does what's active in the 1 2 3 panel while you hold it; releasing goes back to bonk"). Block: G / 🛡️.
   U.canvas.addEventListener('contextmenu', e => e.preventDefault());
-  U.canvas.addEventListener('mousedown', e => { if (e.button === 2 && G.W && G.state() === 'play' && !stack.length && G.fun) { e.preventDefault(); G.fun.setBlock(true); } });
-  const onMouseUp = e => { if (e.button === 2) unblock(); };
+  U.canvas.addEventListener('mousedown', e => { if (e.button === 2 && G.W && G.state() === 'play' && !stack.length && G.aim) { e.preventDefault(); G.aim.setAim(true); } });
+  const onMouseUp = e => { if (e.button === 2) unaim(); else if (e.button === 0 && G.aim) G.aim.fire(false); };
   window.addEventListener('mouseup', onMouseUp);
   { const b = $('[data-block]');
     b.addEventListener('pointerdown', e => { e.preventDefault(); if (G.fun && G.state() === 'play' && !stack.length) G.fun.setBlock(true); });
@@ -818,17 +828,26 @@ function create(G, root) {
   $('[data-bonk]').addEventListener('click', () => G.attack());
   $('[data-quaff]').addEventListener('click', () => G.fun && G.fun.quaff());
   $('.cft-lvl').addEventListener('click', () => U.phone('hero'));
-  // with the mouse captured, a left click bonks
-  U.canvas.addEventListener('mousedown', e => { if (e.button === 0 && G.W && G.W.isLocked() && G.state() === 'play' && !stack.length) G.attack(); });
+  // a left click: with the sight up, use the chosen slot; else (mouse captured) bonk
+  U.canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0 || !G.W || G.state() !== 'play' || stack.length) return;
+    if (G.aim && G.aim.on()) { e.preventDefault(); G.aim.fire(true); }
+    else if (G.W.isLocked()) G.attack();
+  });
   $('[data-mmwrap]').addEventListener('click', e => { if (e.target.closest('[data-mmz],[data-mms]')) return; U.phone('map'); });
   $('[data-mmz]').addEventListener('click', () => toggleZoom());
   $('[data-mms]').addEventListener('click', () => U.mapSize());
   $('[data-mcount]').addEventListener('click', () => U.phone('camp'));
   $('[data-mlist]').addEventListener('click', e => { const r = e.target.closest('[data-mid]'); if (!r) return; const id = r.dataset.mid, s = save(); if (id && s.m[id] && s.m[id].s === 'active') { G.track(id); U.toast('🎯 Tracking: ' + G.getM(id).title); } else U.phone('quests'); });
-  for (const b of shell.querySelectorAll('[data-pw]')) { // the hotbar powers: tap (water, lightning), hold (extinguisher)
+  for (const b of shell.querySelectorAll('[data-pw]')) { // the hotbar: a mouse click chooses the slot; a finger chooses AND uses it (hold the extinguisher)
     const k = b.dataset.pw;
-    b.addEventListener('pointerdown', e => { e.preventDefault(); if (G.camp && G.state() === 'play' && !stack.length) G.camp.power(k, true); });
-    if (k === 'foam') for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { if (G.camp) G.camp.power('foam', false); });
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (G.state() !== 'play' || stack.length) return;
+      if (G.aim) { if (e.pointerType === 'mouse') G.aim.select(k); else G.aim.tap(k, true); }
+      else if (G.camp && k !== 'web') G.camp.power(k, true);
+    });
+    if (k === 'foam') for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { if (G.aim) G.aim.tap(k, false); else if (G.camp) G.camp.power('foam', false); });
   }
   $('[data-quest]').addEventListener('click', () => U.phone('quests'));
   $('[data-jump]').addEventListener('touchstart', e => { if (G.W) { G.W.input.jump = true; G.W.input.hold = true; } e.preventDefault(); }, { passive: false });
@@ -838,7 +857,7 @@ function create(G, root) {
   // ------------------------------------------------------------------ the phone
   const APPS = [
     ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['wardrobe', '👕', 'Wardrobe'], ['hero', '🧙', 'Character'], ['rep', '🤝', 'Reputation'], ['ach', '🏆', 'Achievements'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
-    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['chaos', '🤪', 'Chaos'], ['camp', '🌀', 'Campaign'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
+    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['chaos', '🤪', 'Chaos'], ['dex', '📸', 'Dex'], ['camp', '🌀', 'Campaign'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
   ];
   let phoneOv = null, phoneApp = null;
   U.phone = function (app) {
@@ -1027,14 +1046,26 @@ function create(G, root) {
         ['🍌 Banana slides', v.slides], ['🤸 Bounces', v.bounces], ['😂 Jokes told', v.jokes], ['🎪 Street events', v.events]].map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
   };
   // ---- the chaos update (cft-chaos.js): aura, mayhem, the Dex, ranged weapons, flying
+  // The Dex (2026-11-19, the user: "a bunch of things I can take pictures next to... is there a gallery? how am I completing
+  // or collecting something?"): every creature you can snap, your photo of each, what's left and what it pays.
+  VIEWS.dex = function () {
+    if (!G.chaos) return '<div class="cft-empty">📸<p>The Dex is still loading.</p></div>';
+    const v = G.chaos.summary(), pics = G.chaos.dexPics ? G.chaos.dexPics() : {}, RAR = { legendary: '👑 Legendary', rare: '💎 Rare', common: 'Common', neighbour: 'Neighbour' };
+    const next = [[4, 'Okafor\'s mission at the library'], [6, '🏆 Brainrot Scholar'], [20, '🎓 the title "the Brainrot Professor"']].find(m => v.dexGot < m[0]);
+    return '<div class="cft-pcard cft-dexhead"><b>📸 ' + v.dexGot + ' / ' + v.dexAll + ' creatures</b>' + bar(v.dexGot, v.dexAll, 'xp') +
+      '<small>See an animal or a weird creature? Walk close and press <b>E</b> (the 📸 button) to snap it. Every <b>new</b> one pays cash + XP and its photo lands here and in your Album. ' +
+      'Animals live all over town; the weird ones show as ❓ on the minimap (some fly, some only come out at night). A rainbow trail on the ground points to new ones.' + (next ? ' Next reward: <b>' + next[0] + ' snapped</b> = ' + esc(next[1]) + '.' : ' You snapped them all! 🎓') + '</small></div>' +
+      '<div class="cft-dexg">' + v.dex.map(d => '<div class="cft-dexp ' + (d.got ? 'got ' : '') + d.rar + '" title="' + esc(d.got ? d.line || d.n : '???') + '">' +
+        (d.got && pics[d.id] ? '<img alt="" src="' + pics[d.id] + '">' : '<span>' + (d.got ? d.e : '❓') + '</span>') +
+        '<b>' + esc(d.got ? d.e + ' ' + d.n : '???') + '</b><small>' + esc(RAR[d.rar] || '') + (d.night ? ' · 🌙 night' : '') + (d.fly ? ' · flies' : '') + (d.got > 1 ? ' · ×' + d.got : '') + '</small></div>').join('') + '</div>';
+  };
   VIEWS.chaos = function () {
     if (!G.chaos) return '<div class="cft-empty">🤪<p>The chaos is still loading.</p></div>';
     const v = G.chaos.summary(), s = save(), RAR = { legendary: '👑 Legendary', rare: '💎 Rare', common: 'Common', neighbour: 'Neighbour' };
     const fly = v.fly === 'jet' ? '🫘 Bean jetpack: hold Space in the air (refills on the ground). Golden ⭕ sky hoops pay out.' : v.fly === 'glide' ? '☂️ Glide-brella: hold Space while falling. Golden ⭕ sky hoops pay out.' : 'Nothing yet. Hardware stores sell the 🫘 Bean jetpack, clothes shops the ☂️ Glide-brella (back slot).';
     return '<div class="cft-pcard cft-aura"><b>😎 ' + v.aura.toLocaleString() + ' aura</b><span>Best mayhem: ' + (v.best ? v.best.toLocaleString() + ' pts (rank ' + esc(v.bestRank) + ')' : 'none yet') + '</span>' +
       '<small>Chain chaos without stopping (bonks, smashes, stunts, piñatas, launches, photos) and watch the meter at the top climb D → SSS. Stop for a few seconds and it cashes in. Getting pooped on by a seagull costs aura. Such is life.</small></div>' +
-      '<div class="cft-sec"><h4>📸 The Dex · ' + v.dexGot + ' / ' + v.dexAll + '</h4><p class="muted small">Snap creatures with E when one is close. Weird ones show as ❓ on the minimap; some fly, some only come out at night.</p><div class="cft-dex">' +
-      v.dex.map(d => '<div class="cft-dexc ' + (d.got ? 'got ' : '') + d.rar + '" title="' + esc(d.got ? d.line || d.n : '???') + '"><span>' + (d.got ? d.e : '❓') + '</span><b>' + esc(d.got ? d.n : '???') + '</b><small>' + esc(RAR[d.rar] || '') + (d.got > 1 ? ' · ×' + d.got : '') + '</small></div>').join('') + '</div></div>' +
+      '<div class="cft-sec"><h4>📸 The Dex · ' + v.dexGot + ' / ' + v.dexAll + '</h4><p class="muted small">Snap creatures with E when one is close. Your photos and what is left: the 📸 Dex app.</p><button type="button" class="cft-btn sm" data-app="dex">Open the Dex</button></div>' +
       '<div class="cft-sec"><h4>🎯 Ranged weapons</h4>' + (v.ranged.length ? '<div class="cft-chips">' + v.ranged.map(k => '<button type="button" class="cft-chipb ' + (s.equip.weapon === k ? 'on' : '') + '" data-act="weapon" data-id="' + k + '">' + D.ITEMS[k].e + ' ' + esc(D.ITEMS[k].n) + '</button>').join('') + '</div>' : '') +
       '<p class="muted small">' + (v.ranged.length ? 'F (or click with the mouse captured) fires. Aim helps itself to the nearest figment in front of you.' : 'Toy shops 🎈, fast food 🥤🌭, gift shops 🎉💨, groceries 🍌, clothes 👕 and hardware stores 🥔🍄 sell things that shoot.') +
       ' Figments throw things too: dodge, block, or block right as it lands to send it back. 🔁</p></div>' +
@@ -1288,6 +1319,7 @@ function create(G, root) {
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('blur', unblock);
+    window.removeEventListener('blur', unaim);
     window.removeEventListener('mouseup', onMouseUp);
     window.removeEventListener('resize', sizeMinimap);
     U.closeAll();

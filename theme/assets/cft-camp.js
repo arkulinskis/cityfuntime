@@ -326,6 +326,7 @@ function attach(G, api) {
   // ------------------------------------------------------------------ powers: water (1), lightning (2), the extinguisher (hold 3)
   function aimDir() {
     const p = P();
+    if (W.aiming && W.aimPoint) { const dx = W.aimPoint.x - p.x, dz = W.aimPoint.z - p.z, d = Math.hypot(dx, dz); if (d > 0.5) return { x: dx / d, z: dz / d }; }  // the right-mouse sight (cft-aim.js)
     if (W.isLocked && W.isLocked()) return { x: -Math.sin(W.cam.yaw), z: -Math.cos(W.cam.yaw) };
     // nudge onto the best target in front: a mega's open weak spot, a figment, a fire
     const fx = -Math.sin(W.player.face), fz = -Math.cos(W.player.face);

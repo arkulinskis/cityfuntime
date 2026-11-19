@@ -97,7 +97,8 @@ window.__wildOut = []; window.__wildDone = false;
       ok(!document.querySelector('.cft-donut').hidden || true, 'the stamina donut shows while climbing');
       const roofY = wall.b.base + wall.b.h;
       for (let i = 0; i < 400 && W.player.climb; i++) sim(1);
-      ok(Math.abs(pp.y - roofY) < 0.8 && !W.player.climb, 'at the top you pull yourself onto the roof (feet ' + pp.y.toFixed(1) + ', roof ' + roofY.toFixed(1) + ', stamina ' + Math.round(X.stam) + ')');
+      const roofHere = W.roofAt(pp.x, pp.z);   // gabled roofs follow their slope since 2026-11-19 (the gable end wall reaches the ridge)
+      ok((Math.abs(pp.y - roofY) < 0.8 || (roofHere != null && Math.abs(pp.y - roofHere) < 0.5)) && !W.player.climb, 'at the top you pull yourself onto the roof (feet ' + pp.y.toFixed(1) + ', roof ' + roofY.toFixed(1) + ', stamina ' + Math.round(X.stam) + ')');
       stopInput(); sim(5);
       // tired: let go, walk slowly, recover at a third
       W.teleport(wall.x, wall.z); sim(3); W.cam.yaw = Math.atan2(wall.nx, wall.nz); W.player.face = W.cam.yaw; W.input.f = 1;

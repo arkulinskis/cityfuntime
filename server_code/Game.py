@@ -22,9 +22,13 @@ UPGRADE = [0.5, 1, 2, 4]
 
 
 def level_of(xp):
-    lvl = 1
-    while lvl < 99 and round(60 * lvl ** 1.8) <= xp:
+    # no level cap since 2026-11-19 (closed form first, then the exact step; same as levelOf in cft-game.js)
+    xp = max(0.0, float(xp or 0))
+    lvl = max(1, int(1 + (xp / 60) ** (1 / 1.8)) - 1)
+    while round(60 * lvl ** 1.8) <= xp:
         lvl += 1
+    while lvl > 1 and round(60 * (lvl - 1) ** 1.8) > xp:
+        lvl -= 1
     return lvl
 
 

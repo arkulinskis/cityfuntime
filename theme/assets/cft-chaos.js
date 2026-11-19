@@ -258,7 +258,12 @@ function attach(G, api) {
     for (const q of C.pinatas) consider(q.x, q.y, q.z, 0);
     if (C.ev && C.ev.balloons) for (const b of C.ev.balloons) if (!b.dead) consider(b.x, b.y, b.z, -0.1);
     let tx, ty, tz, d;
-    if (best) { tx = best.x; ty = best.y; tz = best.z; d = best.d; fx = (tx - p.x) / d; fz = (tz - p.z) / d; W.player.face = Math.atan2(-fx, -fz); }
+    if (W.aiming && W.aimPoint) { // the right-mouse sight (cft-aim.js): exactly where the crosshair is
+      const ap = W.aimPoint, dd = Math.hypot(ap.x - p.x, ap.z - p.z);
+      if (dd > 0.6) { best = null; tx = ap.x; ty = ap.y; tz = ap.z; d = Math.min(dd, w.reach * 1.3); fx = (tx - p.x) / dd; fz = (tz - p.z) / dd; if (dd > d) { tx = p.x + fx * d; tz = p.z + fz * d; ty = from.y + (ap.y - from.y) * d / dd; } }
+    }
+    if (tx != null) { /* aimed */ }
+    else if (best) { tx = best.x; ty = best.y; tz = best.z; d = best.d; fx = (tx - p.x) / d; fz = (tz - p.z) / d; W.player.face = Math.atan2(-fx, -fz); }
     else { d = Math.min(w.reach * 0.75, 18); tx = p.x + fx * d; tz = p.z + fz * d; ty = (W.isLocked && W.isLocked()) ? from.y + Math.tan(-(W.cam.pitch - 0.16)) * d : gy(tx, tz) + 0.6; }
     if (lob) {
       const vh = speed * 0.82, t = Math.max(0.25, d / vh), vy = ((ty - from.y) + 0.5 * g * t * t) / t;
@@ -471,7 +476,7 @@ function attach(G, api) {
   };
   function enemyShot(m) {
     const R = m.def.ranged, p = P(), y0 = monY(m), pv = W.player.vel;
-    const dmg = R.dmg * (1 + D.TUNE.monsters.atkPerLevel * ((m.lvl || 1) - 1)) * (m.champ ? 1.4 : 1) * (T.enemyShots || 1);
+    const dmg = R.dmg * (m.atkK || (1 + D.TUNE.monsters.atkPerLevel * ((m.lvl || 1) - 1))) * (m.champ ? 1.4 : 1) * (T.enemyShots || 1);   // atkK: scaled to you (cft-fun F.scaleFor)
     const d0 = Math.hypot(p.x - m.x, p.z - m.z), speed = R.speed || 15, tF = d0 / speed * (R.lob ? 1.2 : 1);
     const tx = p.x + pv.x * tF * 0.6, tz = p.z + pv.z * tF * 0.6, ty = p.y + 1.0;   // leads you a little: keep moving
     let vx, vy, vz, g;
@@ -779,10 +784,21 @@ function attach(G, api) {
     } else { G.addMoney(3, 'for another photo of ' + d.n); }
     C.add('photo');
     W.burst(c.x, c.obj.position.y + 1.2, c.z, '📸', 3, { spread: 1, up: 2, size: 0.6 });
+    // a real photo (2026-11-19, the user: "is there a gallery? how am I collecting something?"): the first snap of each
+    // creature is kept for the Dex app and goes into your Album; the feed says how many are left
+    if (first) {
+      U.feed('📸', 'Dex ' + Object.keys(dex).length + ' / ' + ALL_DEX.length + ': ' + d.n + ' (phone → 📸 Dex)');
+      if (G.takePhoto) { const p = P(); W.cam.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z)); G.takePhoto('📸 Dex: ' + d.e + ' ' + d.n).then(url => { if (url) savePic(d.id, url); }).catch(() => {}); }
+    }
     if (c.kind === 'rot') { c.snapped = c.t + 2.5; W.say(c.obj, pick(d.say), 2); }
     G.dirty();
   }
   C.snap = snap;
+  // the Dex photos live in this browser (not in the save: pictures are big). Key per player, like the Album.
+  const picKey = () => 'cityfuntime.dexpics.' + ((G.opts && G.opts.me && G.opts.me.id) || 'guest');
+  let pics = null;
+  C.dexPics = function () { if (!pics) { try { pics = JSON.parse(localStorage.getItem(picKey()) || '{}') || {}; } catch (e) { pics = {}; } } return pics; };
+  function savePic(id, url) { const p = C.dexPics(); p[id] = url; try { localStorage.setItem(picKey(), JSON.stringify(p)); } catch (e) { /* storage full or blocked: the photo stays for this visit */ } }
 
   // ------------------------------------------------------------------ toys: piñatas, beach balls, sewer launchers, whoopee cushions, tube men
   function pinataModel(col) {
@@ -1122,9 +1138,9 @@ function attach(G, api) {
     if (C.ev && C.ev.id === 'sixseven' && !C.ev.joined) return { t: '🖐️ Do the six-seven', fn: join67 };
     let best = null, bd = 99;
     for (const c of C.rot) { if (c.snapped) continue; const d = Math.hypot(c.x - p.x, c.z - p.z); if (d < 11 && d < bd) { bd = d; best = c; } }
-    if (best) return { t: '📸 Snap the ' + (st().dex[best.d.id] ? best.d.n : '???'), fn: () => snap(best) };
+    if (best) return { t: '📸 Snap the ' + (st().dex[best.d.id] ? best.d.n : '??? (new for your Dex!)'), fn: () => snap(best) };
     for (const c of C.critters) { const d = Math.hypot(c.x - p.x, c.z - p.z); if (d < 4.5 && d < bd) { bd = d; best = c; } }
-    if (best) return { t: '📸 Snap the ' + best.d.n.toLowerCase().replace(/^a cow\? here\?$/, 'cow (?)'), fn: () => snap(best) };
+    if (best) return { t: '📸 Snap the ' + best.d.n.toLowerCase().replace(/^a cow\? here\?$/, 'cow (?)') + (st().dex[best.d.id] ? '' : ' (new for your Dex!)'), fn: () => snap(best) };
     const potty = W.propNear && W.propNear(p.x, p.z, 2.2, { kind: 'potty' });
     if (potty && onFoot() && hideT <= 0) return { t: '🚽 Hide in the porta-potty', fn: () => hide(potty) };
     return null;
@@ -1140,7 +1156,7 @@ function attach(G, api) {
   C.hiding = () => hideT > 0;
   C.summary = function () {
     const c = st(), s = save(), k = s.counters;
-    const dex = ALL_DEX.map(d => ({ id: d.id, n: d.n, e: d.e, rar: d.rar || 'neighbour', kind: d.kind, got: c.dex[d.id] || 0, line: d.line || '' }));
+    const dex = ALL_DEX.map(d => ({ id: d.id, n: d.n, e: d.e, rar: d.rar || 'neighbour', kind: d.kind, got: c.dex[d.id] || 0, line: d.line || '', night: !!d.night, fly: !!d.fly }));
     const ranged = Object.keys(s.owned).filter(id => D.ITEMS[id] && D.ITEMS[id].weapon && D.ITEMS[id].weapon.ranged === 'proj');
     return { aura: c.aura, best: c.best, bestRank: c.bestRank || '', dex, dexGot: Object.keys(c.dex).length, dexAll: ALL_DEX.length, ranged, fly: flyGear(), weapon: s.equip.weapon || '',
       stats: [['🎯 Shots fired', k.shots || 0], ['💨 Toots', k.farts || 0], ['🪅 Piñatas popped', k.pinatas || 0], ['🕳️ Manhole launches', k.launches || 0], ['🛩️ Seconds flying', k.airtime || 0], ['⭕ Sky hoops', k.hoops || 0],

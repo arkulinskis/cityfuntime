@@ -1,6 +1,6 @@
 ---
 name: cityfuntime
-description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 178 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events) and the main character update (blocks and parries, compliments and hype, Tom Hearton's and grocery outposts, smashing things, borrowed cars, GTA mission letters) and the chaos update (decor everywhere, mayhem meter, ranged weapons and shooters, flying, the Dex, toys, meme humour) and the campaign update (a 5-minute immortal opening, a crazy list switched on mission by mission, at most 5 missions on the map, ammo, water/lightning/extinguisher powers, fire, storms, MEGA figments, secrets in tight gaps, a bouncy world, a redesigned HUD with map size). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
+description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 178 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events) and the main character update (blocks and parries, compliments and hype, Tom Hearton's and grocery outposts, smashing things, borrowed cars, GTA mission letters) and the chaos update (decor everywhere, mayhem meter, ranged weapons and shooters, flying, the Dex, toys, meme humour) and the campaign update (a 5-minute immortal opening, a crazy list switched on mission by mission, at most 5 missions on the map, ammo, water/lightning/extinguisher powers, fire, storms, MEGA figments, secrets in tight gaps, a bouncy world, a redesigned HUD with map size) and the aim update (a right-mouse sight with slots 1-4, a web shooter that pulls you to walls, bonk weapons with visible reach, rainbow floor guides, the Dex gallery, figments that scale with you, no level cap). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
 ---
 
 # City Fun Time: working on the app
@@ -627,6 +627,58 @@ loaded before cft-world.js (cft-kit.js `ALL`, harness.py `ENGINE`, a `cft-asset`
 - **Not verified on a real GPU:** frame rate with MeshStandard everywhere + post + facade shader (software WebGL only). If a
   real machine stutters: the watchdog drops AO then post by itself; next steps are `W.post.params.ao = 0`, a lower
   `setPixelRatio` cap, or `ENV_K`. Phones (auto = low quality) only get the models.
+
+## The aim update (cft-aim.js + aim camera / web tether / reach arcs / guides in cft-world.js, 2026-11-19)
+
+The user: "remove block on the right mouse key; instead the right mouse key creates a sight; depending on what is in your
+1 2 3 panel the left click does it (while holding the right button); releasing goes back to bonk. Different bonk weapons
+with different ranges I can see. Light guides when something is announced: a wave of rainbow energy on the floor toward a
+nearby monster (the head arrow is for missions). Fix angled roofs you can't walk on. Fix 'Cannot read properties of null
+(reading appendChild)'. Remove the level cap and make city enemies scale with you. The photo things: is there a gallery? How
+am I collecting? Spiderwebs: in the right-left click combo it shoots out and pulls you; it must attach to a wall."
+- **cft-aim.js** (`G.aim`, attached after G.wild; api {bump}; knobs `D.TUNE.aim`; state `save.aim` {slot, tips}). A new engine
+  file: listed in cft-kit.js `ALL`, harness.py `ENGINE` and a `cft-asset` meta in anvil.yaml (tools/assets.py keeps its hash).
+  - **Input (cft-ui.js):** right mouse down on the canvas -> `G.aim.setAim(true)`, up (window) -> off + `fire(false)`; left
+    mouse down: `G.aim.on()` ? `G.aim.fire(true)` : (pointer locked) `G.attack()`; keys 1-4 -> `G.aim.select(slot)` (`SLOT_KEYS`
+    water / volt / foam / web); hotbar `[data-pw]` buttons: mouse = select, touch = `G.aim.tap(slot, down)` (select + use;
+    foam held). G / 🛡️ still block. Blur / overlays / riding / blackout drop the sight.
+  - **The sight:** `W.aiming` -> cft-world `updateCamera` blends `cam.aimK` (over the right shoulder 0.85 m, distance <= 3.6,
+    fov 50) and stores `W.aimRay` (camera position + direction) every frame; updatePlayer turns you to `cam.yaw`, walks at 75%,
+    no sprint, and raises the aim pose. `aimTick` = a figment (or MEGA) near the ray, else `W.rayCast` (0.5 m steps + 6
+    halvings against `roofAt` walls and `surfaceAt` ground) -> `W.aimPoint` {x, y, z, kind 'foe'|'wall'|'ground'|'sky', m}.
+    DOM `.cft-sight[data-sight]` (centre of the screen, only while aiming: the one thing allowed in the middle) red on a
+    figment, green on a web-able wall, dashed grey "no wall"; label = slot + distance. cft-camp `aimDir` and cft-chaos
+    `aimShot` use `W.aimPoint` first (exact, no nudge).
+  - **The web:** `shootWeb` -> a strand (`strandGeo` box stretched from `handPos()`, flies at `webSpeed`) -> on a wall
+    `W.tether = {x, y, z, v0, acc, max, life}`; cft-world updatePlayer (foot only) pulls toward it, no gravity, A/D steer,
+    Space = let go (`W.onTetherEnd('jump')`); arrival (within 1.6 m, or a wall hit within 5.5 m, or `life` s) = mantle onto the
+    roof when it is < 2.4 m above ('roof'), else `player.climb` (cft-wild stamina) ('wall'), else a drop. Without the sight
+    (touch) `wallAhead()` casts four rays up the facing direction. On a figment: `m.stun` + `m.webbed`. Counters webs, webpulls,
+    webroofs, webbed.
+  - **Rainbow guides:** `W.guide(x, z, {hue, max})` = up to 34 additive chevrons (`CHEV`) on the ground (0.32 m over
+    `standAt`/`surfaceAt`: road drapes sit above the terrain), two waves at 34 m/s, removed when done (`updateArcs`).
+    `scanTick` (every 0.4 s): MEGAs within `megaR` always; figments within `guideR` (special ones always, others when
+    `guideCd` is over); weird creatures within `rotR`; animals missing from the Dex within `critterR`. Counter guides.
+  - **Dex tags:** `W.label('📸 NEW')` on critters / creatures not in `save.chaos.dex` within 40 m (`c.newTag`).
+- **Reach arcs (cft-world):** `W.swing(reach, arc)` draws a crescent (`arcGeo` RingGeometry, band 0.4 m or 30% of the reach)
+  for 0.26 s; `W.showReach(reach)` a gold ring for 1.6 s (cft-fun `syncWeapon` when the weapon in hand changes, + a "REACH
+  x m" pop). Weapon fields `arc` (degrees, default 160, cone 66, >= 300 = all round, no hit cap), `cd` (cooldown), `hits`.
+  F.attack uses `cos(arc/2)` for figments and chasers. New items w_pan, w_selfie, w_rake, w_yoyo, w_tether (+ loot bases,
+  shapes in `W.propMesh`, names in content_check `MESHES`).
+- **Gabled roofs:** `gableRise(b, x, z)` / `roofTop(b, x, z)` (W.roofTop) mirror `gable()`'s ridge (the longer side pair);
+  `roofAt` and `collide`'s footY skip use it, so the slope is walkable and the gable ends are solid below the slope.
+- **Scaling:** `F.scaleFor(lvl)` in spawnMonster: hp x (1 + 0.15 (L-1)) x (weapon dmg x dmg bonus / slap)^`gearShare` x
+  (1 + hpPerLevel x (lvl - L)) x (1 + min(challengeMax, challenge x (L-1))); atk x (maxHp / 71)^`lifeShare` x (1 + armour /
+  100)^`armorShare` x (1 + atkPerLevel x (lvl - L)) x the same push. Level 1 with bare hands = exactly as before. `m.atkK`
+  feeds cft-chaos enemy shots. MEGAs keep their own formula (cft-camp).
+- **No level cap:** `levelOf` (cft-game.js) and `level_of` (server_code/Game.py) start from the closed form and settle on the
+  exact step; identical below 99.
+- **Dex photos:** cft-chaos `snap` turns the camera to the creature and calls `G.takePhoto` (now returns the URL) on a first
+  snap -> the Album + `localStorage cityfuntime.dexpics.<user|guest>` (`C.dexPics()`); phone app 📸 Dex (`VIEWS.dex`).
+- **The appendChild error:** `U.destroy` empties the root, and a queued banner (`nextBanner`) or a late dialog (`overlay`)
+  then appended to null. Both (and toast/feed) now return quietly when the HUD is gone.
+- **Tests:** `game_test.py --aim` (aimtest.js, 43 checks, last in the full run); pictures `--aimshots DIR`.
+- **Not verified on a real device:** web feel with a real mouse, the shoulder camera in tight streets, guides on hills.
 
 ## Recipes
 

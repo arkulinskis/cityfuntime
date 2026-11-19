@@ -38,7 +38,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Smashing things | "lamp needs too many hits", "debris weird", "hydrant" | cft-world `W.hitProp` `debris` `updateSmash` `W.propNear`, cft-fun `smashProp` | `D.TUNE.smash` | --hero |
 | Fighting: monster attacks | "can't see it coming", "hits too hard" | cft-fun `windUp` `teleTick` `strike` `touch` `updateMonsters` | `D.TUNE.combat`, `D.MONSTERS` | --combat --hero |
 | Fighting: your hits | "aim jumps", "combo", "slap weak" | cft-fun `F.attack` `hitMonster` | `D.TUNE.combat`, weapons in `D.ITEMS` | --fun --hero |
-| Blocking / parry | "parry too hard", "block button" | cft-fun `F.setBlock` `strike`, cft-ui keys (`onKey`, `[data-block]`), cft-world block pose in `updatePlayer` | `D.TUNE.combat.parry/block` | --hero |
+| Blocking / parry | "parry too hard", "block button" | cft-fun `F.setBlock` `strike`, cft-ui keys (`onKey` G, `[data-block]`; right mouse aims since 2026-11-19), cft-world block pose in `updatePlayer` | `D.TUNE.combat.parry/block` | --hero |
 | Monster spawning | "too many at night", "none by day" | cft-fun `updateMonsters` (top), `spawnMonster`, `monsterLevel` | `D.TUNE.monsters` | --combat |
 | Monster looks | "the goose looks odd" | cft-world `W.monster` `W.animateMonster` | | --monsters |
 | Health, healing, blackout | "regen too slow", "lost too much money" | cft-fun `F.hurt` `F.heal` `F.quaff` `die` `F.maxHp` | `D.TUNE.monsters.regen*` | --combat |
@@ -108,6 +108,13 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Rooftop antennas, giggles | "antenna floating", "too many antennas" | cft-wild `viewTick` `antenna` `tuneIn` `X.interaction` `X.markers` `giggleTick` | `D.TUNE.wild.viewCell/viewMinH/giggleR` | --wild |
 | Legs in the ground (pavements) | "feet sink into the pavement" | cft-world `pchunks` (registerSub), `paveAt` `standAt` `surfaceAt` `segPoint` | `KERB_Y` | --wild |
 | Four-corner HUD | "something in the middle of the screen" | cft-ui markup (`.cft-tl/.cft-tr/.cft-bl/.cft-br`), CSS "the four corners" block (end of app.css) | 40vw/40vh caps in the CSS | --wild (corner check) |
+| Right-mouse sight, slots 1-4 | "sight off-centre", "camera too close when aiming", "left click didn't fire" | cft-aim `A.setAim` `A.select` `A.fire` `A.tap` `aimTick`, cft-ui input (`SLOT_KEYS`, mousedown/up), cft-world `updateCamera` (`cam.aimK`, shoulder 0.85, fov 50), `W.rayCast`; CSS `.cft-sight` | `D.TUNE.aim.range` | --aim |
+| Web shooter | "web too slow", "doesn't stick", "pulls through walls" | cft-aim `shootWeb` `strandTick` `wallAhead` `W.onTetherEnd`, cft-world updatePlayer (`W.tether` block + arrival after collide) | `D.TUNE.aim.web*` | --aim |
+| Rainbow floor guides, Dex NEW tags | "too many rainbows", "can't see the trail" | cft-aim `scanTick` `guideTo`, cft-world `W.guide` `CHEV` `updateArcs` | `D.TUNE.aim.guide*/megaR/rotR/critterR` | --aim --aimshots |
+| Weapon reach / arcs | "pan too short", "yo-yo hits too many", "arc too bright" | weapons in `D.ITEMS` (`reach`, `arc`, `cd`, `hits`), cft-fun `F.attack` (`arcDot`, `spin`), cft-world `W.swing` `arcFx` `W.showReach` | | --aim |
+| Figment scaling, level cap | "figments too tanky at 30", "too easy" | cft-fun `F.scaleFor` `spawnMonster`, cft-game `levelOf`, server `Game.py level_of` | `D.TUNE.monsters.gearShare/lifeShare/armorShare/challenge*` | --aim --combat |
+| Gabled roofs | "fell into a roof", "can't walk up the roof" | cft-world `gableRise` `roofTop` `roofAt` `collide` | | --aim |
+| Dex gallery, Dex photos | "photo missing", "Dex app wrong" | cft-ui `VIEWS.dex`, cft-chaos `snap` `savePic` `C.dexPics` `C.summary`, cft-game `takePhoto` | | --aim |
 | Play-test panel | | cft-debug.js (`?debug=1`) | | |
 
 ## Tests (pick the narrowest)
@@ -119,6 +126,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | `python -I tools/live/game_test.py --hero` | speed, combat, smashing, cars, outposts, hype, blips, shields | ~2 min |
 | `python -I tools/live/game_test.py --chaos` | decor, mayhem, ranged weapons + figments, flying, Dex, toys, chaos events | ~2 min |
 | `python -I tools/live/game_test.py --wild` | four-corner HUD, pavements, climbing + stamina, glide + updrafts, perfect dodge, air slow-mo, chemistry, antennas | ~2 min |
+| `python -I tools/live/game_test.py --aim` | right-mouse sight + slots, the web, weapon reach + arcs, gabled roofs, scaling, no level cap, rainbow guides, the Dex gallery | ~2 min |
 | `python -I tools/live/game_test.py --camp` | HUD + map size, crazy list + mission cap, the opening, ammo, powers, fire, storms, MEGA figments, secrets, bouncy world | ~2 min |
 | `python -I tools/live/game_test.py --boro` | borough names, looks, HUD chip, banners, discovery | ~1 min |
 | `... --fun` / `--combat` / `--rpg` | street life / monsters, health, guardians / loot, talents | 2-3 min each |

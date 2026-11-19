@@ -67,7 +67,7 @@ window.__heroOut = []; window.__heroDone = false;
     let sawWind = false; hp0 = F.hp();
     for (let i = 0; i < 120 && F.hp() >= hp0; i++) { sim(2); if (m.wind > 0) sawWind = true; }
     ok(sawWind && F.hp() < hp0, 'a figment walks up, winds up and strikes on its own');
-    ok(!!document.querySelector('[data-block]'), 'a 🛡️ block button in the HUD (and G / right mouse)');
+    ok(!!document.querySelector('[data-block]'), 'a 🛡️ block button in the HUD (and G)');
     clear(); s.fun.hp = F.maxHp();
 
     // ---------- shields (the new off-hand slot)
