@@ -315,12 +315,29 @@ function attach(G, api) {
   }
   K.collect = function (k) {
     const c = st(), p = P();
-    if (k.type === 'ammo') { const n = T.ammoCrate + Math.floor(lvl() / 2); c.ammo = Math.min(T.ammoMax, c.ammo + n); U.feed('🎯', '+' + n + ' ammo (' + c.ammo + ')'); W.pop(p.x, p.y + 2.4, p.z, 'RELOADED!', '#ffb26b', 0.9); }
+    if (k.type === 'ammo') { const n = T.ammoCrate + Math.floor(lvl() / 2); c.ammo = Math.min(T.ammoMax, c.ammo + n); U.feed('🎯', '+' + n + ' ammo (' + c.ammo + ')'); W.pop(p.x, p.y + 2.4, p.z, 'RELOADED!', '#ffb26b', 0.9); shooterHint(); }
     else if (k.type === 'water') { c.water = Math.min(T.waterMax, c.water + T.waterOrb); U.feed('💧', 'Water power +' + T.waterOrb + ' (' + c.water + ')'); }
     else if (k.type === 'volt') { c.volt = Math.min(T.voltMax, c.volt + T.voltOrb); U.feed('🌩️', 'Lightning power +' + T.voltOrb + ' (' + c.volt + ')'); }
     else if (k.type === 'foam') { c.foam = T.foamMax; U.feed('🧯', 'Fire extinguisher: full (hold 3 to spray)'); if (!K._foamTip) { K._foamTip = 1; U.toast('🧯 Got an extinguisher! Hold 3 (or the 🧯 button) to spray foam on fires.'); } }
     G.dirty();
   };
+  // Ammo is only for things that shoot (2026-11-19, the user: "I pick up arrows around town but I don't know how to shoot").
+  // No shooter yet: the first crate has a Spitball straw in it (worn straight away if your hands are empty). A shooter in
+  // the wardrobe but not in hand: say so (once a visit).
+  const isShooter = w => !!(w && (w.ranged === 'proj' || w.ranged === 'shot'));
+  function shooterHint() {
+    const s = save(), worn = G.rpg && G.rpg.weapon(), inHand = worn || (D.ITEMS[s.equip.weapon] && D.ITEMS[s.equip.weapon].weapon);
+    if (isShooter(inHand)) { if (!K._shootTip) { K._shootTip = 1; U.toast('🎯 F shoots your ' + (worn ? worn.n : D.ITEMS[s.equip.weapon].n) + '. Hold the right mouse button first to aim it at the crosshair.'); } return; }
+    const owned = Object.keys(s.owned).filter(id => s.owned[id] && D.ITEMS[id] && isShooter(D.ITEMS[id].weapon));
+    if (!owned.length) {
+      s.owned.w_straw = true;
+      const bare = !worn && !s.equip.weapon;
+      if (bare && G.wearShop) G.wearShop('w_straw');
+      U.banner('🥤 A Spitball straw was in the crate!', bare ? 'Ammo is for things that shoot. Press F to shoot (hold the right mouse button first to aim).' : 'Ammo is for things that shoot. Wear it from the 👕 Wardrobe (I, weapon slot), then F shoots.', 'done');
+      U.feed('🥤', 'Shooters: fast food 🥤🌭, toy shops 🎈🐔, gift shops 🎉💨, groceries 🍌, clothes 👕, hardware 🥔🍄');
+      G.dirty();
+    } else if (!K._wearTip) { K._wearTip = 1; const it = D.ITEMS[owned[0]]; U.toast('🎯 Ammo is for things that shoot. Wear your ' + it.e + ' ' + it.n + ' (👕 Wardrobe: I, weapon slot), then press F to shoot.'); }
+  }
   K.charges = () => { const c = st(); return { ammo: c.ammo, water: c.water, volt: c.volt, foam: c.foam }; };
 
   // ------------------------------------------------------------------ powers: water (1), lightning (2), the extinguisher (hold 3)

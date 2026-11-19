@@ -678,7 +678,10 @@ am I collecting? Spiderwebs: in the right-left click combo it shoots out and pul
   snap -> the Album + `localStorage cityfuntime.dexpics.<user|guest>` (`C.dexPics()`); phone app 📸 Dex (`VIEWS.dex`).
 - **The appendChild error:** `U.destroy` empties the root, and a queued banner (`nextBanner`) or a late dialog (`overlay`)
   then appended to null. Both (and toast/feed) now return quietly when the HUD is gone.
-- **Tests:** `game_test.py --aim` (aimtest.js, 43 checks, last in the full run); pictures `--aimshots DIR`.
+- **Ammo without a shooter** (user: "I pick up arrows but don't know how to shoot"): cft-camp `shooterHint()` after an ammo
+  pickup: no shooter owned = a free `w_straw` (worn if bare-handed) + banner; owned but not worn = a toast (once a visit); in
+  hand = how to aim (once). Buying a shooter says "F shoots; hold the right mouse button to aim".
+- **Tests:** `game_test.py --aim` (aimtest.js, 50 checks, last in the full run); pictures `--aimshots DIR`.
 - **Not verified on a real device:** web feel with a real mouse, the shoulder camera in tight streets, guides on hills.
 
 ## Recipes

@@ -409,12 +409,12 @@ native_deps:
     <meta name="cft-asset" content="_/theme/cft-rpg.js?v=c3ce4e89cd">
     <meta name="cft-asset" content="_/theme/cft-hero.js?v=bf5739a218">
     <meta name="cft-asset" content="_/theme/cft-chaos.js?v=d2c7e27cee">
-    <meta name="cft-asset" content="_/theme/cft-camp.js?v=e0b54800e6">
+    <meta name="cft-asset" content="_/theme/cft-camp.js?v=beae943dd0">
     <meta name="cft-asset" content="_/theme/cft-wild.js?v=875bb032dc">
     <meta name="cft-asset" content="_/theme/cft-aim.js?v=d515e1edde">
     <meta name="cft-asset" content="_/theme/cft-debug.js?v=fac2552f4c">
-    <meta name="cft-asset" content="_/theme/cft-ui.js?v=537d7d4d51">
-    <meta name="cft-asset" content="_/theme/cft-game.js?v=dc0405b684">
+    <meta name="cft-asset" content="_/theme/cft-ui.js?v=4e5096a99d">
+    <meta name="cft-asset" content="_/theme/cft-game.js?v=774b3e08f5">
 package_name: City_Fun_Time
 runtime_options:
   client_version: '3'

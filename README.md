@@ -282,6 +282,8 @@ extinguishers, water and lightning powers".
   the next reward; animals and creatures you haven't snapped wear a "📸 NEW" tag.
 - **No level cap,** and **figments scale with you:** their health follows your level and part of your weapon power, their
   hits follow your health and armour, so fights stay a challenge at every level (gear still helps).
+- **Ammo explained:** ammo 🎯 is for weapons that shoot (F; hold the right mouse button to aim them). Picking up ammo with no
+  shooter gives you a free Spitball straw (worn if your hands are empty); with one in the wardrobe, a tip says to wear it.
 - **Gabled roofs are solid:** you walk on the slope instead of sinking into it.
 - Fixed: a console error ("Cannot read properties of null (reading 'appendChild')") when a banner or dialog arrived after
   leaving the game.
