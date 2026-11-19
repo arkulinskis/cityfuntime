@@ -821,6 +821,7 @@ button.cft-slot { font: inherit; color: #1f1a3d; cursor: pointer; } .cft-slot.em
 .cft-vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse 75% 70% at 50% 46%, rgba(0,0,0,0) 58%, rgba(20,12,48,.34) 100%); }
 .cft-canvas { filter: saturate(1.07) contrast(1.04); }
 .cft.touch .cft-canvas { filter: none; }
+.cft-canvas.cft-post { filter: none; }   /* high quality grades in cft-post.js instead */
 .cft-hype { position: absolute; left: 50%; top: 31%; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px; width: min(760px, 96vw); }
 .cft-hw { text-align: center; transform: rotate(var(--tilt, 0deg)); animation: cft-hw 1.7s var(--ease-out) both; }
 .cft-hw.big { animation-duration: 2.3s; }

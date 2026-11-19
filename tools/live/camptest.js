@@ -92,7 +92,9 @@ window.__campOut = []; window.__campDone = false;
     ok(K.useAmmo({ ammo: 3 }) && /∞/.test(document.querySelector('[data-pwn="water"]').textContent), 'infinite ammo and powers during the opening');
     // things you 'get' in the dream: money, XP (levels), a weapon, loot, a sticker, a counter
     if (s.rpg && s.rpg.loot && s.rpg.loot.length > 10) { const keep = new Set(Object.values(s.rpg.eq || {})); s.rpg.loot = s.rpg.loot.filter((x, i) => keep.has(x.id) || i < 10); }   // room in the bag (the full run fills it)
-    const before = { loot: (s.rpg && s.rpg.loot || []).length, tshirt: !!s.owned.w_tshirt, stickers: JSON.stringify(s.stickers), bonks: c('bonks') };
+    // compare with the game's own snapshot from when the dream began (things can already happen in the dream before this line)
+    const sn = (s.camp && s.camp.snap) || {}, before = sn.counters ? { loot: (sn.rpg && sn.rpg.loot || []).length, tshirt: !!(sn.owned || {}).w_tshirt, stickers: JSON.stringify(sn.stickers), bonks: (sn.counters || {}).bonks || 0 }
+      : { loot: (s.rpg && s.rpg.loot || []).length, tshirt: !!s.owned.w_tshirt, stickers: JSON.stringify(s.stickers), bonks: c('bonks') };
     s.money += 777; s.xp = G.xpAt(6); s.owned.w_tshirt = true; s.equip.weapon = 'w_tshirt'; if (G.rpg) { G.rpg.drop('boss'); G.rpg.drop('chest'); } G.addSticker(); s.counters.bonks = (s.counters.bonks || 0) + 50;
     ok(G.level() >= 6 && (s.rpg.loot || []).length > before.loot, 'in the dream you level up and find things (level ' + G.level() + ', ' + (s.rpg.loot || []).length + ' loot)');
     s.camp.left = 0.5; sim(10);
@@ -103,8 +105,8 @@ window.__campOut = []; window.__campDone = false;
     let dream = false; for (let i = 0; i < 40 && !dream; i++) { await sleep(120); const d = document.querySelector('.cft-dlg'); if (d && /fever dream/i.test(d.textContent)) dream = true; else if (d) d.click(); }
     ok(dream, 'Max explains it was all a fever dream');
     ok(s.xp === 0 && G.level() === 1 && s.money === 0, 'back to level 1 (no XP) with $0 (level ' + G.level() + ', $' + s.money + ')');
-    ok(!!s.owned.w_tshirt === before.tshirt && s.equip.weapon !== 'w_tshirt' && (s.rpg.loot || []).length === before.loot && JSON.stringify(s.stickers) === before.stickers && c('bonks') === before.bonks,
-      'nothing from the dream is kept: weapon, loot, stickers and counters are back to what they were');
+    ok(!!s.owned.w_tshirt === before.tshirt && s.equip.weapon !== 'w_tshirt' && (s.rpg.loot || []).length === before.loot && JSON.stringify(s.stickers) === before.stickers && (c('bonks') || 0) === before.bonks,
+      'nothing from the dream is kept: weapon, loot, stickers and counters are back to what they were (tshirt ' + !!s.owned.w_tshirt + '/' + before.tshirt + ', weapon ' + s.equip.weapon + ', loot ' + (s.rpg.loot || []).length + '/' + before.loot + ', stickers ' + (JSON.stringify(s.stickers) === before.stickers) + ', bonks ' + c('bonks') + '/' + before.bonks + ')');
     ok(!F.monsters.some(m => m.introFoe) && !K.storm && document.querySelector('.cft-intro').hidden && Math.abs(s.clock - 8) < 0.5, 'and the world is peaceful: no figments, no storm, a calm morning');
     for (let i = 0; i < 80 && !document.querySelector('.cft-help'); i++) { await sleep(120); const d = document.querySelector('.cft-dlg'); if (d) { const o = d.querySelector('[data-k]:not(.lock)'); if (o) o.click(); else d.click(); } }
     ok(!!document.querySelector('.cft-help'), 'then the controls card welcomes you home');

@@ -45,6 +45,11 @@ function create(opts) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW ? 1 : 1.75));
   renderer.shadowMap.enabled = !LOW;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // high quality: post-processing (cft-post.js: ambient occlusion, bloom, filmic grade). P.level drops itself when slow.
+  const POST = !LOW && !opts.nopost && !/[?&]nopost=1/.test(location.search) && window.CFTPost && renderer.capabilities.isWebGL2 ? window.CFTPost.create(renderer) : null;
+  if (POST) canvas.classList.add('cft-post');
+  // high quality: detailed procedural materials + sky reflections (cft-gfx.js)
+  const GFX = !LOW && window.CFTGfx ? window.CFTGfx.create(THREE, renderer) : null;
   const scene = new THREE.Scene();
   const skyCol = new THREE.Color(0xaecde9);
   scene.background = skyCol.clone();
@@ -146,6 +151,7 @@ function create(opts) {
   function resize() {
     const r = canvas.getBoundingClientRect(), w = Math.max(1, r.width), h = Math.max(1, r.height);
     renderer.setSize(w, h, false);
+    if (POST) POST.setSize(canvas.width, canvas.height);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
@@ -199,22 +205,22 @@ function create(opts) {
   const [winDay, winNight] = windowTextures();
   const FLOOR_H = 3.3, WIN_W = 3.6;
   const MAT = {
-    walls: new THREE.MeshLambertMaterial({ map: winDay, emissiveMap: winNight, emissive: 0xffffff, emissiveIntensity: 0, vertexColors: true }),
-    plain: new THREE.MeshLambertMaterial({ vertexColors: true }),
+    walls: GFX ? GFX.wallMaterial() : new THREE.MeshLambertMaterial({ map: winDay, emissiveMap: winNight, emissive: 0xffffff, emissiveIntensity: 0, vertexColors: true }),
+    plain: GFX ? GFX.roofMaterial() : new THREE.MeshLambertMaterial({ vertexColors: true }),
     terrain: new THREE.MeshLambertMaterial({ vertexColors: true }),   // photo-textured (groundify, below)
     // parks, water, roads draped on the hills: pulled towards the camera so they never flicker into the ground
     drape: new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }),
     trunk: new THREE.MeshLambertMaterial({ color: 0x6b4f37 }),
-    crown: new THREE.MeshLambertMaterial({ color: 0xffffff }),
-    vc: new THREE.MeshLambertMaterial({ vertexColors: true }),
+    crown: GFX ? GFX.pbr({ vertexColors: false, leaf: true }) : new THREE.MeshLambertMaterial({ color: 0xffffff }),
+    vc: GFX ? GFX.pbr() : new THREE.MeshLambertMaterial({ vertexColors: true }),
     glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
     bulb: new THREE.MeshBasicMaterial({ color: 0x9a9a8c }),          // street-lamp heads: grey by day, warm at night (setClock)
     pool: new THREE.MeshBasicMaterial({ color: 0xffd890, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }),
     signal: new THREE.MeshBasicMaterial({ color: 0xffffff }),        // traffic-light lamps, coloured per instance
     // instanced street furniture has its own materials: three r149 keeps one shader per material, so a material
     // shared by tinted and untinted instances would draw every parked car white
-    prop: new THREE.MeshLambertMaterial({ vertexColors: true }),
-    tint: new THREE.MeshLambertMaterial({ vertexColors: true }),
+    prop: GFX ? GFX.pbr() : new THREE.MeshLambertMaterial({ vertexColors: true }),
+    tint: GFX ? GFX.pbr() : new THREE.MeshLambertMaterial({ vertexColors: true }),
     // a soft glow around every street-lamp head at night (additive, so it reads as bloom without post-processing)
     wreck: new THREE.MeshLambertMaterial({ color: 0x2b2a2e }),
     halo: new THREE.MeshBasicMaterial({ color: 0xffd890, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
@@ -318,32 +324,40 @@ varying float vGL; varying vec2 vGUV;
   // Merges coloured primitives into one vertex-coloured geometry (people, cars, props).
   const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
   const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
+  // Surface classes (2026-11-19, read by cft-gfx.js pbr materials): 0 matte, 1 car paint, 2 glass, 3 metal, 4 skin, 5 wet /
+  // eyes, 6 cloth, 7 hair, 8 leaves, 9 plastic. m.as(k) sets the class for what follows (null = look it up); m.kOf =
+  // {hexColour: class} (or the builder-wide KOF while W.person runs) picks it by colour.
+  let KOF = null;
   class Merge {
-    constructor() { this.p = []; this.n = []; this.c = []; }
+    constructor() { this.p = []; this.n = []; this.c = []; this.mk = []; this.k = null; this.kOf = null; }
+    as(k) { this.k = k; return this; }
+    kFor(hex) { if (this.k != null) return this.k; const t = this.kOf || KOF; return (t && t[hex]) || 0; }
     add(geo, color, x, y, z, rx, ry, rz, sx, sy, sz) {
       const g = geo.index ? geo.toNonIndexed() : geo;
       _m4.compose(_v.set(x || 0, y || 0, z || 0), _q.setFromEuler(_e.set(rx || 0, ry || 0, rz || 0)), _s.set(sx || 1, sy || 1, sz || 1));
       const nm = new THREE.Matrix3().getNormalMatrix(_m4);
       const P = g.attributes.position, N = g.attributes.normal;
       _c.set(color);
+      const k = this.kFor(_c.getHex());
       const pv = new THREE.Vector3(), nv = new THREE.Vector3();
       for (let i = 0; i < P.count; i++) {
         pv.fromBufferAttribute(P, i).applyMatrix4(_m4); nv.fromBufferAttribute(N, i).applyMatrix3(nm).normalize();
-        this.p.push(pv.x, pv.y, pv.z); this.n.push(nv.x, nv.y, nv.z); this.c.push(_c.r, _c.g, _c.b);
+        this.p.push(pv.x, pv.y, pv.z); this.n.push(nv.x, nv.y, nv.z); this.c.push(_c.r, _c.g, _c.b); this.mk.push(k);
       }
       return this;
     }
     box(w, h, d, color, x, y, z, rx, ry, rz) { return this.add(UNIT_BOX, color, x, y, z, rx, ry, rz, w, h, d); }
     addRaw(geo) { // a non-indexed geometry with its own vertex colours, as is
       const P = geo.attributes.position, N = geo.attributes.normal, C = geo.attributes.color;
-      for (let i = 0; i < P.count; i++) { this.p.push(P.getX(i), P.getY(i), P.getZ(i)); this.n.push(N.getX(i), N.getY(i), N.getZ(i)); this.c.push(C.getX(i), C.getY(i), C.getZ(i)); }
+      const t = this.kOf || KOF, k = this.k != null ? this.k : (t && t.raw) || 0;
+      for (let i = 0; i < P.count; i++) { this.p.push(P.getX(i), P.getY(i), P.getZ(i)); this.n.push(N.getX(i), N.getY(i), N.getZ(i)); this.c.push(C.getX(i), C.getY(i), C.getZ(i)); this.mk.push(k); }
       return this;
     }
     addMerge(o, x, y, z, sx, sy, sz) { // another Merge, scaled (sx, sy, sz) then moved by (x, y, z)
       for (let i = 0; i < o.p.length; i += 3) {
         this.p.push(o.p[i] * sx + x, o.p[i + 1] * sy + y, o.p[i + 2] * sz + z);
         const nx = o.n[i] / sx, ny = o.n[i + 1] / sy, nz = o.n[i + 2] / sz, l = Math.hypot(nx, ny, nz) || 1;
-        this.n.push(nx / l, ny / l, nz / l); this.c.push(o.c[i], o.c[i + 1], o.c[i + 2]);
+        this.n.push(nx / l, ny / l, nz / l); this.c.push(o.c[i], o.c[i + 1], o.c[i + 2]); this.mk.push(o.mk[i / 3] || 0);
       }
       return this;
     }
@@ -352,6 +366,7 @@ varying float vGL; varying vec2 vGUV;
       g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
       g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
       g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
+      if (GFX && this.mk.some(v => v)) g.setAttribute('mk', new THREE.Float32BufferAttribute(this.mk, 1));
       g.computeBoundingSphere();
       return g;
     }
@@ -582,7 +597,7 @@ varying float vGL; varying vec2 vGUV;
     vend: [0xe8453c, 0x2b6cb0, 0x35a05a, 0x9b5cf6, 0xff8a3d], couch: [0xc9a227, 0x6b8e23, 0xd98fb0, 0x8b4513, 0x5f9ea0], potty: [0x2b6cb0, 0x35a05a, 0xff8a3d, 0x9b5cf6],
     mushroom: [0xe8453c, 0x9b5cf6, 0x38bdf8, 0xff5c8a, 0xff8a3d], donut: [0xff8fb8, 0x7a4a2a, 0xb48cff, 0x9effa8], floatring: [0xff5c8a, 0x38bdf8, 0xffc21f, 0x35e06a],
     flag: [0xff5c8a, 0xffc21f, 0x35e06a, 0x38bdf8, 0x9b5cf6, 0xff8a3d, 0xffffff] };
-  MAT.decor = new THREE.MeshLambertMaterial({ vertexColors: true });   // decor's own colours, instanced, never tinted
+  MAT.decor = GFX ? GFX.pbr() : new THREE.MeshLambertMaterial({ vertexColors: true });   // decor's own colours, instanced, never tinted
   MAT.dglow = new THREE.MeshBasicMaterial({ vertexColors: true });
 
   // ---- cars (realism pass, 2026-11-17): a real side profile (bonnet, windscreen rake, roof, boot or hatch, wheel arches)
@@ -624,6 +639,7 @@ varying float vGL; varying vec2 vGUV;
   function carShape(m, s, paint, glass, fine) {
     const L = s.L, Wd = s.Wd, F = z => L / 2 - z;  // shape x = metres from the back, so after rotateY the nose faces -z
     const dark = 0x1d1f23, trim = 0x2b2e34, rim = 0xb9bfc6, aR = s.wr + 0.07;
+    const kp = m.kOf; m.kOf = Object.assign({}, kp || {}, { [_c.set(paint).getHex()]: 1, [_c.set(glass).getHex()]: 2, [rim]: 3, 0x8d949c: 3, 0x8fa4b6: 2, 0xf2f2ec: 9, [trim]: 9 });
     // body: nose, bonnet up to the windscreen base, then the deck / panel sides to the tail, and along the bottom over the arches
     const body = [[F(0.06), s.sill + 0.02], [F(0), s.sill + 0.2], [F(0), s.nose - 0.12], [F(0.12), s.nose], [F(s.ws * 0.55), s.nose + (s.belt - s.nose) * 0.6], [F(s.ws), s.belt]];
     if (s.panel) body.push([F(s.panel), s.belt], [F(s.panel), s.roof], [F(L - 0.1), s.roof], [F(L), s.roof - 0.12]);
@@ -680,6 +696,7 @@ varying float vGL; varying vec2 vGUV;
     m.box(0.46, 0.11, 0.02, 0xf2f2ec, 0, fy + 0.13, zf(0) - 0.03); m.box(0.46, 0.11, 0.02, 0xf2f2ec, 0, s.bus ? fy + 0.4 : s.deck - 0.38, zf(L) + 0.03);
     if (s.wing) { m.box(Wd * 0.84, 0.04, 0.26, trim, 0, s.deck + 0.2, zf(L - 0.18)); for (const sx of [-1, 1]) m.box(0.04, 0.2, 0.08, trim, sx * Wd * 0.34, s.deck + 0.09, zf(L - 0.2)); }
     const hy = s.nose - 0.1, ty = s.bus ? s.belt - 0.5 : s.deck - 0.16;
+    m.kOf = kp;
     return { head: [[-Wd * 0.34, hy, zf(0) - 0.02], [Wd * 0.34, hy, zf(0) - 0.02]], tail: [[-Wd * 0.38, ty, zf(L) + 0.02], [Wd * 0.38, ty, zf(L) + 0.02]], roofY: s.roof, cabZ: zf((s.rf + s.rb) / 2), L, Wd };
   }
   function carLights(m, at, Wd, bus) { // headlight and tail-light shapes (parked cars: plain colours; traffic: an unlit glow mesh)
@@ -747,9 +764,10 @@ varying float vGL; varying vec2 vGUV;
   class Geo {
     // ground = true: a photo-textured drape (MAT.drape). Set geo.layer (TL.*) before adding a surface; geo.fr = null lays
     // the photo in world x/z, or [ox, oz, ax, az, bx, bz, u0, v0] lays it along unit vector a (u) and across b (v).
-    constructor(withUV, ground) { this.p = []; this.n = []; this.c = []; this.uv = withUV ? [] : null; this.gl = ground ? [] : null; this.guv = ground ? [] : null; this.layer = -1; this.fr = null; }
+    // withUV (walls) also carries `wa` = this.wv = [facade style, seed, street-floor band] for cft-gfx's facade shader
+    constructor(withUV, ground) { this.p = []; this.n = []; this.c = []; this.uv = withUV ? [] : null; this.wa = withUV ? [] : null; this.wv = [2, 0, 0]; this.gl = ground ? [] : null; this.guv = ground ? [] : null; this.layer = -1; this.fr = null; }
     vert(x, y, z, nx, ny, nz, col, u, v) {
-      this.p.push(x, y, z); this.n.push(nx, ny, nz); this.c.push(col.r, col.g, col.b); if (this.uv) this.uv.push(u, v);
+      this.p.push(x, y, z); this.n.push(nx, ny, nz); this.c.push(col.r, col.g, col.b); if (this.uv) { this.uv.push(u, v); this.wa.push(this.wv[0], this.wv[1], this.wv[2]); }
       if (this.gl) {
         this.gl.push(this.layer);
         const f = this.fr;
@@ -817,7 +835,7 @@ varying float vGL; varying vec2 vGUV;
       g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
       g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
       g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
-      if (this.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+      if (this.uv) { g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2)); g.setAttribute('wa', new THREE.Float32BufferAttribute(this.wa, 3)); }
       if (this.gl) { g.setAttribute('glayer', new THREE.Float32BufferAttribute(this.gl, 1)); g.setAttribute('guv', new THREE.Float32BufferAttribute(this.guv, 2)); }
       g.computeBoundingSphere();
       return g;
@@ -1457,6 +1475,7 @@ varying float vGL; varying vec2 vGUV;
       for (let q = W.places.length - 1; q >= 0; q--) { const o = W.places[q]; if (o.made && Math.hypot(o.x - x, o.z - z) < 16) { o.gone = true; W.places.splice(q, 1); } }
       W.placeIds.add(id); W.places.push(pl);
       if (W.onPlace) W.onPlace(pl);
+      for (const b of s.buildings) if (x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1 && inRings(b.rings, x, z)) { b.shop = true; break; }  // shop windows (cft-gfx)
     }
     // Made-up shops in real buildings, so every street has signs and somewhere to go. The game names them
     // (W.makeShop(seed) -> {kind, name}); the same building always gets the same shop.
@@ -1475,7 +1494,7 @@ varying float vGL; varying vec2 vGUV;
         const shop = W.makeShop(seed);
         if (!shop) return;
         const pl = { id, x: b.cx, z: b.cz, kind: shop.kind, name: shop.name, pin, virtual: true, made: true };
-        made.push(pl); W.placeIds.add(id); W.places.push(pl);
+        made.push(pl); W.placeIds.add(id); W.places.push(pl); b.shop = true;
         if (W.onPlace) W.onPlace(pl);
       });
     }
@@ -2033,7 +2052,11 @@ varying float vGL; varying vec2 vGUV;
       wc.multiplyScalar(0.82 + hash(idx + Math.round(b.x0)) * 0.18);
       // the street floor is a darker band (shopfronts), when the building is tall enough to have one
       const gf = b.m <= 0.5 && b.h > 6.2 ? gfc.copy(wc).lerp(shopfront, 0.38) : null;
+      const fst = facadeStyle(b, idx, wc);
+      // street floor: shop windows where a shop is (or about one building in four on a shopping street), else plain windows
+      walls.wv = [fst, Math.floor(hash(idx * 31 + Math.round(b.cx * 3 + b.cz * 7)) * 997), gf && (b.shop || hash(idx * 7 + 3) < 0.25) ? 1 : 0];
       for (const ring of b.rings) addWalls(walls, ring, y0, top, wc, b.base, gf);
+      if (GFX && b.m <= 0.5) facadeExtras(roofs, b, idx, fst, top, walls.wv[2]);
       const rcs = cssColor(b.r);
       if (rcs) { rc.set(rcs); if (lk) rc.lerp(lk.rc[(idx & 1)], 0.6); } else { rc.copy(wc).lerp(gray, 0.55).multiplyScalar(0.85); if (lk) rc.lerp(lk.rc[(idx & 1)], 0.45); }
       if (!LOW && b.area > 40) { // ledges: a cornice under the roof line, a band above the shopfronts
@@ -2234,6 +2257,21 @@ varying float vGL; varying vec2 vGUV;
     }
   }
   const aoA = new THREE.Color(), aoC = new THREE.Color(), corA = new THREE.Color();
+  // Facade style for cft-gfx (high quality): 0 red brick, 1 buff brick, 2 stucco, 3 concrete panels, 4 lap siding,
+  // 5 greystone, 6 glass curtain wall. Towers get glass or concrete, houses siding or brick, the rest follows the colour.
+  const fsHSL = {};
+  function facadeStyle(b, idx, wc) {
+    const r = hash(idx * 13 + Math.round(b.cx + b.cz * 3));
+    wc.getHSL(fsHSL);
+    if (b.h > 28) return r < 0.55 ? 6 : 3;
+    if (b.h > 16 && r < 0.25) return r < 0.12 ? 6 : 3;
+    if (b.g) return r < 0.45 ? 4 : fsHSL.h < 0.07 || fsHSL.h > 0.94 ? 0 : 1;
+    const warm = fsHSL.h < 0.08 || fsHSL.h > 0.93;
+    if (fsHSL.s < 0.14) return r < 0.5 ? 5 : r < 0.75 ? 3 : 2;
+    if (warm && fsHSL.s > 0.25) return r < 0.8 ? 0 : 5;
+    if (fsHSL.h < 0.17) return r < 0.5 ? 1 : r < 0.7 ? 0 : 2;
+    return r < 0.55 ? 2 : r < 0.8 ? 1 : 4;
+  }
   // A ledge around a building at height y (a roof cornice, or the line above the shopfronts): sticks out o metres, h tall.
   // Goes in the roofs geometry (plain colours, no window texture). High quality only.
   function cornice(geo, p, y, col, o, h) {
@@ -2252,6 +2290,84 @@ varying float vGL; varying vec2 vGUV;
       geo.flat(x1, z1, x2, z2, bx, bz, yb, corA, true); geo.flat(x1, z1, bx, bz, ax, az, yb, corA, true);
     }
   }
+  // A box turned to a wall: centre (cx, cz), u = unit vector along the wall, n = out of it; hl / hd half length / depth.
+  function obox(geo, cx, cz, y0, y1, ux, uz, hl, hd, col) {
+    const nx = -uz, nz = ux;
+    const c = [[-hl, -hd], [hl, -hd], [hl, hd], [-hl, hd]].map(q => [cx + ux * q[0] + nx * q[1], cz + uz * q[0] + nz * q[1]]);
+    const nrm = [[-nx, -nz], [ux, uz], [nx, nz], [-ux, -uz]];
+    for (let i = 0; i < 4; i++) {
+      const a = c[i], b = c[(i + 1) % 4], [fx, fz] = nrm[i];
+      geo.vert(a[0], y0, a[1], fx, 0, fz, col, 0, 0); geo.vert(b[0], y1, b[1], fx, 0, fz, col, 0, 0); geo.vert(b[0], y0, b[1], fx, 0, fz, col, 0, 0);
+      geo.vert(a[0], y0, a[1], fx, 0, fz, col, 0, 0); geo.vert(a[0], y1, a[1], fx, 0, fz, col, 0, 0); geo.vert(b[0], y1, b[1], fx, 0, fz, col, 0, 0);
+    }
+    geo.quadFlat(c[0][0], c[0][1], c[1][0], c[1][1], c[2][0], c[2][1], c[3][0], c[3][1], y1, col);
+    geo.flat(c[0][0], c[0][1], c[1][0], c[1][1], c[2][0], c[2][1], y0, col, true); geo.flat(c[0][0], c[0][1], c[2][0], c[2][1], c[3][0], c[3][1], y0, col, true);
+  }
+  // Is some other building's footprint at (x, z)? (party walls: no balconies into the neighbours)
+  function builtAt(x, z, not) {
+    const list = buckets.get(bkey(x, z));
+    if (list) for (const b of list) if (b !== not && x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1 && inRings(b.rings, x, z)) return true;
+    return false;
+  }
+  // Facade extras (high quality, 2026-11-19): balconies with iron railings and, on some, a Montreal-style outdoor staircase
+  // down to the street; window air conditioners; chimneys on pitched roofs. Only on walls that face a street and have no
+  // neighbour against them. Drawn in the roofs geometry (cft-gfx roof material: weathered paint on the sides).
+  const BAL_SLAB = new THREE.Color(0x9c978d), BAL_IRON = [new THREE.Color(0x24262b), new THREE.Color(0xe9e6df), new THREE.Color(0x2f5d4a)], AC_COL = new THREE.Color(0xd9d8d2), AC_DARK = new THREE.Color(0x5d6066), CHIM = new THREE.Color(0x8a4a38);
+  function facadeExtras(geo, b, idx, st, top, shopBand) {
+    const r0 = hash(idx * 17 + Math.round(b.cx * 5 + b.cz)), floors = Math.floor((b.h + 0.4) / FLOOR_H);
+    if (b.g && b.area > 30) {   // a chimney near the ridge
+      const cx = b.cx + (hash(idx + 5) - 0.5) * (b.x1 - b.x0) * 0.3, cz = b.cz + (hash(idx + 6) - 0.5) * (b.z1 - b.z0) * 0.3;
+      if (inRings(b.rings, cx, cz)) { gbox(geo, cx, cz, top, top + b.g + 0.9, 0.32, 0.32, CHIM); gbox(geo, cx, cz, top + b.g + 0.9, top + b.g + 1.05, 0.38, 0.38, AC_DARK); }
+    }
+    if (st === 3 || st === 6 || floors < 2 || b.h > 24) return;
+    const balconies = r0 < 0.42, stairs = balconies && r0 < 0.2 && floors <= 4 && !shopBand, ac = !balconies && r0 > 0.7;
+    if (!balconies && !ac) return;
+    const iron = BAL_IRON[Math.floor(hash(idx + 9) * 3)];
+    const ring = b.rings[0], n = ring.length / 2;
+    let stairsDone = false;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n, x1 = ring[2 * i], z1 = ring[2 * i + 1], x2 = ring[2 * j], z2 = ring[2 * j + 1];
+      const dx = x2 - x1, dz = z2 - z1, L = Math.hypot(dx, dz);
+      if (L < 4.5) continue;
+      const ux = dx / L, uz = dz / L, nx = -uz, nz = ux, mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+      if (builtAt(mx + nx * 1.5, mz + nz * 1.5, b)) continue;
+      let street = false;
+      for (const k of [3, 6, 9]) if (roadAt(mx + nx * k, mz + nz * k)) { street = true; break; }
+      if (!street) continue;
+      const bays = Math.max(1, Math.round(L / WIN_W)), cw = L / bays;
+      for (let q = 0; q < bays; q++) {
+        const along = (q + 0.5) * cw, bx = x1 + ux * along, bz = z1 + uz * along;
+        for (let f = 1; f < floors; f++) {
+          const y = b.base + f * FLOOR_H;
+          if (balconies) {
+            if ((q + (r0 * 10 | 0)) % 2 && bays > 2) continue;   // every other bay on wide walls
+            const hl = cw * 0.42, d = 1.05, cx = bx + nx * d / 2, cz = bz + nz * d / 2;
+            obox(geo, cx, cz, y - 0.12, y, ux, uz, hl, d / 2, BAL_SLAB);                                         // slab
+            obox(geo, cx + nx * (d / 2 - 0.03), cz + nz * (d / 2 - 0.03), y + 0.9, y + 0.96, ux, uz, hl, 0.03, iron);  // hand rail
+            obox(geo, cx + nx * (d / 2 - 0.03), cz + nz * (d / 2 - 0.03), y + 0.08, y + 0.13, ux, uz, hl, 0.025, iron);
+            for (let k = 0; k <= 6; k++) { const o = -hl + k * hl / 3; obox(geo, cx + ux * o + nx * (d / 2 - 0.03), cz + uz * o + nz * (d / 2 - 0.03), y, y + 0.92, ux, uz, 0.018, 0.018, iron); }
+            for (const sd of [-1, 1]) obox(geo, cx + ux * hl * sd, cz + uz * hl * sd, y + 0.9, y + 0.96, ux, uz, 0.03, d / 2, iron);
+            // the outdoor staircase: from the first balcony down to the pavement, along the wall
+            if (stairs && !stairsDone && f === 1 && q === 0 && L > 7) {
+              stairsDone = true;
+              const steps = 14, rise = (y - b.base) / steps, run = 0.27, sw = 0.5;
+              for (let k = 0; k < steps; k++) {
+                const a = along - hl - 0.15 - (k + 0.5) * run;   // walks away from the balcony along the wall, going down
+                if (a < 0.3) break;
+                const sx = x1 + ux * a + nx * (d - sw), sz = z1 + uz * a + nz * (d - sw), ty = y - (k + 1) * rise;
+                obox(geo, sx, sz, ty - 0.05, ty, ux, uz, run / 2 + 0.01, sw, iron);
+                if (k % 2 === 0) obox(geo, sx + nx * sw, sz + nz * sw, ty, ty + 0.95, ux, uz, 0.018, 0.018, iron);
+              }
+            }
+          } else if (ac && hash(idx * 3 + q * 7 + f * 13) < 0.22) {
+            const cx = bx + nx * 0.27, cz = bz + nz * 0.27;
+            obox(geo, cx, cz, y + 0.42, y + 0.84, ux, uz, 0.32, 0.27, AC_COL);
+            obox(geo, cx + nx * 0.27, cz + nz * 0.27, y + 0.48, y + 0.78, ux, uz, 0.25, 0.006, AC_DARK);   // the grille
+          }
+        }
+      }
+    }
+  }
   // An upright box in a flat-shaded Geo (roof huts, tanks, antennas)
   function gbox(geo, x, z, y0, y1, hw, hd, col, top) {
     const c = [[x - hw, z - hd], [x + hw, z - hd], [x + hw, z + hd], [x - hw, z + hd]];
@@ -2266,8 +2382,8 @@ varying float vGL; varying vec2 vGUV;
   const ROOF_COLS = [0x9aa0a6, 0x7c8288, 0xb7b1a4, 0x6f7a86, 0xa8734a].map(h => new THREE.Color(h));
   const TANK_COL = new THREE.Color(0x8a5a3a), TANK_TOP = new THREE.Color(0x6b4428), MAST_COL = new THREE.Color(0xd9d9d9), MAST_RED = new THREE.Color(0xe23b2e);
   function roofClutter(geo, b, top, idx) {
-    if (LOW || b.area < 170 || b.h < 8) return;
-    const sx = (b.x1 - b.x0) * 0.3, sz = (b.z1 - b.z0) * 0.3, n = Math.min(4, 1 + Math.floor(b.area / 500));
+    if (LOW || b.area < 110 || b.h < 6) return;
+    const sx = (b.x1 - b.x0) * 0.3, sz = (b.z1 - b.z0) * 0.3, n = Math.min(GFX ? 7 : 4, 1 + Math.floor(b.area / (GFX ? 220 : 500)));
     const fits = (x, z, r) => inRings(b.rings, x, z) && inRings(b.rings, x + r, z + r) && inRings(b.rings, x - r, z + r) && inRings(b.rings, x + r, z - r) && inRings(b.rings, x - r, z - r);
     for (let k = 0; k < n; k++) {
       const hh = idx * 7 + k * 13 + Math.round(b.cx);
@@ -2545,7 +2661,8 @@ varying float vGL; varying vec2 vGUV;
     for (const k in LIMB) o[k] = new THREE.LatheGeometry(LIMB[k].map(p => new THREE.Vector2(p[0], p[1])), ln).toNonIndexed();
     return o;
   };
-  const PRIM_HI = prims(16, 12, 10, 7, 4, 12, 16, 6, 14, 12), PRIM_MID = prims(10, 7, 6, 3, 2, 8, 10, 4, 10, 8), PRIM_LO = prims(8, 5, 5, 3, 1, 6, 8, 3, 8, 6);
+  const PRIM_HI = prims(26, 18, 14, 10, 6, 18, 26, 9, 22, 18), PRIM_MID = LOW ? prims(10, 7, 6, 3, 2, 8, 10, 4, 10, 8) : prims(14, 10, 8, 5, 3, 10, 14, 5, 12, 10),  // smoother since 2026-11-19 (high quality)
+    PRIM_LO = prims(8, 5, 5, 3, 1, 6, 8, 3, 8, 6);
   const DUCK_RING = new THREE.TorusGeometry(0.5, 0.16, 6, 16).rotateX(Math.PI / 2).toNonIndexed();
   const shade = (c, k) => { _c.set(c).multiplyScalar(k); return _c.getHex(); };
   const mix = (a, b, t) => { _c.set(a).lerp(new THREE.Color(b), t); return _c.getHex(); };
@@ -2594,8 +2711,25 @@ varying float vGL; varying vec2 vGUV;
   // look: {skin, hair, shirt, pants, shoe, h, build, fig 0-1 (straight -> curvy), eye, style | long + hs, sleeve: 'short' |
   //   'long' | 'none', shorts, dress, hat, beanie, crown, glasses, beard, bag, apron, cape, coat, scarf, stripes, logo, phones,
   //   collar, tie, tuck, mood: 'angry', silly (one of W.SILLY)}. npc: true = only the big parts cast shadows.
+  // surface classes for a person's parts, by colour (cft-gfx: skin, hair strands, cloth weave, glossy eyes)
+  function personKOF(look) {
+    const t = { raw: 6 }, h = c => _c.set(c).getHex();
+    for (const c of [look.shirt, look.pants, look.coat, look.scarf, look.apron, look.cape, look.stripes, look.tie]) if (c != null) t[h(c)] = 6;
+    if (look.shoe != null) t[h(look.shoe)] = 9; else t[0x222222] = 9;
+    if (look.bag != null) t[h(look.bag)] = 9;
+    if (look.hair != null) t[h(look.hair)] = 7;
+    t[0xffffff] = 5; t[0x111111] = 5;
+    if (look.skin != null) t[h(look.skin)] = 4;
+    return t;
+  }
   W.person = function (look, npc) {
     look = look || W.randomLook(Math.random() * 1e6 | 0);
+    if (!GFX) return buildPerson(look, npc);
+    const prev = KOF;
+    KOF = personKOF(look);
+    try { return buildPerson(look, npc); } finally { KOF = prev; }
+  };
+  function buildPerson(look, npc) {
     const P = npc ? (LOW ? PRIM_LO : PRIM_MID) : (LOW ? PRIM_MID : PRIM_HI);
     const { sph: P_SPH, sm: P_SM, cap: P_CAP, dome: P_DOME, skirt: P_SKIRT, ring: P_RING } = P;
     const g = new THREE.Group(), body = new THREE.Group();
@@ -2769,7 +2903,7 @@ varying float vGL; varying vec2 vGUV;
     body.scale.x = 1 + ((look.build || 1) - 1) * 0.6;
     g.scale.setScalar(look.h || 1);
     return g;
-  };
+  }
   // Walk / run / idle and the poses (sit, ground, ride, pedal, air, wave, dance) for anything made by W.person or W.animal.
   // Limbs hang down, so a positive rotation.x swings them forward; knees bend back (negative), elbows forward (positive).
   W.animate = function (g, speed, dt, pose) {
@@ -2889,7 +3023,7 @@ varying float vGL; varying vec2 vGUV;
   // Monsters (cartoon figments: you bonk them, they pop into coins). Each has googly eyes and its own wobble.
   // kind: slime | bin | cone | sock | pigeon | goose | blob (the big purple boss) | rat | raccoon | wisp | cart | spider | worm | gargoyle | brute. W.animateMonster(g, dt, speed) moves it.
   const eye = (m, x, y, z, r) => { m.add(SPHERE, 0xffffff, x, y, z, 0, 0, 0, r, r, r); m.add(SPHERE, 0x111111, x, y, z - r * 0.36, 0, 0, 0, r * 0.5, r * 0.5, r * 0.4); };
-  const slimeMat = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.86 });
+  const slimeMat = GFX ? GFX.pbr({ transparent: true, opacity: 0.86, rough: 0.15 }) : new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.86 });
   W.monster = function (kind) {
     const g = new THREE.Group(), body = new THREE.Group(), m = new Merge();
     g.add(body);
@@ -3053,14 +3187,86 @@ varying float vGL; varying vec2 vGUV;
       m.box(0.08, 0.36, 0.08, 0xe0a030, -0.2, 0.18, 0); m.box(0.08, 0.36, 0.08, 0xe0a030, 0.2, 0.18, 0);
       h = goose ? 2.1 : 1.7;
     }
+    const mm = monModel(kind);   // a rigged, animated figment model once it has loaded (2026-11-19), else the built one
+    if (mm) {
+      body.add(mm.obj);
+      g.userData = { kind: 'monster', mkind: kind, body, lid: null, wings: null, phase: Math.random() * 6, h: mm.h, hurt: 0, model: mm };
+      return g;
+    }
     const mesh = m.mesh(mat);
     body.add(mesh);
     g.userData = { kind: 'monster', mkind: kind, body, lid, wings, phase: Math.random() * 6, h, hurt: 0 };
     return g;
   };
+  // ---- figment models (2026-11-19 graphics overhaul): Quaternius "Ultimate Monsters" (CC0), packed by tools/monster_models.py
+  // into theme/assets/mon-*.glb. MON_MODELS = monster kind -> model files (one picked at random); MON_H = height in metres.
+  // Kinds not listed (bin, cone, cart, tomato, wifi, rat, spider, goose) keep their built models: they are jokes about
+  // real objects. Loaded in the background after the world starts; until then (or without THREE.GLTFLoader) every
+  // figment is the built one. W.animateMonster plays the clips: idle / walk / run, the attack while it winds up
+  // (userData.act = 'wind', set by cft-fun), a flinch when hurt.
+  const MON_MODELS = { slime: ['greenblob', 'pinkblob', 'spikyblob'], blob: ['spikyblob'], sock: ['ghost'], wisp: ['ghostskull'], pigeon: ['fatpigeon'],
+    gull: ['pigeon'], raccoon: ['ninja'], worm: ['fish'], gargoyle: ['bluedemon'], brute: ['orc'], spitter: ['alien'] };
+  const MON_H = { greenblob: 1.05, pinkblob: 1.05, spikyblob: 1.15, fatpigeon: 1.5, ghost: 1.55, ghostskull: 1.6, pigeon: 1.25, ninja: 1.75, fish: 1.85, bluedemon: 2.0, orc: 2.15, alien: 1.6 };
+  const monSrc = {};
+  W.monModels = monSrc;
+  function loadMonsters() {
+    if (!THREE.GLTFLoader || !THREE.SkeletonUtils || opts.nomodels || /[?&]nomodels=1/.test(location.search)) return;
+    const loader = new THREE.GLTFLoader();
+    const names = [...new Set(Object.values(MON_MODELS).flat())];
+    names.forEach(name => loader.load('_/theme/mon-' + name + '.glb?v=1', gl => {
+      if (destroyed) return;
+      const sc = gl.scene;
+      sc.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = !LOW; o.frustumCulled = false;   // skinned: the bind-pose bounds lag behind the animation
+        const old = o.material, map = old.map;
+        if (map) { map.encoding = THREE.LinearEncoding; map.anisotropy = 4; map.needsUpdate = true; }   // this game draws in display colours
+        o.material = GFX ? new THREE.MeshStandardMaterial({ map, roughness: 0.5, metalness: 0, envMapIntensity: 0.6, side: old.side })
+          : new THREE.MeshLambertMaterial({ map, side: old.side });
+        old.dispose();
+      });
+      const box = new THREE.Box3().setFromObject(sc);
+      const clip = n => gl.animations.find(a => a.name === n) || null;
+      const any = (...ns) => { for (const n of ns) { const c = clip(n); if (c) return c; } return null; };
+      monSrc[name] = { scene: sc, h0: Math.max(0.2, box.max.y - box.min.y), y0: box.min.y,
+        clips: { idle: any('Idle', 'Flying_Idle'), walk: any('Walk', 'Flying_Idle'), run: any('Run', 'Fast_Flying', 'Walk'), atk: any('Punch', 'Bite_Front', 'Headbutt', 'Weapon'), hit: any('HitReact', 'HitRecieve') } };
+    }, undefined, () => { /* a missing model: that figment stays the built one */ }));
+  }
+  function monModel(kind) {
+    const list = (MON_MODELS[kind] || []).filter(n => monSrc[n]);
+    if (!list.length) return null;
+    const name = list[Math.random() * list.length | 0], src = monSrc[name];
+    const obj = THREE.SkeletonUtils.clone(src.scene);
+    const h = MON_H[name] * (kind === 'blob' ? 2.7 : 1), k = h / src.h0;
+    obj.scale.setScalar(k); obj.position.y = -src.y0 * k; obj.rotation.y = Math.PI;   // glTF faces +z, figments face -z
+    const mixer = new THREE.AnimationMixer(obj), acts = {};
+    for (const c in src.clips) if (src.clips[c]) { acts[c] = mixer.clipAction(src.clips[c]); if (c === 'atk' || c === 'hit') { acts[c].setLoop(THREE.LoopOnce, 1); acts[c].clampWhenFinished = true; } }
+    const mm = { obj, mixer, acts, cur: null, h, name };
+    playMon(mm, 'idle', 0);
+    mixer.update(Math.random() * 2);
+    return mm;
+  }
+  function playMon(mm, c, fade) {
+    const a = mm.acts[c] || mm.acts.idle;
+    if (!a || mm.cur === a) return;
+    a.reset(); a.setEffectiveWeight(1); a.play();
+    if (mm.cur && fade) mm.cur.crossFadeTo(a, fade, false); else if (mm.cur) mm.cur.stop();
+    mm.cur = a;
+  }
+  setTimeout(loadMonsters, 1200);
   W.animateMonster = function (g, dt, speed) {
     const u = g.userData, b = u.body;
     u.phase += dt * (3 + speed * 1.6);
+    if (u.model) {
+      const mm = u.model, A = mm.acts;
+      const want = u.hurt > 0 && A.hit ? 'hit' : u.act === 'wind' && A.atk ? 'atk' : speed > 4.2 ? 'run' : speed > 0.25 ? 'walk' : 'idle';
+      playMon(mm, want, 0.18);
+      const loco = want === 'walk' || want === 'run';
+      mm.mixer.update(dt * (loco ? Math.max(0.6, Math.min(1.8, speed / (want === 'run' ? 5.5 : 2.6))) : 1));
+      if (mm.name === 'ghost' || mm.name === 'ghostskull') b.position.y = 0.3 + Math.sin(u.phase * 0.6) * 0.18;   // ghosts drift
+      if (u.hurt > 0) { u.hurt -= dt; const f = 1 + Math.sin(u.hurt * 40) * 0.06; g.scale.setScalar((u.size || 1) * f); } else g.scale.setScalar(u.size || 1);
+      return;
+    }
     const s = Math.sin(u.phase), k = u.mkind;
     if (k === 'slime' || k === 'blob') { const q = 1 + s * 0.14; b.scale.set(1 / Math.sqrt(q), q, 1 / Math.sqrt(q)); b.position.y = Math.max(0, s) * (speed > 0.3 ? 0.5 : 0.08); }
     else if (k === 'sock') { b.position.y = 0.25 + s * 0.14; b.rotation.z = s * 0.14; }
@@ -3653,13 +3859,14 @@ varying float vGL; varying vec2 vGUV;
     scene.fog.color.copy(skyCol);
     const day = smooth(5.5, 8, h) * (1 - smooth(18.3, 21, h));
     W.night = 1 - day;
-    hemi.intensity = 0.4 + 0.3 * day;
+    hemi.intensity = (0.4 + 0.3 * day) * (GFX ? 0.5 : 1);   // high quality: the sky's environment map does much of the fill
     hemi.color.setHex(day > 0.5 ? 0xe4f0ff : 0xa9b6f0);
     sun.intensity = 0.16 + 0.56 * day;
     sun.color.setHex(day < 0.15 ? 0x9fb4ff : h < 9 || h > 17 ? 0xffc79a : 0xfff0d8);  // moonlight is blue
     const a = (h - 6) / 12 * Math.PI;  // sun travels east -> west
     sunDir.set(Math.cos(a) * 0.6, Math.max(0.25, Math.sin(Math.max(0.2, Math.min(Math.PI - 0.2, a)))), 0.46).normalize();
     MAT.walls.emissiveIntensity = Math.max(0, (W.night - 0.3) * 1.3);
+    if (GFX) { GFX.U.uNight.value = W.night; GFX.U.uDay.value = day; }
     scene.fog.near = 120 - W.night * 40; scene.fog.far = 600 - W.night * 180;
     // the dome: deep blue overhead by day, almost black at night, the horizon keeps the fog colour
     i = 0;
@@ -3685,7 +3892,14 @@ varying float vGL; varying vec2 vGUV;
     cloudMat.emissive.copy(cloudMat.color); cloudMat.emissiveIntensity = 0.5 * (1 - W.night);
     MAT.pool.visible = glow > 0.02;
     W.glow = glow;
+    if (GFX) { GFX.U.uSkyTop.value.copy(skyTop); GFX.U.uSkyLow.value.copy(skyCol); }
+    // reflections: re-render the sky into the environment map when the hour has moved on (a game quarter hour = 15 s)
+    if (GFX && (envH == null || Math.abs(angDiff(h / 24 * 6.2832, envH / 24 * 6.2832)) > 0.065)) {
+      envH = h;
+      scene.environment = GFX.updateEnv(skyTop, skyCol, sunDir, sun.color, W.night);
+    }
   };
+  let envH = null;
 
   // ---------------------------------------------------------------- ambient life: pedestrians, traffic, pigeons
   const TW = (opts.tune && opts.tune.world) || { peds: 44, pedsLow: 22, cars: 20, carsLow: 9 };  // D.TUNE.world
@@ -4154,7 +4368,7 @@ varying float vGL; varying vec2 vGUV;
 
   let snapReq = null;
   // Renders now and returns a small JPEG (data URL) of the view
-  W.snapshot = (w, h) => new Promise(res => { snapReq = { w: w || 320, h: h || 180, res }; updateCamera(0.016); updateSky(0); renderer.render(scene, camera); takeSnap(); });
+  W.snapshot = (w, h) => new Promise(res => { snapReq = { w: w || 320, h: h || 180, res }; updateCamera(0.016); updateSky(0); draw(); takeSnap(); });
   function takeSnap() {
     if (!snapReq) return;
     const c = document.createElement('canvas'); c.width = snapReq.w; c.height = snapReq.h;
@@ -4178,8 +4392,15 @@ varying float vGL; varying vec2 vGUV;
     updateCamera(dt);
     updateSky(dt);
     if (opts.render === false) return;
-    renderer.render(scene, camera);
+    draw(true);
   };
+  // every frame goes through here: post-processing on high quality, else straight to the screen
+  let lastDraw = 0;
+  function draw(live) {
+    if (!POST) { renderer.render(scene, camera); return; }
+    POST.render(scene, camera);
+    if (live) { const now = performance.now(); if (lastDraw) POST.adapt((now - lastDraw) / 1000); lastDraw = now; }
+  }
 
   // ---------------------------------------------------------------- little effects: bursts of emoji, comic words
   const fx = [];
@@ -4222,8 +4443,10 @@ varying float vGL; varying vec2 vGUV;
     const r = canvas.getBoundingClientRect(), behind = _pj.z > 1;
     return { x: (_pj.x * (behind ? -1 : 1) + 1) / 2 * r.width, y: (1 - _pj.y * (behind ? -1 : 1)) / 2 * r.height, behind, w: r.width, h: r.height };
   };
-  W.render = () => { updateCamera(0.016); updateSky(0); renderer.render(scene, camera); };
-  W.renderInfo = () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls });  // the last frame (tests, tuning)
+  W.render = () => { updateCamera(0.016); updateSky(0); draw(); };
+  W.renderInfo = () => POST && POST.info ? Object.assign({}, POST.info) : ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls });
+  W.gfx = GFX;     // null on low quality (tests flip GFX.U.uDbg to see the facade shader's inputs)
+  W.post = POST;   // null on low quality / WebGL1; tests and the play-test panel read POST.level / POST.params  // the last frame (tests, tuning)
   W.resize = resize;
 
   // Rotating minimap. opts: {radius, markers:[{x,z,color,emoji,r,ring,edge}], rects:[{x0,z0,x1,z1,fill,stroke}], heading}
@@ -4316,6 +4539,7 @@ varying float vGL; varying vec2 vGUV;
   W.destroy = function () {
     for (const [el, ev, fn, o] of listeners) el.removeEventListener(ev, fn, o);
     W.unlock();
+    if (POST) POST.dispose();
     try { renderer.dispose(); renderer.forceContextLoss(); } catch (e) { /* ignore */ }
     gen++;
     destroyed = true;

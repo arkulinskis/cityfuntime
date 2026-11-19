@@ -60,7 +60,7 @@ function attach(G, api) {
   layer.className = 'cft-hero';
   layer.innerHTML = '<div class="cft-blips" data-blips></div><div class="cft-ticker" data-ticker></div><div class="cft-hype" data-hype></div>';
   shell.insertBefore(layer, U.canvas.nextSibling);
-  if (!LOW) { const v = document.createElement('div'); v.className = 'cft-vignette'; shell.insertBefore(v, layer); }  // a soft vignette: the "graded" look
+  if (!LOW && !W.post) { const v = document.createElement('div'); v.className = 'cft-vignette'; shell.insertBefore(v, layer); }  // a soft vignette: the "graded" look
   const hypeBox = layer.querySelector('[data-hype]'), tickBox = layer.querySelector('[data-ticker]'), blipBox = layer.querySelector('[data-blips]');
   const tl = shell.querySelector('.cft-tl');
   const swagEl = document.createElement('button');

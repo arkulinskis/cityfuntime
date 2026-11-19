@@ -572,6 +572,62 @@ plan: `docs/open-air-report.md` (mechanics only; no names/art; durability and co
 - **Not verified on a real device:** climbing/gliding feel with real mouse + touch, slow motion feel, the corner layout on
   every phone size (measured: 1264x705 desktop).
 
+## The graphics overhaul (2026-11-19: "improve city fun time graphics by a large factor... enemies, the world, the characters, buildings.. all need more detail")
+
+High quality only (low keeps the old Lambert look, except the figment models, which load on both). Three new engine files,
+loaded before cft-world.js (cft-kit.js `ALL`, harness.py `ENGINE`, a `cft-asset` meta each in anvil.yaml):
+- **cft-post.js** (`W.post`, null on low / WebGL1 / `?nopost=1`): the world renders into a half-float 4x MSAA target with a
+  depth texture, then SAO-style ambient occlusion (half res + depth-aware blur), bloom (bright pass + 4-level chain), and one
+  composite (AO, bloom, gamma -> linear, exposure, ACES curve, saturation, contrast, warmth, vignette, dither). Knobs:
+  `W.post.params` {exposure, ao, aoR, bloom, thr, sat, con, warm, vig}. `P.adapt(dt)` (fed real frame times by `draw()`)
+  drops `W.post.level` 2 -> 1 (no AO) -> 0 (straight to screen) after ~4 s of frames slower than 1/34 s; it never comes back
+  that session. Every render goes through cft-world `draw()` (frame, W.render, W.snapshot). `W.renderInfo()` reads
+  `POST.info` (the scene pass only). The CSS vignette/filter are off when post is on (`.cft-canvas.cft-post`, cft-hero).
+- **cft-gfx.js** (`W.gfx`, null on low): procedural materials, no downloads.
+  - `wallMaterial()` = MAT.walls. Vertex attribute `wa` = [style, seed, shop band] from `Geo.wv` (walls Geo only), set per
+    building in buildSub: `facadeStyle(b, idx, colour)` picks 0 red brick, 1 buff brick, 2 stucco, 3 concrete panels, 4 lap
+    siding, 5 greystone, 6 glass curtain wall (towers > 28 m: glass or concrete; houses with gables: siding or brick; else
+    by colour). Windows are cut on the existing bay/floor grid (uv x 4; `CW` 3.6 / `FH` 3.3 in the shader): lintels + sills
+    on brick/stone, frames, mullions, a 0.14 m recess with its reveal, blinds, doors, and **interior mapping** (`room()`):
+    a fake room per window (back wall + furniture, side walls, floor, ceiling lamp) lit by day and, for ~42% of windows, at
+    night (TVs flicker blue). Street floor = shop windows when `wa.z` is 1: buildings with a real or made-up shop (`b.shop`,
+    set in registerSub) or ~1 in 4 others with a shop band; shop interiors are shelves, a cafe counter + menu board, or a
+    boutique rail. Glass mixes the room with a Fresnel sky reflection (`uSkyTop/uSkyLow`, copied in setClock).
+  - `roofMaterial()` = MAT.plain (roofs geometry): membrane + gravel + seams on flat roofs, shingle rows on pitched ones,
+    weathered paint on vertical faces (cornices, huts, balconies).
+  - `pbr(o)` = MAT.vc / prop / tint / decor / crown / slimeMat: MeshStandard + a per-vertex surface class `mk` from
+    **Merge** (`m.as(k)`, `m.kOf = {hex: k}`, or the builder-wide `KOF` while `W.person` runs (`personKOF(look)`)):
+    0 matte, 1 car paint (glossy, reflects the sky), 2 glass, 3 metal (rims), 4 skin (warm shadows), 5 eyes/wet, 6 cloth
+    (weave), 7 hair (strands), 8 leaves, 9 plastic. carShape sets kOf for paint/glass/rims/trim.
+  - `updateEnv()`: a little sky scene (gradient, horizon city band, sun) rendered to a PMREM map = `scene.environment`,
+    redone in setClock when the clock moved ~15 game minutes. Every gfx material uses `envMapIntensity` `ENV_K` 0.5, and
+    the hemisphere light is halved on high quality to make room for it.
+  - Debug: `W.gfx.U.uDbg.value` = 1 view vector, 2 metres, 3 bay/floor cell, 4 detail fade (facade shader inputs).
+- **three-gltf.js**: three r149's GLTFLoader + SkeletonUtils turned into a plain script (THREE.GLTFLoader, THREE.SkeletonUtils).
+- **Figment models** (`mon-*.glb`, 3.3 MB, Quaternius "Ultimate Monsters", CC0, packed by `tools/monster_models.py <pack
+  folder>`, which keeps only the clips we play): `MON_MODELS` maps kinds to models (slime: green/pink/spiky blob, blob:
+  giant spiky blob, sock: ghost, wisp: ghost skull, pigeon: fat pigeon, gull: flying pigeon, raccoon: ninja, worm: fish,
+  gargoyle: blue demon, brute: orc, spitter: alien); `MON_H` = heights. Loaded 1.2 s after the world starts
+  (`loadMonsters`; `?nomodels=1` skips); until then, or for kinds not listed (bin, cone, cart, tomato, wifi, rat, spider,
+  goose: jokes about real objects), `W.monster` builds the old model. A model figment has `userData.model` = {obj, mixer,
+  acts, cur, h}; `W.animateMonster` plays idle / walk / run (by speed), the attack while `userData.act === 'wind'` (set by
+  cft-fun before each animateMonster call) and the flinch while `hurt > 0`. Textures are switched to LinearEncoding (the
+  game draws in display colours). MEGA figments use the same models at 15-27 m.
+- **Facade extras** (`facadeExtras` in buildSub, roofs geometry): balconies with iron railings on ~42% of 2-7 floor brick /
+  stucco / siding / stone buildings, on walls facing a street with no neighbour against them (`builtAt`); ~half of those
+  also get a Montreal-style outdoor staircase from the first balcony down to the pavement (no collision: you walk through
+  it); window AC units on others; chimneys on gabled roofs. `obox` = a box turned to a wall.
+- **People:** `PRIM_HI` / `PRIM_MID` have more segments on high quality (passer-by ~5-6k triangles; funtest allows < 7,000).
+- **Pictures:** `game_test.py --gfx DIR` (facades close and angled, roofs from above, cars, you, dusk, night, a figment line-up);
+  `CFT_QS="&nopost=1"` (or `&nomodels=1`) in the environment compares without post / models.
+- **Gotchas hit:** an interpolated varying (the building seed) wobbles in its last bits per pixel and the hashes turned that
+  into TV static: seeds are whole numbers and rounded in the shader (`floor(vWA.y + 0.5)`); pick the room surface with
+  ordered comparisons, never `t == tz`. Bloom threshold is HDR (only values above ~1 glow). The interior light levels are
+  small numbers on purpose (they are emissive and go through exposure + bloom).
+- **Not verified on a real GPU:** frame rate with MeshStandard everywhere + post + facade shader (software WebGL only). If a
+  real machine stutters: the watchdog drops AO then post by itself; next steps are `W.post.params.ao = 0`, a lower
+  `setPixelRatio` cap, or `ENV_K`. Phones (auto = low quality) only get the models.
+
 ## Recipes
 
 - **New page:** copy a similar `client_code/Pages/<Name>/`, register it in `client_code/router.py`; new field on Life / Quests /

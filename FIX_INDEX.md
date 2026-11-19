@@ -27,6 +27,10 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 
 | Area | A note like... | Look at | Knob / data | Test |
 |---|---|---|---|---|
+| Look / exposure / bloom / AO | "too dark", "washed out", "too much glow" | cft-post.js `create` (params) | `W.post.params` | --gfx |
+| Building facades, windows, shop windows | "windows look flat", "too many shops", "brick too strong" | cft-gfx.js `wallMaterial` (WALL_HEAD: `facade`, `room`, `wallH`), cft-world `facadeStyle` | `ENV_K`, shop share in buildSub `walls.wv` | --gfx |
+| Balconies, outdoor stairs, AC units, chimneys | "stairs in the way", "too many balconies" | cft-world `facadeExtras` | r0 thresholds | --gfx |
+| Figment models (animated monsters) | "ghost too big", "wrong monster for X" | cft-world `MON_MODELS`, `MON_H`, `monModel`, `W.animateMonster` | tools/monster_models.py | --gfx / --monsters |
 | Walking, sprint, jump | "too slow", "jump feels floaty" | cft-world `updatePlayer` | `D.WALK`, `GRAV` | --hero |
 | Camera | "camera too close / clips walls" | cft-world `updateCamera` | `cam` in create | --heroshots |
 | Rides, driving | "car turns badly", "bike too fast" | cft-world `updatePlayer` (drive branch), cft-game `setRide` `G.toggleRide` | `D.VEHICLES` | --hero |

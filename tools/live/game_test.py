@@ -19,6 +19,8 @@
     python -I tools/live/game_test.py --long [OUTDIR]     no tests: the Character / Reputation / Achievements apps, a Legendary drop, a rare monster, a level-up
     python -I tools/live/game_test.py --people [OUTDIR]   no tests: close-ups of the characters (you, passers-by in poses, the look editor)
     python -I tools/live/game_test.py --models [OUTDIR]   no tests: the 3D models up close (faces, silly extras, every vehicle, trees, bushes, animals)
+    python -I tools/live/game_test.py --gfx [OUTDIR]      no tests: the graphics overhaul (facades up close, a street, roofs from above, cars, you, dusk, night)
+                                                          CFT_QS="&nopost=1" in the environment = the same without post-processing
     python -I tools/live/game_test.py --eval FILE.js [OUTDIR]   start a game, run FILE.js in the page, print what it returns
 
 It serves the game from theme/assets with tools/live/harness.py (a plain page, no Anvil), starts a fresh guest game in
@@ -252,6 +254,24 @@ CAMPSHOTS = (
     + scene("k6-roof", CAMP_PRE + "let r = null; for (let d = 6; d < 120 && !r; d += 4) for (let a = 0; a < 6.28 && !r; a += 0.5) { const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = W.roofAt(x, z); if (y != null && y > 8) r = { x, z, y }; } if (r) { p.set(r.x, r.y + 0.5, r.z); W.player.vy = 0; } W.cam.pitch = 0.35; W.cam.dist = W.cam.cur = 10;", 30)
     + scene("k7-phone", CAMP_PRE + "G.ui.phone('camp');", 3, 2000)
 )
+# The graphics overhaul (2026-11-19): the same spots every run (the street nearest home), close and far, day and night.
+GFX = (
+    scene("g1-street", "s.m['c1-couch'] = { s: 'done', done: 1 }; s.money = 400; s.clock = 10.5;"
+          "const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 11) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.14; W.cam.dist = W.cam.cur = 8; window.__g1 = q;", 400)
+    + scene("g2-facade", "s.clock = 15; const pl = near(W.places.filter(q => q.made && W.signs().has(q.id)), q => q.pin); const dx = pl.pin.x - pl.x, dz = pl.pin.z - pl.z, d = Math.hypot(dx, dz) || 1;"
+            "W.teleport(pl.pin.x + dx / d * 3, pl.pin.z + dz / d * 3); look(pl.x, pl.z, 6, -0.12); W.avatar.visible = false;", 120)
+    + scene("g3-facade-angle", "W.cam.yaw += 0.75; W.cam.pitch = -0.2; W.cam.dist = W.cam.cur = 4;", 20)
+    + scene("g4-roofs", "W.avatar.visible = true; s.clock = 11; const q = window.__g1; W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.75; W.cam.dist = W.cam.cur = 34;", 60)
+    + scene("g5-cars", "s.clock = 13; const n = near(W.signals(), q => q), e = n.ends.slice().sort((a, b) => b.sg.w - a.sg.w)[0], sg = e.sg, k = e.end === 1 ? 1 : -1;"
+            "const ux = (sg.x2 - sg.x1) / sg.L * k, uz = (sg.z2 - sg.z1) / sg.L * k, b = Math.min(14, sg.L * 0.9); W.teleport(n.x + ux * b + uz * 3, n.z + uz * b - ux * 3); look(n.x, n.z, 6, 0.1);", 160)
+    + scene("g6-you", "s.clock = 11; const q = window.__g1; W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.1; W.showOff = true;", 200)
+    + scene("g7-dusk", "W.showOff = false; s.clock = 19.2; W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 14;", 40)
+    + scene("g8-night", "s.clock = 22.5; W.cam.pitch = 0.12; W.cam.dist = W.cam.cur = 8; W.cam.yaw += 1.2;", 60)
+    + scene("g9-figments", "s.clock = 12; const f = { x: -Math.sin(W.player.face), z: -Math.cos(W.player.face) };"
+            "['slime', 'raccoon', 'brute', 'gargoyle', 'sock', 'spitter', 'worm', 'pigeon', 'wisp'].forEach((k, i) => F.spawnMonster(k, p.x + f.x * (7 + (i % 3) * 2.5) + f.z * (i - 4) * 1.9, p.z + f.z * (7 + (i % 3) * 2.5) - f.x * (i - 4) * 1.9, { event: 300 }));"
+            "look(p.x + f.x * 8, p.z + f.z * 8, 9, 0.12); window.__models = Object.keys(W.monModels || {}).length; console.log('models loaded', window.__models);", 10)
+)
+
 
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
@@ -269,6 +289,8 @@ elif "--people" in flags:
     steps = START + PEOPLE
 elif "--models" in flags:
     steps = START + MODELS
+elif "--gfx" in flags:
+    steps = START + GFX
 elif "--long" in flags:
     steps = START + LONG
 elif "--monsters" in flags:
@@ -308,7 +330,7 @@ else:
 sf = out / "steps.json"
 sf.write_text(json.dumps(steps), encoding="utf-8")
 env = dict(__import__("os").environ, WINDOW=__import__("os").environ.get("WINDOW", "1280,800"))
-r = subprocess.run(["node", str(HERE / "gldrive.mjs"), "http://127.0.0.1:%d/?fresh=1&music=0&nointro=1" % port, str(sf), str(out)],
+r = subprocess.run(["node", str(HERE / "gldrive.mjs"), "http://127.0.0.1:%d/?fresh=1&music=0&nointro=1" % port + __import__("os").environ.get("CFT_QS", ""), str(sf), str(out)],
                    capture_output=True, text=True, env=env, encoding="utf-8", errors="replace", timeout=3000)
 fails = passes = 0
 for line in r.stdout.splitlines():
@@ -319,13 +341,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

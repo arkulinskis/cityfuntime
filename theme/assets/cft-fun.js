@@ -407,6 +407,7 @@ function attach(G, api) {
         if (m.home && Math.hypot(m.x - m.home.x, m.z - m.home.z) > 6) walk(m, m.home.x, m.home.z, sp, dt, m.r);
         else walk(m, m.x + Math.cos(m.wanderA) * 4, m.z + Math.sin(m.wanderA) * 4, sp, dt, m.r);
       }
+      m.obj.userData.act = m.wind > 0 ? 'wind' : null;   // animated figment models play their attack while winding up
       W.animateMonster(m.obj, dt, sp);
       m.say -= dt;
       if (m.say <= 0 && d < 25) { m.say = 5 + Math.random() * 7; sayAt(m.obj, m.kind === 'goose' ? 'HONK!' : pick(D.MONSTER_LINES), 1.8); }

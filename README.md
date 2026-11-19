@@ -154,6 +154,10 @@ detail near you, lighter stand-ins further away.
 - **High-end look:** pavements with kerbs, edge lines on big roads, cornices and shopfront ledges, walls that darken towards
   the street, crisper windows with plants and rails, leafy trees, detailed cars (bumpers, lights, mirrors, hubcaps), lamp
   halos at night, a fill light, sharper shadows, a soft vignette and colour grade (high graphics; low keeps the light version).
+- **Graphics overhaul (2026-11-19, high graphics):** ambient occlusion, bloom and a filmic colour grade; buildings in brick,
+  stucco, siding, greystone, concrete or glass with deep windows and little rooms behind them that light up at night, shop
+  windows with shelves, cafes and boutiques, balconies, outdoor staircases, AC units and chimneys; sky reflections on cars
+  and glass; smoother people with skin, cloth and hair shading; 12 animated monster models.
 - **Seven new missions:** Hold the Line, Morning Rush, Aisle Hero, Wrecking Ball, Keys in the Ignition, Main Character
   Energy, The Liberator.
 
@@ -297,6 +301,8 @@ doesn't answer, so every neighbourhood someone has played keeps working; places 
 5. **Publish** (Publish → public URL, or your own domain).
 
 ## Ground textures
+
+The animated figments (blobs, ghosts, the pigeon, the ninja bandit, the fish, the blue demon, the orc, the alien) are from Quaternius' [Ultimate Monsters](https://quaternius.com/packs/ultimatemonsters.html) pack (CC0, free for any use); `tools/monster_models.py` packs them into small GLB files.
 
 The road, pavement, grass, woods, plaza, sand and path textures are photos from [Poly Haven](https://polyhaven.com) (CC0, free for any use): asphalt_02, concrete_pavement, leafy_grass, forest_leaves_02, pavement_03, sand_01, grass_path_3, concrete_floor_01. `tools/ground_textures.py` downloads and prepares them.
 

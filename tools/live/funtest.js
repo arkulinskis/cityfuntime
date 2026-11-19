@@ -114,7 +114,7 @@ window.__funOut = []; window.__funDone = false;
       const u = W.life.peds[0].fig.userData, tris = o => { let n = 0; o.traverse(m => { if (m.isMesh) n += m.geometry.attributes.position.count / 3; }); return Math.round(n); };
       ok(!!(u.head && u.kneeL && u.kneeR && u.elbowL && u.elbowR && u.handR), 'people have heads that turn, knees, elbows and hands');
       const t1 = tris(W.life.peds[0].fig);
-      ok(t1 > 1000 && t1 < 3600, 'a passer-by is built from ' + t1 + ' triangles (the old box figures had about 130)');
+      ok(t1 > 1000 && t1 < 7000, 'a passer-by is built from ' + t1 + ' triangles (the old box figures had about 130; smoother since the 2026-11-19 graphics overhaul)');
       const walker = W.life.peds.find(q => q.type === 'walk' && !q.pause && !q.hold);
       if (walker) { let bend = 0; for (let i = 0; i < 40; i++) { sim(1); bend = Math.min(bend, walker.fig.userData.kneeL.rotation.x, walker.fig.userData.kneeR.rotation.x); } ok(bend < -0.1, 'knees bend when they walk (' + bend.toFixed(2) + ' rad)'); }
       const me = G.playerLook();
