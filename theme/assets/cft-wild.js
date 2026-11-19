@@ -2,7 +2,7 @@
    I want this game to feel more like that, but with the insanity and 12-year-old humour." A research agent's report
    (mechanics and feel only: no names, art or story) became, in this order:
    - climb any building (hold forward against a wall; cft-world.js updatePlayer) with a STAMINA DONUT next to you that only
-     shows when it isn't full; climb-jump (Space), back-flip off (S + Space); empty = you let go and walk slowly for a bit
+     shows when it isn't full; jump off (Space), a burst up the wall (Shift + Space); empty = you let go and walk slowly for a bit
    - an umbrella by default: hold Space while falling to glide (gear jetpacks / glide-brellas still win); UPDRAFTS rise
      from fires and sewer manholes
    - a perfect dodge: jump while blocking (a hop away) just before a hit lands -> slow motion + a FLURRY of free hits
@@ -248,7 +248,7 @@ function attach(G, api) {
   };
 
   // ------------------------------------------------------------------ the rest of the hooks
-  W.onClimb = function () { tip('climb', '🧗 Climbing! Keep pushing forward to go up (it costs stamina: the donut). Space = jump up the wall, S + Space = flip off.'); };
+  W.onClimb = function () { tip('climb', '🧗 Climbing! Keep pushing forward to go up (it costs stamina: the donut). Space = jump off the wall, Shift + Space = jump up it.'); };
   W.onClimbJump = function () { const p = P(); W.burst(p.x, p.y + 0.5, p.z, '💨', 3, { spread: 1, up: 1, size: 0.45, life: 0.4 }); };
   W.onTired = function () { const p = P(); W.pop(p.x, p.y + 2.4, p.z, pick(['AAAAH!', 'GRIP FAILED', 'NOODLE ARMS!']), '#b0a9c8', 0.9); };
   function giggleTick() {

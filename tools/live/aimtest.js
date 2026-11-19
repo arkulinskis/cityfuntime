@@ -109,6 +109,30 @@ window.__aimOut = []; window.__aimDone = false;
       const wasPull = !!W.tether; W.input.jump = true; sim(2);
       ok(wasPull && !W.tether, 'Space lets go of the web mid-pull');
       sim(40); W.player.climb = null;
+      // letting go of the right button cuts the web
+      W.teleport(setup.sx, setup.sz); sim(5); faceTo(setup.mx, setup.mz); W.cam.pitch = -0.1; sim(3);
+      key('Digit4'); mouse('mousedown', 2); sim(6); A.test.aimTick(); mouse('mousedown', 0);
+      for (let i = 0; i < 5; i++) sim(1);
+      const pulling = !!W.tether, dA = Math.hypot(setup.mx - pp.x, setup.mz - pp.z);
+      window.dispatchEvent(new MouseEvent('mouseup', { button: 2 })); sim(1);
+      ok(pulling && !W.tether && !A.test.strand, 'letting go of the right button cuts the web (pull stops, strand gone)');
+      for (let i = 0; i < 20; i++) sim(1);
+      ok(Math.hypot(setup.mx - pp.x, setup.mz - pp.z) > 1.8 && !W.player.climb, 'after the cut you fall instead of reaching the wall (' + dA.toFixed(1) + ' m when cut)');
+      sim(40);
+      // climbing: Space jumps off the building, Shift + Space jumps up it
+      const grab = () => { W.teleport(setup.mx + setup.nx * 0.6, setup.mz + setup.nz * 0.6); sim(2); pp.y += 2.5; W.player.grounded = false; W.player.vy = 0; W.player.climb = { nx: setup.nx, nz: setup.nz, t: 0, lost: 0 }; faceTo(setup.mx, setup.mz); W.input.f = 1; sim(3); };
+      if (G.wild) G.wild.stam = D.TUNE.wild.stamMax;
+      grab(); const wj0 = c('walljumps'), onWall = !!W.player.climb;
+      W.input.jump = true; sim(1); W.input.f = 0;
+      const offV = W.player.vel.x * setup.nx + W.player.vel.z * setup.nz;
+      ok(onWall && !W.player.climb && offV > 4 && W.player.vy > 3, 'Space while climbing jumps off the building (away ' + offV.toFixed(1) + ' m/s, up ' + W.player.vy.toFixed(1) + ')');
+      W.input.f = 1; for (let i = 0; i < 8; i++) sim(1); W.input.f = 0;
+      ok(c('walljumps') > wj0 && Math.hypot(pp.x - setup.mx, pp.z - setup.mz) > 2, 'you fly clear of the wall instead of sticking straight back on (' + Math.hypot(pp.x - setup.mx, pp.z - setup.mz).toFixed(1) + ' m, wall jumps ' + (c('walljumps') - wj0) + ')');
+      sim(40);
+      if (G.wild) G.wild.stam = D.TUNE.wild.stamMax;
+      grab(); W.input.sprint = true; W.input.jump = true; sim(1); W.input.sprint = false;
+      ok(!!W.player.climb && W.player.vy > 3, 'Shift + Space still bursts up the wall');
+      W.input.f = 0; W.player.climb = null; sim(40);
     }
     // a miss: point at the sky
     W.cam.pitch = 1.3; W.cam.yaw += Math.PI; sim(3); W.cam.pitch = -0.15; sim(2);

@@ -3695,7 +3695,7 @@ varying float vGL; varying vec2 vGUV;
       player.slope = slopeAlong(dirX, dirZ);
       const speed = (running && !W.blocking && !W.aiming ? ride.run : ride.walk) * (W.speedMul || 1) * slopeMul(player.slope) * (W.blocking ? 0.45 : W.aiming ? 0.75 : 1);
       const tx = dirX * speed, tz = dirZ * speed;
-      const k = 1 - Math.exp(-(player.grounded ? (ride.mode === 'ride' ? 5.5 : 15) : 3.5) * dt);
+      const k = 1 - Math.exp(-(player.grounded ? (ride.mode === 'ride' ? 5.5 : 15) : player.noGrab > 0 ? 0.6 : 3.5) * dt);   // just jumped off a wall: momentum first
       player.vel.x += (tx - player.vel.x) * k; player.vel.z += (tz - player.vel.z) * k;
       // climbing (2026-11-18, Breath of the Wild-style): hold forward against a building and you go up it, paying stamina
       // (W.stam, set by cft-wild.js). The wall normal comes from collide's push-back each frame.
@@ -3727,6 +3727,7 @@ varying float vGL; varying vec2 vGUV;
       const wnl = Math.hypot(wnx, wnz);
       if (wnl > 1e-4) { wnx /= wnl; wnz /= wnl; }
       const into = wnl > 1e-4 ? -(dirX * wnx + dirZ * wnz) : 0;   // how hard you push into the wall (1 = straight at it)
+      if (player.noGrab > 0) player.noGrab -= dt;   // just jumped off a wall: don't stick straight back onto it
       const stam = W.stam;
       if (teth && W.tether === teth && (tethD < 1.6 || (wallHit && wnl > 1e-4 && tethD < 5.5) || teth.t > (teth.life || 3.2))) {
         W.tether = null;
@@ -3750,18 +3751,22 @@ varying float vGL; varying vec2 vGUV;
           if (W.onMantle) W.onMantle();
         } else if (cl.lost > 0.25 || !ctl || (stam && !stam.can('hang'))) { // let go (or too tired to hold on)
           player.climb = null; if (stam && !stam.can('hang') && W.onTired) W.onTired();
-        } else if (input.jump && up < -0.3) { // a back flip off the wall: the old wall kick
-          player.climb = null; player.vy = ride.jump * 1.3; player.vel.x = cl.nx * 8; player.vel.z = cl.nz * 8; player.jumps = 1; input.jump = false;
-          if (W.onWallJump) W.onWallJump();
-        } else if (input.jump && (!stam || stam.use('climbjump'))) { // climb-jump: a burst up the wall
+        } else if (input.jump && input.sprint && (!stam || stam.use('climbjump'))) { // Shift + Space: a burst up the wall
           player.vy = 7.6; input.jump = false; if (W.onClimbJump) W.onClimbJump();
+        } else if (input.jump) { // Space: jump off the building (2026-11-19, the user: "space bar jumps off the building if
+          // the user is climbing it"): up and away from the wall, steered by A/D, and no re-grabbing for a moment
+          const tgx = -cl.nz, tgz = cl.nx, sd = ctl ? sideIn : 0;
+          player.climb = null; player.vy = ride.jump * 1.15; player.vel.x = cl.nx * 8.5 + tgx * sd * 4; player.vel.z = cl.nz * 8.5 + tgz * sd * 4;
+          player.jumps = 1; player.noGrab = 0.5; player.face = Math.atan2(-player.vel.x, -player.vel.z); input.jump = false;
+          W.burst(player.pos.x, player.pos.y + 0.8, player.pos.z, '💨', 4, { up: 0.5, spread: 1.4, size: 0.5, life: 0.5 });
+          if (W.onWallJump) W.onWallJump();
         } else {
           if (player.vy > 1.6 || player.vy < -1.6 || !input.jump) player.vy += ((up > 0.2 ? 1.6 : up < -0.2 ? -2.4 : 0) - player.vy) * Math.min(1, dt * 10);
           if (stam) stam.use(up > 0.2 || Math.abs(sideIn) > 0.2 ? 'climb' : 'hang', dt);
           player.face = Math.atan2(cl.nx, cl.nz);
         }
         input.jump = false;
-      } else if (wallHit && wnl > 1e-4 && ctl && into > 0.55 && fwdIn > 0.3 && stam && stam.can('climb') && ride.mode === 'foot' && !W.blocking) {
+      } else if (wallHit && wnl > 1e-4 && ctl && into > 0.55 && fwdIn > 0.3 && stam && stam.can('climb') && ride.mode === 'foot' && !W.blocking && !(player.noGrab > 0)) {
         // grab the wall: straight away in the air, after a short push from the ground (so brushing a wall doesn't stick)
         player.climbPush = player.grounded ? (player.climbPush || 0) + dt : 1;
         const rf0 = roofAt(player.pos.x - wnx * 0.7, player.pos.z - wnz * 0.7);

@@ -67,7 +67,7 @@ function attach(G, api) {
     on = !!on && alive && !quiet() && onFoot() && !F.dying;
     if (on === aiming) return;
     aiming = on; W.aiming = on;
-    if (!on) { if (foamDown) A.fire(false); W.aimPoint = null; aimHit = null; }
+    if (!on) { if (foamDown) A.fire(false); W.aimPoint = null; aimHit = null; cutWeb(); }   // letting go of the right button cuts the web (2026-11-19)
     sight.hidden = !on; shell.classList.toggle('cft-aiming', on);
     if (on) { aimTick(); tip('aim', '🎯 Aiming! Left click = ' + NAMES[st().slot] + ' (choose with 1-4: water, lightning, extinguisher, web). Let go of the right button to bonk again.'); }
   };
@@ -126,6 +126,14 @@ function attach(G, api) {
     const p = P(), f = W.player.face, rx = Math.cos(f), rz = -Math.sin(f), fx = -Math.sin(f), fz = -Math.cos(f);
     return { x: p.x + rx * 0.32 + fx * 0.35, y: p.y + (W.tether ? 2.0 : 1.45), z: p.z + rz * 0.32 + fz * 0.35 };
   }
+  // Cut: the strand vanishes and the pull stops; you keep your speed and fall (or keep clinging if you already arrived)
+  function cutWeb() {
+    if (!strand) return;
+    const pulling = strand.tether && W.tether === strand.tether;
+    if (pulling || !strand.stuck) { if (pulling) W.tether = null; const p = P(); W.pop(p.x, p.y + 2.2, p.z, 'SNIP!', '#ffffff', 0.7); }
+    dropStrand();
+  }
+  A.cutWeb = cutWeb;
   function dropStrand() {
     if (!strand) return;
     W.scene.remove(strand.line); W.scene.remove(strand.end); if (strand.end.material) strand.end.material.dispose();
@@ -183,7 +191,7 @@ function attach(G, api) {
           W.tether = { x: s.x, y: s.y, z: s.z, v0: T.webV0, acc: T.webAcc, max: T.webMax, life: T.webLife, t: 0 };
           s.tether = W.tether;
           api.bump('webpulls');
-          tip('web', '🕸️ Stuck! The web pulls you to the wall: you cling on (push forward to climb), or flip onto the roof if it caught near the top. Space lets go.');
+          tip('web', '🕸️ Stuck! The web pulls you to the wall: you cling on (push forward to climb, Space jumps off), or flip onto the roof if it caught near the top. Let go of the right button (or press Space) to cut it.');
         } else if (s.kind === 'foe' && s.m && !s.m.dead) {
           s.m.stun = Math.max(s.m.stun || 0, T.webStun); s.m.webbed = G.rt.t + T.webStun;
           W.pop(s.m.x, s.y + 1.2, s.m.z, 'WEBBED!', '#ffffff', 1);

@@ -249,7 +249,7 @@ extinguishers, water and lightning powers".
 
 **The open-air update (2026-11-18):** "feel more like Breath of the Wild, with the insanity and 12-year-old humour"
 (research and plan in `docs/open-air-report.md`):
-- **Climb any building:** walk into a wall to grab it, hold forward to go up, Space jumps up the wall, S + Space flips off,
+- **Climb any building:** walk into a wall to grab it, hold forward to go up, Space jumps off the building, Shift + Space jumps up the wall,
   a roof edge pulls you over. A **stamina donut** next to you (only when it isn't full) pays for climbing, gliding and
   slow motion; empty = you let go and walk slowly for a bit.
 - **An umbrella by default:** hold Space while falling to glide; **updrafts** rise from fires and sewer manholes.
@@ -270,7 +270,8 @@ extinguishers, water and lightning powers".
   the crosshair; let go of the right button and left click bonks again. Blocking is **G** / the 🛡️ button only. Ranged
   weapons (F) also fire at the crosshair while you aim. On touch, a hotbar button chooses and uses its slot.
 - **The web shooter** 🕸️ (slot 4): the strand sticks to a wall (the sight turns green within 42 m) and reels you in; you cling
-  to the wall (push forward to climb) or flip onto the roof if it caught near the top; Space lets go with a hop. Anything
+  to the wall (push forward to climb, Space jumps off) or flip onto the roof if it caught near the top; Space or letting go of
+  the right button cuts the web (you keep your speed). Anything
   but a wall = "NO WALL!". A figment under the sight gets webbed (stuck for 2 s).
 - **Bonk weapons with very different reach,** drawn as a crescent on every swing (and a gold ring when you pick one up): a
   frying pan (1.8 m, heavy), selfie stick (4.6 m, narrow poke), garden rake (4 m, wide), giant yo-yo (6.2 m, one target),

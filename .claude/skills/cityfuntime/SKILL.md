@@ -556,7 +556,8 @@ plan: `docs/open-air-report.md` (mechanics only; no names/art; durability and co
 - **Climbing (cft-world.js updatePlayer):** `player.climb` {nx, nz, t, lost}; grab = push into a wall (`into` > 0.55, forward)
   in the air, or for 0.22 s from the ground, and `W.stam.can('climb')`; while climbing: velocity pinned into the wall + sideways,
   vy toward 1.6 up / 2.4 down, no gravity, `stam.use('climb' | 'hang', dt)`; over the top when `roofAt` behind the wall is
-  < 1.1 m above; Space = climb-jump (`stam.use('climbjump')`), S + Space = flip off (counts as a wall jump); lost contact
+  < 1.1 m above; Space = jump off the building (up + 8.5 m/s away, A/D steer, counts as a wall jump, `player.noGrab` 0.5 s so you don't
+  stick straight back; 2026-11-19), Shift + Space = climb-jump (`stam.use('climbjump')`); lost contact
   > 0.25 s or no stamina = let go. Climb pose after `W.animate`. Dodge hop: jump while `W.blocking` and grounded.
 - **cft-wild.js** (`G.wild`, after G.camp; knobs `D.TUNE.wild`; state `save.wild` {views, tips}): `W.stam` (the donut DOM
   `.cft-donut` near your head, `X.stam` / `X.tired`, regen after `regenDelay` on the ground; `X.speedMul` in cft-game
@@ -651,7 +652,7 @@ am I collecting? Spiderwebs: in the right-left click combo it shoots out and pul
     `aimShot` use `W.aimPoint` first (exact, no nudge).
   - **The web:** `shootWeb` -> a strand (`strandGeo` box stretched from `handPos()`, flies at `webSpeed`) -> on a wall
     `W.tether = {x, y, z, v0, acc, max, life}`; cft-world updatePlayer (foot only) pulls toward it, no gravity, A/D steer,
-    Space = let go (`W.onTetherEnd('jump')`); arrival (within 1.6 m, or a wall hit within 5.5 m, or `life` s) = mantle onto the
+    Space = let go (`W.onTetherEnd('jump')`); releasing the right button = `cutWeb()` (setAim(false): pull stops, speed kept, strand gone); arrival (within 1.6 m, or a wall hit within 5.5 m, or `life` s) = mantle onto the
     roof when it is < 2.4 m above ('roof'), else `player.climb` (cft-wild stamina) ('wall'), else a drop. Without the sight
     (touch) `wallAhead()` casts four rays up the facing direction. On a figment: `m.stun` + `m.webbed`. Counters webs, webpulls,
     webroofs, webbed.

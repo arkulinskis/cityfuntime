@@ -404,16 +404,16 @@ native_deps:
     <meta name="cft-asset" content="_/theme/three-gltf.js?v=a19eaa4fef">
     <meta name="cft-asset" content="_/theme/cft-content.js?v=34ee95347d">
     <meta name="cft-asset" content="_/theme/cft-tiles.js?v=e580641d28">
-    <meta name="cft-asset" content="_/theme/cft-world.js?v=0cd5cd77f3">
+    <meta name="cft-asset" content="_/theme/cft-world.js?v=06252fc269">
     <meta name="cft-asset" content="_/theme/cft-fun.js?v=d680a1eb57">
     <meta name="cft-asset" content="_/theme/cft-rpg.js?v=c3ce4e89cd">
     <meta name="cft-asset" content="_/theme/cft-hero.js?v=bf5739a218">
     <meta name="cft-asset" content="_/theme/cft-chaos.js?v=d2c7e27cee">
     <meta name="cft-asset" content="_/theme/cft-camp.js?v=e0b54800e6">
-    <meta name="cft-asset" content="_/theme/cft-wild.js?v=794d366a70">
-    <meta name="cft-asset" content="_/theme/cft-aim.js?v=b81eb1105d">
+    <meta name="cft-asset" content="_/theme/cft-wild.js?v=875bb032dc">
+    <meta name="cft-asset" content="_/theme/cft-aim.js?v=d515e1edde">
     <meta name="cft-asset" content="_/theme/cft-debug.js?v=fac2552f4c">
-    <meta name="cft-asset" content="_/theme/cft-ui.js?v=d8d3cc236e">
+    <meta name="cft-asset" content="_/theme/cft-ui.js?v=537d7d4d51">
     <meta name="cft-asset" content="_/theme/cft-game.js?v=dc0405b684">
 package_name: City_Fun_Time
 runtime_options:
