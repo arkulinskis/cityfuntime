@@ -10,6 +10,8 @@
     python -I tools/live/game_test.py --wild [OUTDIR]     only wildtest.js (four-corner HUD, pavement footing, climbing + stamina, umbrella + updrafts, perfect dodge + flurry, air slow-mo, chemistry, rooftop antennas)
     python -I tools/live/game_test.py --aim [OUTDIR]      only aimtest.js (right-mouse sight, slots 1-4, the web, weapon reach + arcs, gabled roofs, scaling figments, no level cap, rainbow guides, the Dex gallery)
     python -I tools/live/game_test.py --aimshots [OUTDIR] no tests: the sight on a wall, the web pulling, a 360° swing, a rainbow guide, the Dex gallery
+    python -I tools/live/game_test.py --stunt [OUTDIR]    only stunttest.js (courses pop up in a car, boost, ramp launch, ring of fire, flips, rolls, wipeout, hop, fire alley, phone app)
+    python -I tools/live/game_test.py --stuntshots [OUTDIR] no tests: a stunt course popping up, the car through a ring of fire, a flip, a MEGA ramp, a fire alley, the phone app
     python -I tools/live/game_test.py --campshots [OUTDIR] no tests: pictures of the campaign update (HUD desktop + phone, the opening, a MEGA figment, fire, a storm, a secret)
     python -I tools/live/game_test.py --chaosshots [OUTDIR] no tests: the chaos update (decor, critters, brainrot, toys, the sky, a jetpack, ranged fights)
     python -I tools/live/game_test.py --boro [OUTDIR]     only borotest.js (borough names, looks, HUD chip, banners, discovery)
@@ -285,12 +287,25 @@ AIMSHOTS = (
     + scene("a5-dex", AIM_PRE + "G.rt.slowmo = 0; const ids = CFT_DATA.CHAOS.CRITTERS.slice(0, 5).map(c => c.id).concat([CFT_DATA.CHAOS.BRAINROT[0].id]); s.chaos.dex = {}; ids.forEach((id, i) => s.chaos.dex[id] = i + 1); G.ui.phone('dex');", 2)
 )
 
+# The stunt update (2026-11-19): ramps and rings of fire that pop up when you get in a car
+STUNT_PRE = "G.rt.slowmo = 0; const St = G.stunt, TS = CFT_DATA.TUNE.stunt; s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11.5; window.CFT_TEST.calm = true; s.owned.car = true;"             "const findC = (kind) => { for (let i = 0; i < 400; i++) { const q = W.randomWalkSpot(p.x, p.z, 10, 420, (x, z, sg) => sg.car && sg.w >= 7 && !sg.br && sg.L >= 30); if (!q) continue; const ux = -Math.sin(q.yaw), uz = -Math.cos(q.yaw); const c = St.spawn(kind, q.x, q.z, ux, uz) || St.spawn(kind, q.x, q.z, -ux, -uz); if (c) return c; } return null; };"             "const fly = (c, frac, fn) => { G.ui.closeAll(); G.rt.busy = false; W.controls.enabled = true; const r = c.ramp; W.teleport(r.x - c.ux * 32, r.z - c.uz * 32, Math.atan2(-c.ux, -c.uz)); G.stepSim(3); W.input.f = 1; for (let i = 0; i < 160 && !W.carAir(); i++) G.stepSim(1); W.input.f = 0; const a = W.carAir(); if (a && fn) fn(a); const tA = r.vy / (W.GRAV * TS.airG); G.stepSim(Math.max(1, Math.round(tA * frac * 30))); };"             "const side = (c, back, up, off) => { const nx = -c.uz, nz = c.ux; W.cam.yaw = Math.atan2(nx * (off || 1), nz * (off || 1)) + (back || 0); W.cam.pitch = up == null ? 0.12 : up; W.cam.dist = W.cam.cur = 16; W.cam.lookT = performance.now() + 1e6; };"
+STUNTSHOTS = (
+    scene("s1-pop-up", STUNT_PRE + "G.setRide(null); G.stepSim(10); const q = W.randomWalkSpot(0, 0, 20, 160, (x, z, sg) => sg.car && sg.w >= 9) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); G.setRide('car'); G.stepSim(9); W.cam.pitch = 0.5; W.cam.dist = W.cam.cur = 30;", 0)
+    + scene("s2-ring-of-fire", STUNT_PRE + "TS.count = 0; G.stepSim(25); for (const c of St.courses.slice()) St.test.drop(c); const c = findC('ramp'); window.__sc = c; G.stepSim(25); fly(c, 1.0); side(c, 0.35, 0.05); G.rt.slowmo = 30; G.rt.slowK = 0.004;", 0)
+    + scene("s3-backflip", STUNT_PRE + "const c = window.__sc; G.stepSim(30); fly(c, 0.9, a => { G.stepSim(3); a.pitch = 2.2; a.pv = 0; }); W.player.carAir && (W.player.carAir.pv = 0); side(c, -0.2, 0.1); G.rt.slowmo = 30; G.rt.slowK = 0.004;", 0)
+    + scene("s4-mega", STUNT_PRE + "for (const c of St.courses.slice()) St.test.drop(c); G.stepSim(5); const c = findC('mega') || findC('ramp'); window.__sc = c; G.stepSim(25); fly(c, 1.45, a => { a.rollTo = 6.28; }); side(c, 0.5, 0.15); G.rt.slowmo = 30; G.rt.slowK = 0.004;", 0)
+    + scene("s5-fire-alley", STUNT_PRE + "for (const c of St.courses.slice()) St.test.drop(c); G.stepSim(5); let c = null; for (let i = 0; i < 400 && !c; i++) { const q = W.randomWalkSpot(p.x, p.z, 10, 420, (x, z, sg) => sg.car && sg.w >= 7 && sg.L >= 50); if (q) c = St.spawn('alley', q.x, q.z, -Math.sin(q.yaw), -Math.cos(q.yaw)); } G.stepSim(25); W.teleport(c.x - c.ux * 14, c.z - c.uz * 14, Math.atan2(-c.ux, -c.uz)); G.ui.closeAll(); W.controls.enabled = true; W.input.f = 1; G.stepSim(18); W.input.f = 0; W.cam.pitch = 0.18; W.cam.dist = W.cam.cur = 11; G.rt.slowmo = 30; G.rt.slowK = 0.004;", 0)
+    + scene("s6-phone", STUNT_PRE + "TS.count = 7; G.ui.phone('stunt');", 3, 2000)
+)
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
 elif "--campshots" in flags:
     steps = START + CAMPSHOTS
 elif "--aimshots" in flags:
     steps = START + AIMSHOTS
+elif "--stuntshots" in flags:
+    steps = START + STUNTSHOTS
 elif "--chaosshots" in flags:
     steps = START + CHAOS
 elif "--boroshots" in flags:
@@ -329,6 +344,8 @@ else:
         steps += script("wildtest.js", "__wildDone", "__wildOut", 900000)
     elif "--aim" in flags:
         steps += script("aimtest.js", "__aimDone", "__aimOut", 600000)
+    elif "--stunt" in flags:
+        steps += script("stunttest.js", "__stuntDone", "__stuntOut", 600000)
     else:
         if "--fun" not in flags:
             steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
@@ -342,6 +359,7 @@ else:
             steps += script("camptest.js", "__campDone", "__campOut", 900000)
             steps += script("wildtest.js", "__wildDone", "__wildOut", 900000)
             steps += script("aimtest.js", "__aimDone", "__aimOut", 600000)
+            steps += script("stunttest.js", "__stuntDone", "__stuntOut", 600000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"
@@ -358,13 +376,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

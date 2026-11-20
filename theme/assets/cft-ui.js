@@ -447,7 +447,7 @@ function create(G, root) {
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
       '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone (👕 Wardrobe: what you wear)</div><div><kbd>💧 🌩️ 🧯 🕸️</kbd> water, lightning, extinguisher (hold), web (pulls you to the wall you face)</div><div><kbd>⤒</kbd> jump: off walls, onto roofs, bounce off everything</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things) · with a shooter in hand (🥤🎈🍌...) <kbd>F</kbd> shoots: hold <kbd>right mouse</kbd> to aim it, ammo 🎯 comes from crates</div><div><kbd>G</kbd> held: block (time it for a PERFECT PARRY)</div><div><kbd>Right mouse</kbd> held: aim with the sight · <kbd>left click</kbd> uses the slot you chose with <kbd>1</kbd>–<kbd>4</kbd> (💧 water, 🌩️ lightning, 🧯 extinguisher, 🕸️ web: sticks to walls and pulls you in) · let go = back to bonking</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>B</kbd> toot (yes, really)</div><div><kbd>Space</kbd> held in the air: jetpack / glide</div><div><kbd>Space</kbd> while climbing a wall: jump off it (<kbd>Shift</kbd> + <kbd>Space</kbd>: jump up it)</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>1</kbd> water power · <kbd>2</kbd> lightning · <kbd>3</kbd> held: extinguisher</div><div><kbd>Space</kbd> at a wall in the air: wall jump; benches, bins and heads are bouncy</div><div><kbd>M</kbd> minimap zoom · <kbd>N</kbd> map size · <kbd>Esc</kbd> pause</div>') +
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things) · with a shooter in hand (🥤🎈🍌...) <kbd>F</kbd> shoots: hold <kbd>right mouse</kbd> to aim it, ammo 🎯 comes from crates</div><div><kbd>G</kbd> held: block (time it for a PERFECT PARRY)</div><div><kbd>Right mouse</kbd> held: aim with the sight · <kbd>left click</kbd> uses the slot you chose with <kbd>1</kbd>–<kbd>4</kbd> (💧 water, 🌩️ lightning, 🧯 extinguisher, 🕸️ web: sticks to walls and pulls you in) · let go = back to bonking</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>B</kbd> toot (yes, really)</div><div><kbd>Space</kbd> held in the air: jetpack / glide</div><div><kbd>Space</kbd> while climbing a wall: jump off it (<kbd>Shift</kbd> + <kbd>Space</kbd>: jump up it)</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div>In a car: ramps 🛹 and rings of fire 🔥 pop up · <kbd>Space</kbd> hop · in the air <kbd>W</kbd>/<kbd>S</kbd> flip, <kbd>A</kbd>/<kbd>D</kbd> spin, <kbd>Space</kbd> barrel roll · land wheels down</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>1</kbd> water power · <kbd>2</kbd> lightning · <kbd>3</kbd> held: extinguisher</div><div><kbd>Space</kbd> at a wall in the air: wall jump; benches, bins and heads are bouncy</div><div><kbd>M</kbd> minimap zoom · <kbd>N</kbd> map size · <kbd>Esc</kbd> pause</div>') +
       '</div><p class="muted">Watch for the red <b>❗</b> over a figment: it is about to strike. When its ring turns gold, block. Big gold <b>letters</b> on the map are people with missions; E next to a parked car borrows it. The <b>gold arrow</b> over your head always points to your current goal. Ranged weapons need ammo 🎯 (crates around town); nosy people find ✨ secrets in the tight gaps between buildings. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
@@ -745,6 +745,7 @@ function create(G, root) {
     if (G.chaos) G.chaos.markers(markers);
     if (G.camp) G.camp.markers(markers);
     if (G.wild) G.wild.markers(markers);
+    if (G.stunt) G.stunt.markers(markers);
     const goal = G.rt.goal;
     if (goal) markers.push({ x: goal.x, z: goal.z, color: '#6b4eff', r: 9, emoji: goal.e || '⭐', ring: '#ffc21f', edge: true });
     return { markers, rects };
@@ -857,7 +858,7 @@ function create(G, root) {
   // ------------------------------------------------------------------ the phone
   const APPS = [
     ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['wardrobe', '👕', 'Wardrobe'], ['hero', '🧙', 'Character'], ['rep', '🤝', 'Reputation'], ['ach', '🏆', 'Achievements'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
-    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['chaos', '🤪', 'Chaos'], ['dex', '📸', 'Dex'], ['camp', '🌀', 'Campaign'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
+    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['chaos', '🤪', 'Chaos'], ['stunt', '🏁', 'Stunts'], ['dex', '📸', 'Dex'], ['camp', '🌀', 'Campaign'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
   ];
   let phoneOv = null, phoneApp = null;
   U.phone = function (app) {
@@ -1071,6 +1072,16 @@ function create(G, root) {
       ' Figments throw things too: dodge, block, or block right as it lands to send it back. 🔁</p></div>' +
       '<div class="cft-sec"><h4>🛩️ Flying</h4><p class="muted small">' + fly + '</p></div>' +
       '<div class="cft-sec"><h4>Chaos so far</h4><div class="cft-grid2">' + v.stats.map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
+  };
+  // ---- the stunt update (cft-stunt.js, 2026-11-19): ramps and rings of fire that pop up when you drive
+  VIEWS.stunt = function () {
+    if (!G.stunt) return '<div class="cft-empty">🏁<p>The stunts are still loading.</p></div>';
+    const v = G.stunt.summary();
+    return '<div class="cft-pcard cft-aura"><b>🏁 Best stunt: ' + (v.best.pts ? v.best.pts.toLocaleString() + ' pts' : 'none yet') + '</b><span>' + (v.best.pts ? esc(v.best.name) : 'Get in a car and find a ramp') + ' · best air ' + v.bestAir + ' s</span>' +
+      '<small>' + (v.inCar ? v.near + ' stunt spots around you right now (🔥 and 🌋 on the map).' : 'Get in any car (your own, or borrow a parked one with E) and ramps 🛹, MEGA ramps 🌋 and rings of fire 🔥 pop up along the streets.') + '</small></div>' +
+      '<div class="cft-sec"><h4>🕹️ How to do tricks</h4><p class="muted small">Drive over the blue arrows for a burst of speed, then off the ramp. In the air: <b>W / S</b> flip, <b>A / D</b> spin, <b>Space</b> barrel roll (on a phone: the stick and ⤒). Let go before you land and the car levels itself. Wheels down = it counts. Roof down = WIPEOUT. Space on the road = a little hop.</p>' +
+      '<p class="muted small">Rings of fire hang where the arrows carry you. Land on the 🎯 for a bullseye. Mix tricks in one jump for a bigger multiplier, and launch again within a few seconds to keep a streak going.</p></div>' +
+      '<div class="cft-sec"><h4>Stunts so far</h4><div class="cft-grid2">' + v.stats.map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
   };
   // ---- the campaign (cft-camp.js, 2026-11-18): the crazy list, missions on the map, secrets, ammo and powers, mega figments
   VIEWS.camp = function () {

@@ -1,6 +1,6 @@
 ---
 name: cityfuntime
-description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 178 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events) and the main character update (blocks and parries, compliments and hype, Tom Hearton's and grocery outposts, smashing things, borrowed cars, GTA mission letters) and the chaos update (decor everywhere, mayhem meter, ranged weapons and shooters, flying, the Dex, toys, meme humour) and the campaign update (a 5-minute immortal opening, a crazy list switched on mission by mission, at most 5 missions on the map, ammo, water/lightning/extinguisher powers, fire, storms, MEGA figments, secrets in tight gaps, a bouncy world, a redesigned HUD with map size) and the aim update (a right-mouse sight with slots 1-4, a web shooter that pulls you to walls, bonk weapons with visible reach, rainbow floor guides, the Dex gallery, figments that scale with you, no level cap). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
+description: Context, workflow and recipes for City Fun Time (folder cityfuntime-forms), the user's Anvil app built as native Anvil Forms around a JavaScript 3D engine. A wacky life-sim game played on the player's real neighbourhood (OpenStreetMap via OpenFreeMap vector tiles, real hills from Mapterhorn, a server backup of every tile played): 178 missions at real places, shops, rides, homes, businesses, turf, love and family, plus street life (monsters and silly weapons, traffic lights, shop signs, flirting and sweethearts, street folk and a cardboard crown, pranks, street events) and the main character update (blocks and parries, compliments and hype, Tom Hearton's and grocery outposts, smashing things, borrowed cars, GTA mission letters) and the chaos update (decor everywhere, mayhem meter, ranged weapons and shooters, flying, the Dex, toys, meme humour) and the campaign update (a 5-minute immortal opening, a crazy list switched on mission by mission, at most 5 missions on the map, ammo, water/lightning/extinguisher powers, fire, storms, MEGA figments, secrets in tight gaps, a bouncy world, a redesigned HUD with map size) and the aim update (a right-mouse sight with slots 1-4, a web shooter that pulls you to walls, bonk weapons with visible reach, rainbow floor guides, the Dex gallery, figments that scale with you, no level cap) and the stunt update (ramps, MEGA ramps and rings of fire that pop up when you get in a car; car flips, spins, barrel rolls and wipeouts). Load this before any feature request, bug fix, restyle, content change or deploy for this app, so you can work without re-exploring the code.
 ---
 
 # City Fun Time: working on the app
@@ -96,6 +96,7 @@ theme/assets/
   cft-chaos.js        window.CFTChaos.attach(G, api) -> G.chaos: the chaos update (decor toys, mayhem, ranged, flying, the Dex)
   cft-camp.js         window.CFTCamp.attach(G, api) -> G.camp: the campaign update (opening, crazy list, mission cap, ammo, powers, fire,
                       storms, MEGA figments, secrets, bouncy-world hooks, HUD counts)
+  cft-stunt.js        window.CFTStunt.attach(G, api) -> G.stunt: the stunt update (courses that pop up in a car, rings of fire, scoring)
   cft-debug.js        window.CFTDebug.attach(G) -> G.debug: the play-test panel (?debug=1 only)
   cft-ui.js           window.CFTUI.create(G, root) -> U: HUD, feed, banners, dialogue, U.choose, phone + 12 apps, panels, minigames, start screen
   app.css             all styles; the game's are the `/* ===== play.html =====` block (.cft-*)
@@ -683,6 +684,47 @@ am I collecting? Spiderwebs: in the right-left click combo it shoots out and pul
   hand = how to aim (once). Buying a shooter says "F shoots; hold the right mouse button to aim".
 - **Tests:** `game_test.py --aim` (aimtest.js, 50 checks, last in the full run); pictures `--aimshots DIR`.
 - **Not verified on a real device:** web feel with a real mouse, the shoulder camera in tight streets, guides on hills.
+
+## The stunt update (cft-stunt.js + car air in cft-world.js, 2026-11-19)
+
+The user: "Add more things for doing car tricks. They appear as you get in the car. Get some air time, have some fun doing
+flips and jumping through rings of fire."
+- **Physics (cft-world.js, after updatePlayer):** the drive branch now has air. `W.ramps` (filled by cft-stunt) are wedges
+  `{x, z, ux, uz, L, H, w, gS, gE, vy, ref, k}`; `rampAt(x, z, y)` gives the surface (only if you came on at the bottom:
+  driving into a ramp from behind or the side passes through it, no invisible walls; `k < 0.999` = still popping in, ignored).
+  `carVertical` follows the road / ramp / a roof you landed on; leaving a ramp's lip (`lastA > 0.7 L`, moving up it)
+  = `carLaunch(vy × clamp(speed / ref, 0.4, 1.15), 'ramp')`; Space on the road = `'hop'`; driving off a roof = `'drop'`.
+  `player.carAir {t, pitch, spin, roll, pv, sv, rv, rollTo, maxH, crash, bounces}`: `carAirTick` W/S = pitch rate (W = nose
+  down = front flip, negative pitch), A/D = spin, Space queues a full roll; no key = the angle eases to the nearest upright
+  (`assist`). Gravity in the air x `airG` (0.6: floaty). Landing: `wrapPi(pitch/roll)` and the spin left over after whole
+  half-turns must be within `landTol` / `spinTol` = clean (`W.onCarLand(info)`; odd half-spins = fakie: heading + π and the
+  speed goes negative), else a crash: bounces 3 times tumbling, then `W.onCarSettle` upright with speed 0. The car turns
+  around its middle (`STUNT.pivot`, avatar position corrected at the end of updatePlayer; avatar rotation order is YXZ).
+  `player.boostT > 0` = top speed x `boostMul` and the car drives itself forward. `collide` gets `footY` in a car now, so
+  a car above a roof passes over the building. `W.setRide` / `W.teleport` clear `carAir`, `onRamp`, `boostT`.
+- **Courses (cft-stunt.js):** entering drive mode (`W.ride().mode === 'drive'`: own car, moped, borrowed car) -> `fill(true)`
+  pops up `D.TUNE.stunt.count` courses (staggered, ramps rise out of the road with an overshoot, rings and pads grow) on car
+  streets (`W.randomWalkSpot`, segments ≥ 14 m, not bridges), facing away from you; the first is always a ring ramp, plus a
+  rainbow guide to it. Every 1.5 s far ones (> dropD) shrink away and new ones fill in. Getting out = all shrink away.
+  `plan(kind, x, z, ux, uz)` checks 30 m of run-up + the ramp for roofs, then FLIES the planned jump at
+  `ref = ride.run × boostMul × 0.97` (what the boost arrows give you) to put rings at fractions of the apex time
+  (`D.STUNT.KINDS[kind].rings`) and the bullseye where it lands; any roof in the way = no course there. A plan is per ride
+  speed (a sports car gets longer jumps).
+- **Touch checks (`touchTick`, each frame in a car):** boost pad rectangles; ring planes crossed between last frame and this
+  one (car middle = pos.y + pivot): within R - 0.15 = through (`firerings`, fire trail, mayhem `firering`), within R + 1.3 =
+  singed (smoke). Rings in the air add to the jump; fire-alley rings on the ground pay at once.
+- **Scoring (`W.onCarLand`):** `D.STUNT.PTS` per second of air, flip, half-spin, roll, ring, bullseye, fakie, roof; x (1 +
+  0.25 per extra kind of trick) x streak (1 + 0.25 per clean stunt launched within `streakT`, max x2). A plain hop under
+  `minAir` scores nothing. `award` -> `G.addMoney` (pts / ptsPerCoin, capped, + level bonus), `G.addXp`, `G.chaos.add('stunt')`.
+  Wipeouts: a joke from `D.STUNT.WIPEOUT`, streak reset, rings still pay. State `save.stunt {best {pts, name}, bestAir, tips}`.
+  Counters: stunts, flips, spins (full 360s), rolls, firerings, megarings (all 3 rings of a MEGA in one jump), bullseyes,
+  fakies, wipeouts, carhops. Missions s-stunts, s-mega (Kai); achievements cat 'Stunts'. Phone app `stunt` (VIEWS.stunt),
+  minimap `St.markers`, keys line in the help card.
+- **Tests:** `game_test.py --stunt` (stunttest.js, 26 checks, last in the full run); pictures `--stuntshots DIR` (pop-up,
+  ring of fire, back flip, MEGA, fire alley, phone). Shots must set `W.controls.enabled = true` after `G.ui.closeAll()`:
+  `G.stepSim` doesn't, and a dialog left open turns the controls off.
+- **Not verified on a real device:** the feel of the flip/spin rates with a real keyboard, touch (the stick flips, ⤒ rolls),
+  ramps on steep hills, frame rate with ~7 courses x ~13 flame sprites per ring.
 
 ## Recipes
 

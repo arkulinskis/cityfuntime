@@ -3596,6 +3596,8 @@ varying float vGL; varying vec2 vGUV;
   // spec: {kind: null|'skateboard'|..., mode: 'foot'|'ride'|'drive', walk, run, jump, radius, turn, accel}
   W.setRide = function (spec) {
     ride = Object.assign({ mode: 'foot', walk: 6.2, run: 12.5, jump: 8.5, radius: 0.4, turn: 1.9, accel: 9 }, spec || {});
+    if (player.carAir && ride.mode !== 'drive') { player.vy = Math.min(player.vy, 0); player.pitch = 0; }
+    player.carAir = null; player.onRamp = null; player.boostT = 0;
     if (rideMesh) { avatar.remove(rideMesh); rideMesh = null; }
     if (ride.kind) { rideMesh = W.vehicle(ride.kind, ride.color); avatar.add(rideMesh); }
     player.heading = player.face;
@@ -3657,34 +3659,42 @@ varying float vGL; varying vec2 vGUV;
     const fwdIn = ctl ? input.f - input.b + input.jy : 0, sideIn = ctl ? input.r - input.l + input.jx : 0;
     const sx = player.pos.x, sz = player.pos.z;
     if (ride.mode === 'drive') {
-      const boost = ctl && (input.sprint || Math.abs(input.jy) > 0.95);
+      // car stunts (2026-11-19, cft-stunt.js): W.ramps launch you, Space hops, and in the air W/S flip, A/D spin, Space
+      // barrel-rolls (player.carAir). Land on four wheels or wipe out. Boost pads set player.boostT.
+      const air = player.carAir;
       const hx = -Math.sin(player.heading), hz = -Math.cos(player.heading), back = player.speed < 0 ? -1 : 1;
-      player.slope = slopeAlong(hx * back, hz * back);
-      const top = (boost ? ride.run : ride.walk) * (W.speedMul || 1) * slopeMul(player.slope);
-      const target = fwdIn > 0 ? top * Math.min(1, fwdIn) : fwdIn < 0 ? -top * 0.35 * Math.min(1, -fwdIn) : 0;
-      const rate = (Math.sign(target - player.speed) === Math.sign(player.speed) || player.speed === 0) ? ride.accel : ride.accel * 2;
-      player.speed += Math.max(-rate * dt, Math.min(rate * dt, target - player.speed));
-      if (!fwdIn) player.speed *= Math.exp(-0.8 * dt);
-      const steer = Math.max(-1, Math.min(1, sideIn));
-      player.heading -= steer * ride.turn * dt * Math.max(-1, Math.min(1, player.speed / 6));
+      if (!air) {
+        const boost = ctl && (input.sprint || Math.abs(input.jy) > 0.95);
+        player.slope = slopeAlong(hx * back, hz * back);
+        const bst = player.boostT > 0 ? STUNT.boostMul : 1;
+        if (player.boostT > 0) player.boostT -= dt;
+        const top = (boost || bst > 1 ? ride.run : ride.walk) * bst * (W.speedMul || 1) * slopeMul(player.slope);
+        const target = fwdIn > 0 || bst > 1 ? top * (bst > 1 ? 1 : Math.min(1, fwdIn)) : fwdIn < 0 ? -top * 0.35 * Math.min(1, -fwdIn) : 0;
+        const rate = (Math.sign(target - player.speed) === Math.sign(player.speed) || player.speed === 0) ? ride.accel * (bst > 1 ? 3 : 1) : ride.accel * 2;
+        player.speed += Math.max(-rate * dt, Math.min(rate * dt, target - player.speed));
+        if (!fwdIn && bst === 1) player.speed *= Math.exp(-0.8 * dt);
+        const steer = Math.max(-1, Math.min(1, sideIn));
+        player.heading -= steer * ride.turn * dt * Math.max(-1, Math.min(1, player.speed / 6));
+      } else carAirTick(air, dt, ctl, fwdIn, sideIn);
       player.vel.set(-Math.sin(player.heading) * player.speed, 0, -Math.cos(player.heading) * player.speed);
       player.pos.x += player.vel.x * dt; player.pos.z += player.vel.z * dt;
-      if (collide(player.pos, ride.radius)) { player.speed *= 0.6; if (Math.abs(player.speed) > 4) W.lastHit = performance.now(); }
+      if (collide(player.pos, ride.radius, player.pos.y)) { player.speed *= 0.6; if (Math.abs(player.speed) > 4) W.lastHit = performance.now(); }
+      const lowAir = !air || player.pos.y - groundAt(player.pos.x, player.pos.z) < 1.4;
       // driving into street furniture, trees and parked cars smashes them (the game decides what that's worth: W.onDriveHit)
-      if (Math.abs(player.speed) > 4.5 && W.onDriveHit) {
+      if (lowAir && Math.abs(player.speed) > 4.5 && W.onDriveHit) {
         const hx2 = -Math.sin(player.heading) * Math.sign(player.speed), hz2 = -Math.cos(player.heading) * Math.sign(player.speed);
         const e = W.propNear(player.pos.x + hx2 * ride.radius, player.pos.z + hz2 * ride.radius, ride.radius + 0.5, { cars: Math.abs(player.speed) > 9 });
         if (e) { W.onDriveHit(e, Math.abs(player.speed), { x: hx2, z: hz2 }); player.speed *= e.car ? 0.45 : e.k === 'tree' || e.k === 'lamp' ? 0.7 : 0.88; }
       }
-      const pc = carAt(player.pos.x, player.pos.z, ride.radius * 0.5);
+      const pc = !air ? carAt(player.pos.x, player.pos.z, ride.radius * 0.5) : null;
       if (pc) { // squeeze past parked cars
         const dx = player.pos.x - pc.x, dz = player.pos.z - pc.z, across = -dx * pc.uz + dz * pc.ux, sd = across >= 0 ? 1 : -1, push = (0.95 + ride.radius * 0.5 - Math.abs(across)) * sd;
         player.pos.x += -pc.uz * push; player.pos.z += pc.ux * push; player.speed *= 0.97;
       }
       player.face = player.heading;
       if (performance.now() - cam.lookT > 1500) cam.yaw += angDiff(player.heading, cam.yaw) * Math.min(1, dt * 2.5);
-      player.pos.y = surfaceAt(player.pos.x, player.pos.z, player.pos.y + 0.6); player.grounded = true;
-      player.pitch += (Math.atan(slopeAlong(hx, hz)) - player.pitch) * Math.min(1, dt * 8);
+      carVertical(dt, ctl);
+      if (!player.carAir) player.pitch += (Math.atan(slopeAlong(hx, hz)) - player.pitch) * Math.min(1, dt * 8);
     } else {
       const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
       let fwd = fwdIn, side = sideIn;
@@ -3907,7 +3917,125 @@ varying float vGL; varying vec2 vGUV;
     avatar.position.copy(player.pos);
     avatar.rotation.y = player.face;
     avatar.rotation.x = player.pitch;
+    avatar.rotation.z = 0;
+    const ca = ride.mode === 'drive' && player.carAir;
+    if (ca) { // flips, spins and rolls turn the car around its middle, not its wheels
+      avatar.rotation.set(player.pitch + ca.pitch, player.face + ca.spin, ca.roll);
+      const c = STUNT.pivot, v = _sv.set(0, c, 0).applyQuaternion(avatar.quaternion);
+      avatar.position.x -= v.x; avatar.position.y += c - v.y; avatar.position.z -= v.z;
+    }
   }
+
+  // ---------------------------------------------------------------- car stunts (2026-11-19, the user: "add more things for
+  // doing car tricks. They appear as you get in the car. Get some air time, have some fun doing flips and jumping through
+  // rings of fire"). cft-stunt.js places the ramps (W.ramps) and scores; the physics lives here.
+  // ramp: {x, z (where it starts), ux, uz (the way it launches), L, H, w, gS, gE (ground at start / lip), vy (launch speed up), ref (speed it is built for)}
+  const STUNT = Object.assign({ airG: 0.6, hop: 7.5, flipRate: 8.4, spinRate: 7.4, rollRate: 10.5, landTol: 0.75, spinTol: 0.8, boostMul: 1.3, pivot: 0.75, assist: 2.2 }, (opts.tune && opts.tune.stunt) || {});
+  W.STUNT = STUNT; W.GRAV = GRAV;
+  W.ramps = [];
+  const _sv = new THREE.Vector3();
+  const TAU = Math.PI * 2;
+  const wrapPi = a => a - TAU * Math.round(a / TAU);
+  // The ramp surface under (x, z): {y, r, a (metres up the ramp)} or null. A ramp only carries you if you came on at the
+  // bottom (from behind or the side you drive through it: cartoon physics, no invisible walls).
+  function rampAt(x, z, y) {
+    let best = null;
+    for (const r of W.ramps) {
+      if (r.k != null && r.k < 0.999) continue;   // still popping in / out
+      const dx = x - r.x, dz = z - r.z, a = dx * r.ux + dz * r.uz;
+      if (a < 0 || a > r.L) continue;
+      const c = -dx * r.uz + dz * r.ux;
+      if (Math.abs(c) > r.w / 2) continue;
+      const sy = r.gS + (r.gE - r.gS) * a / r.L + r.H * a / r.L;
+      if (player.onRamp !== r && a > r.L * 0.4 && !(y != null && y >= sy - 0.3)) continue;
+      if (!best || sy > best.y) best = { y: sy, r, a };
+    }
+    return best;
+  }
+  W.rampAt = rampAt;
+  // Up you go: vy (m/s), why ('ramp' | 'hop' | 'drop'), ramp
+  function carLaunch(vy, why, r) {
+    player.carAir = { t: 0, vy0: vy, why, ramp: r || null, pitch: 0, spin: 0, roll: 0, pv: 0, sv: 0, rv: 0, rollTo: 0, maxH: 0, x0: player.pos.x, z0: player.pos.z, flipsSeen: 0, spinsSeen: 0, rollsSeen: 0, crash: false, bounces: 0 };
+    player.vy = vy; player.grounded = false; player.onRamp = null;
+    if (W.onCarAir) W.onCarAir(player.carAir);
+  }
+  W.carLaunch = carLaunch;
+  function carAirTick(a, dt, ctl, fwdIn, sideIn) {
+    a.t += dt;
+    if (a.crash) { a.pitch += a.pv * dt; a.spin += a.sv * dt; a.roll += a.rv * dt; player.speed *= Math.exp(-1.2 * dt); return; }
+    const fi = ctl ? Math.max(-1, Math.min(1, fwdIn)) : 0, si = ctl ? Math.max(-1, Math.min(1, sideIn)) : 0;
+    a.pv += (-fi * STUNT.flipRate - a.pv) * Math.min(1, dt * 7);   // W = nose down (front flip), S = back flip
+    a.sv += (-si * STUNT.spinRate - a.sv) * Math.min(1, dt * 7);   // A / D = spin
+    a.pitch += a.pv * dt; a.spin += a.sv * dt;
+    if (!fi) a.pitch += (TAU * Math.round(a.pitch / TAU) - a.pitch) * Math.min(1, dt * STUNT.assist);   // let go and the nose levels out
+    if (!si) a.spin += (Math.PI * Math.round(a.spin / Math.PI) - a.spin) * Math.min(1, dt * STUNT.assist);
+    if (ctl && input.jump) { a.rollTo += TAU * (si > 0.2 ? -1 : 1); input.jump = false; }   // Space = a barrel roll (queue several)
+    const rd = a.rollTo - a.roll;
+    a.roll += Math.sign(rd) * Math.min(Math.abs(rd), STUNT.rollRate * dt);
+    // the moment a trick completes, the game shouts it (W.onCarTrick)
+    const fl = Math.floor((Math.abs(a.pitch) + 0.6) / TAU), sp = Math.floor((Math.abs(a.spin) + 0.5) / Math.PI), rl = Math.floor((Math.abs(a.roll) + 0.4) / TAU);
+    if (W.onCarTrick) {
+      if (fl > a.flipsSeen) W.onCarTrick(a.pitch < 0 ? 'front' : 'back', fl, a);
+      if (sp > a.spinsSeen) W.onCarTrick('spin', sp, a);
+      if (rl > a.rollsSeen) W.onCarTrick('roll', rl, a);
+    }
+    a.flipsSeen = fl; a.spinsSeen = sp; a.rollsSeen = rl;
+  }
+  // The car's height: on the road, up a ramp, off its lip, through the air, onto a roof, and the landing.
+  function carVertical(dt, ctl) {
+    const x = player.pos.x, z = player.pos.z;
+    let gy = surfaceAt(x, z, player.pos.y + 0.6);
+    const rf = roofAt(x, z);
+    if (rf != null && player.pos.y > rf - 0.6) gy = Math.max(gy, rf);   // a car on a roof (landed there)
+    const rp = W.ramps.length ? rampAt(x, z, player.pos.y) : null;
+    if (rp && rp.y > gy) gy = rp.y;
+    let a = player.carAir;
+    if (!a) {
+      const was = player.onRamp, along = was ? player.vel.x * was.ux + player.vel.z * was.uz : 0;
+      if (was && (!rp || rp.r !== was) && along > 5 && was.lastA > was.L * 0.7) { // off the lip!
+        const k = Math.max(0.4, Math.min(1.15, along / (was.ref || 25)));
+        player.pos.y = was.gE + was.H; carLaunch(was.vy * k, 'ramp', was);
+      } else if (ctl && input.jump && Math.abs(player.speed) > 2) { // Space: a little hop (time for a barrel roll)
+        carLaunch(STUNT.hop, 'hop'); input.jump = false;
+      } else if (player.pos.y > gy + 0.9) carLaunch(0, 'drop');   // off a roof or a bridge
+      else { player.pos.y = gy; player.grounded = true; player.onRamp = rp ? rp.r : null; if (rp) rp.r.lastA = rp.a; }
+      return;
+    }
+    player.vy -= GRAV * (W.gravMul || 1) * STUNT.airG * dt;
+    player.pos.y += player.vy * dt;
+    a.maxH = Math.max(a.maxH, player.pos.y - groundAt(x, z));
+    if (player.pos.y > gy || player.vy > 0) return;
+    // touchdown
+    player.pos.y = gy;
+    if (a.crash) { // a wipeout: bounce, tumble, settle
+      a.bounces++;
+      if (a.bounces < 3) { player.vy = 5.5 / a.bounces; a.pv *= 0.6; a.rv *= 0.6; a.sv *= 0.6; player.speed *= 0.5; W.burst(x, gy + 0.4, z, '💥', 3, { spread: 2, size: 0.6, life: 0.5 }); return; }
+      player.carAir = null; player.grounded = true; player.speed = 0; player.vy = 0; player.pitch = 0;
+      player.heading += wrapPi(a.spin); player.face = player.heading;
+      if (W.onCarSettle) W.onCarSettle(a);
+      return;
+    }
+    const ep = wrapPi(a.pitch), er = wrapPi(a.roll), hs = Math.round(a.spin / Math.PI), es = a.spin - hs * Math.PI;
+    const info = {
+      t: a.t, h: a.maxH, why: a.why, ramp: a.ramp, dist: Math.hypot(x - a.x0, z - a.z0),
+      flips: Math.round((a.pitch - ep) / TAU), halfSpins: Math.abs(hs), rolls: Math.abs(Math.round((a.roll - er) / TAU)),
+      fakie: Math.abs(hs) % 2 === 1, clean: Math.abs(ep) < STUNT.landTol && Math.abs(er) < STUNT.landTol && Math.abs(es) < STUNT.spinTol, x, z, onRoof: rf != null && gy >= rf - 0.01,
+    };
+    if (info.clean) {
+      player.carAir = null; player.grounded = true; player.vy = 0; player.pitch = 0;
+      player.heading += es + (info.fakie ? Math.PI : 0); player.face = player.heading;
+      if (info.fakie) player.speed = -Math.abs(player.speed) * 0.8;   // landed backwards: roll on in reverse
+      if (a.t > 0.6) W.burst(x, gy + 0.1, z, '💨', 5, { up: 0.4, spread: 2.5, size: 0.6, life: 0.5 });
+      cam.shake = Math.max(cam.shake, Math.min(0.5, a.maxH * 0.04));
+    } else { // roof first: WIPEOUT
+      a.crash = true; a.bounces = 0; player.vy = 7; player.speed *= 0.45;
+      a.pv = (Math.random() < 0.5 ? -1 : 1) * (6 + Math.random() * 5); a.sv = (Math.random() - 0.5) * 8; a.rv = (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 5);
+      cam.shake = Math.max(cam.shake, 0.7);
+      W.burst(x, gy + 0.6, z, '💥', 6, { spread: 3, size: 0.8, life: 0.6 });
+    }
+    if (W.onCarLand) W.onCarLand(info);
+  }
+  W.carAir = () => player.carAir || null;
   // For tests and screenshots: a spot inside the nearest park / plaza / ... of these kinds (AREA keys), at least minA m².
   W.findArea = function (kinds, minA) {
     let best = null, bd = Infinity;
@@ -3924,6 +4052,7 @@ varying float vGL; varying vec2 vGUV;
   };
   W.teleport = function (x, z, yaw) {
     player.pos.set(x, surfaceAt(x, z), z); player.vel.set(0, 0, 0); player.vy = 0; player.speed = 0; player.grounded = true; player.pitch = 0;
+    player.carAir = null; player.onRamp = null; player.boostT = 0;
     if (yaw != null) { player.face = player.heading = yaw; cam.yaw = yaw; }
     trail.length = 0;
     for (const f of followers) f.obj.position.set(x + 1, groundAt(x + 1, z + 1), z + 1);

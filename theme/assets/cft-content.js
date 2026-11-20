@@ -1578,7 +1578,7 @@ D.EVENTS.push(
 D.CHAOS = {
   // the mayhem meter: chain chaos without stopping; [points, letter, name]
   RANKS: [[0, 'D', 'Dull'], [150, 'C', 'Chaotic'], [400, 'B', 'Bonkers'], [900, 'A', 'Absolutely Unhinged'], [1800, 'S', 'Sigma Mayhem'], [3200, 'SS', 'Certified Brainrot'], [5500, 'SSS', 'OHIO FINAL BOSS']],
-  POINTS: { kill: 60, bigKill: 200, parry: 120, dodge: 30, block: 10, smash: 40, wreck: 150, combo: 25, hit: 15, pinata: 120, ball: 40, launch: 80, hoop: 70, photo: 150, fart: 30, stink: 90, peel: 50, bounce: 40, reflect: 200, air: 12, cushion: 45 },
+  POINTS: { kill: 60, bigKill: 200, parry: 120, dodge: 30, block: 10, smash: 40, wreck: 150, combo: 25, hit: 15, pinata: 120, ball: 40, launch: 80, hoop: 70, photo: 150, fart: 30, stink: 90, peel: 50, bounce: 40, reflect: 200, air: 12, cushion: 45, stunt: 100, firering: 150 },
   // aura: a number that only goes up for cool things (and down for very uncool ones). Purely for the meme.
   AURA: { kill: 10, bigKill: 100, parry: 50, reflect: 150, photo: 100, legendary: 1000, mission: 500, level: 250, hoop: 30, rankS: 670, rankSSS: 6700, stink: 67,
     poop: -100, blackout: -1000, tomato: -50, lag: -25, peel: 20 },
@@ -1657,6 +1657,47 @@ D.RPG.ACH.push(
   { id: 'pinatas', cat: 'Chaos', e: '🪅', n: 'Piñata Party', d: 'Pop 20 piñatas', k: 'pinatas', c: 20, pts: 10 },
   { id: 'gnomes', cat: 'Chaos', e: '🍄', n: 'Gnome Liberation Front', d: 'Smash 25 garden gnomes', k: 'smash_gnome', c: 25, pts: 10 },
 );
+
+// ======================================================== the stunt update (2026-11-19, cft-stunt.js)
+// The user: "Add more things for doing car tricks. They appear as you get in the car. Get some air time, have some fun
+// doing flips and jumping through rings of fire." Get in any car (yours, or borrow a parked one with E) and a stunt
+// course pops up along the streets around you: boost arrows, ramps, MEGA ramps, rings of fire. In the air: W/S flip,
+// A/D spin, Space barrel roll. Land on four wheels.
+D.STUNT = {
+  // course kinds: L / H / w = ramp length, height, width (m); vy = launch speed up (m/s) at the speed it's built for;
+  // rings = where the rings of fire hang, as a share of the time to the top of the jump; R = ring radius (m)
+  KINDS: {
+    kicker: { n: 'Kicker', e: '🛹', L: 5, H: 0.9, w: 4.6, vy: 10, rings: [], R: 3.2, weight: 0.22 },
+    ramp: { n: 'Ramp', e: '🔥', L: 8, H: 1.7, w: 5, vy: 15, rings: [1], R: 3.3, weight: 0.4 },
+    mega: { n: 'MEGA ramp', e: '🌋', L: 13, H: 3.4, w: 6, vy: 21, rings: [0.55, 1, 1.45], R: 3.7, weight: 0.16 },
+    alley: { n: 'Fire alley', e: '🔥', alley: 3, gap: 15, R: 2.9, weight: 0.22 },   // rings of fire standing on the road
+  },
+  PTS: { air: 120, flip: 500, half: 200, roll: 350, ring: 600, ringGround: 250, eye: 400, fakie: 300, roof: 500, big: 150, singe: 80 },
+  WIPEOUT: ['The car is fine. Your dignity is not.', 'Wheels go DOWN, bestie.', 'Physics: 1. You: 0.', 'The pigeons saw that.',
+    'Was that a parallel-parking attempt?', '2/10 landing. 10/10 commitment.', 'Certified crash-test dummy moment.',
+    'Insurance has left the chat.', 'You meant to do that. Right?', 'Roof side down is a choice.'],
+  AIR: ['AIR!', 'YEET!', 'SEND IT!', 'WHEEE!', 'LIFTOFF!'],
+};
+D.RPG.ACH.push(
+  { id: 'stunt1', cat: 'Stunts', e: '🏁', n: 'Hold My Juice Box', d: 'Land your first car stunt', k: 'stunts', c: 1, pts: 10 },
+  { id: 'stunt50', cat: 'Stunts', e: '🏎️', n: 'Stunt Double', d: 'Land 50 car stunts', k: 'stunts', c: 50, pts: 25, title: 'the Stunt Double' },
+  { id: 'fire1', cat: 'Stunts', e: '🔥', n: 'Through the Fire', d: 'Drive through a ring of fire', k: 'firerings', c: 1, pts: 10 },
+  { id: 'fire30', cat: 'Stunts', e: '🌋', n: 'Ring of Fire Regular', d: 'Drive through 30 rings of fire', k: 'firerings', c: 30, pts: 25, title: 'the Human Torch' },
+  { id: 'flips10', cat: 'Stunts', e: '🔄', n: 'Flip Mode', d: 'Flip a car 10 times (and land it)', k: 'flips', c: 10, pts: 10 },
+  { id: 'rolls10', cat: 'Stunts', e: '🌀', n: 'Do a Barrel Roll', d: 'Barrel-roll a car 10 times (and land it)', k: 'rolls', c: 10, pts: 10 },
+  { id: 'eyes5', cat: 'Stunts', e: '🎯', n: 'Bullseye!', d: 'Land on 5 bullseye pads', k: 'bullseyes', c: 5, pts: 10 },
+  { id: 'wipe10', cat: 'Stunts', e: '💥', n: 'Crash Test Dummy', d: 'Wipe out 10 times', k: 'wipeouts', c: 10, pts: 10, title: 'the Crash Test Dummy' },
+);
+S('s-stunts', 'Hold My Juice Box', 'kai', 'park', { m: ['c1-couch'], lvl: 2 }, ['Kai: You know what this city is missing? RAMPS. So I put some up. And rings of fire. Don\'t tell anyone.',
+  'Kai: Get in a car (your own, or borrow a parked one with E). The ramps pop up when you do. Hit the blue arrows, fly, and in the air: W or S to flip, A or D to spin, Space to barrel roll. Wheels DOWN when you land.'],
+  [{ do: 'count', key: 'stunts', n: 3, text: 'Land 3 car stunts: launch off a ramp (or hop with Space), do a trick, land on four wheels' },
+   { do: 'count', key: 'firerings', n: 1, text: 'Drive through a ring of fire 🔥 (they hang over the ramps and stand in fire alleys)' }],
+  ['Kai: You flew THROUGH FIRE. In a car. I am going to tell my grandchildren about you.'], { money: 250, xp: 500, stats: { cred: 2, style: 1 }, rel: { kai: 10 } });
+S('s-mega', 'Send It', 'kai', 'park', { m: ['s-stunts'], lvl: 4 }, ['Kai: Okay, small ramps are for babies. There are MEGA ramps 🌋 out there now. Three rings of fire, one after another.',
+  'Kai: Boost, launch, thread all three, and land it. Bonus points if you flip on the way. Bonus bonus points if you land on the bullseye 🎯.'],
+  [{ do: 'count', key: 'megarings', n: 1, text: 'Fly a MEGA ramp 🌋 through all three of its rings of fire in one jump' },
+   { do: 'count', key: 'flips', n: 2, text: 'Land 2 flips (W or S in the air)' }],
+  ['Kai: THREE RINGS. I need a lie-down and a juice box.'], { money: 500, xp: 1000, stats: { cred: 2, fit: 1 }, rel: { kai: 12 } });
 
 // ======================================================== the campaign update (2026-11-18, cft-camp.js)
 // The user: "leave little secrets around town in the tight gaps between buildings; redesign the HUD; ranged attacks limited
@@ -1821,6 +1862,20 @@ D.TUNE = {
     webStun: 2.2,                 // seconds a webbed figment is stuck
     guideR: 48, megaR: 260, rotR: 110, critterR: 26,  // how near something is when its rainbow guide runs (figment, MEGA, weird creature, new animal)
     guideCd: 7, guideMax: 80,     // seconds between ordinary guides (special ones always run), longest trail (m)
+  },
+  stunt: {                        // cft-stunt.js + car air in cft-world.js (2026-11-19): ramps, rings of fire, car flips
+    count: 7, countLow: 4,        // stunt courses kept around you while you drive
+    minD: 45, maxD: 260, dropD: 420, apart: 70,   // where courses pop up (m), when far ones go, how far apart they stay
+    airG: 0.6,                    // gravity in the air (x normal): floatier = more time for tricks
+    hop: 7.5,                     // Space on the ground: a little hop (m/s up)
+    flipRate: 8.4, spinRate: 7.4, rollRate: 10.5,   // trick speeds (radians per second): a flip takes about 0.75 s
+    landTol: 0.75, spinTol: 0.8,  // how crooked a landing can be and still count (radians)
+    assist: 2.2,                  // let go of the keys and the car levels itself out this fast
+    boostMul: 1.3, boostSecs: 1.6,   // blue arrows: top speed x, seconds
+    pivot: 0.75,                  // flips turn around this height (the car's middle)
+    minAir: 0.8,                  // a jump without tricks needs this much air time to score
+    ptsPerCoin: 30, cashCap: 450, ptsPerXp: 14,   // rewards
+    streakT: 6,                   // seconds after a landing to launch again and keep the streak (x1.25, x1.5 ... x2)
   },
   camp: {                         // cft-camp.js (2026-11-18): the campaign, secrets, ammo, powers, fire, storms, mega figments
     introFoes: 14, introFoesLow: 8,   // figments chasing you at once in the opening five minutes

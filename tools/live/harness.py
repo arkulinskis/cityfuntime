@@ -13,7 +13,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 ASSETS = ROOT / "theme" / "assets"
-ENGINE = ["three.min.js", "cft-post.js", "cft-gfx.js", "three-gltf.js", "cft-content.js", "cft-tiles.js", "cft-world.js", "cft-ui.js", "cft-fun.js", "cft-rpg.js", "cft-hero.js", "cft-chaos.js", "cft-camp.js", "cft-wild.js", "cft-aim.js", "cft-debug.js", "cft-game.js"]
+ENGINE = ["three.min.js", "cft-post.js", "cft-gfx.js", "three-gltf.js", "cft-content.js", "cft-tiles.js", "cft-world.js", "cft-ui.js", "cft-fun.js", "cft-rpg.js", "cft-hero.js", "cft-chaos.js", "cft-camp.js", "cft-wild.js", "cft-aim.js", "cft-stunt.js", "cft-debug.js", "cft-game.js"]
 TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg"}
 
 PAGE = """<!doctype html>

@@ -288,6 +288,19 @@ extinguishers, water and lightning powers".
 - Fixed: a console error ("Cannot read properties of null (reading 'appendChild')") when a banner or dialog arrived after
   leaving the game.
 
+**The stunt update (2026-11-19):**
+- **Get in any car and a stunt course pops up** along the streets around you (your own car, a moped, or a borrowed one):
+  about 7 spots between 45 and 260 m, refreshed as you drive, gone when you get out. Ramps 🛹, ramps with a **ring of fire**
+  🔥 at the top of the jump, **MEGA ramps** 🌋 with three rings along the arc, and **fire alleys** (three rings standing on
+  the road). Blue boost arrows before every ramp, a 🎯 bullseye where you should land; all on the minimap.
+- **Tricks:** in the air **W / S** flip, **A / D** spin, **Space** barrel roll; **Space** on the road hops. Let go and the
+  car levels itself. Wheels down = it counts; roof down = **WIPEOUT** (a cartoon tumble and a joke, no damage); an odd
+  half-spin = **FAKIE** (you roll on backwards). Every trick is shouted the moment it completes.
+- **Scoring:** air time, flips, 180s, barrel rolls, rings of fire, bullseye, fakie, rooftop landings; more kinds of trick in
+  one jump = a bigger multiplier, and launching again within 6 s keeps a streak (up to x2). Coins, XP and mayhem.
+- Phone app 🏁 **Stunts** (best stunt, best air, counts, how-to); missions **Hold My Juice Box** and **Send It** from Kai;
+  8 achievements (Stunts).
+
 **For members:** the same game saved to the server (and still in the browser), the **Life** page (`#life`, home after sign-in):
 level, money, net worth, stats, home, love & family, friends, businesses, blocks, stickers, the current mission and the diary.
 A game played as a guest is kept when you sign up.

@@ -115,6 +115,9 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Figment scaling, level cap | "figments too tanky at 30", "too easy" | cft-fun `F.scaleFor` `spawnMonster`, cft-game `levelOf`, server `Game.py level_of` | `D.TUNE.monsters.gearShare/lifeShare/armorShare/challenge*` | --aim --combat |
 | Gabled roofs | "fell into a roof", "can't walk up the roof" | cft-world `gableRise` `roofTop` `roofAt` `collide` | | --aim |
 | Dex gallery, Dex photos | "photo missing", "Dex app wrong" | cft-ui `VIEWS.dex`, cft-chaos `snap` `savePic` `C.dexPics` `C.summary`, cft-game `takePhoto` | | --aim |
+| Car stunts: air, flips, landings | "car flips too slow", "lands crooked and wipes out", "too floaty" | cft-world `carVertical` `carAirTick` `carLaunch` `rampAt` (drive branch of updatePlayer, `STUNT` = D.TUNE.stunt), avatar pivot at the end of updatePlayer | `D.TUNE.stunt` (airG, hop, flipRate, spinRate, rollRate, landTol, spinTol, assist, pivot) | --stunt |
+| Stunt courses: ramps, rings of fire, boost arrows, bullseyes | "ring too high", "ramps in the way", "too few ramps" | cft-stunt `plan` (where rings hang) `build` `rampGeo` `fireRing` `findSpot` `fill` `touchTick` `throughRing` | `D.STUNT.KINDS`, `D.TUNE.stunt` (count, minD, maxD, dropD, apart, boostMul, boostSecs) | --stunt --stuntshots |
+| Stunt scoring, trick names, wipeout jokes | "stunts pay too little", "trick name wrong" | cft-stunt `W.onCarLand` `W.onCarTrick` `award` | `D.STUNT.PTS/WIPEOUT/AIR`, `D.TUNE.stunt` (ptsPerCoin, cashCap, ptsPerXp, streakT, minAir) | --stunt |
 | Play-test panel | | cft-debug.js (`?debug=1`) | | |
 
 ## Tests (pick the narrowest)

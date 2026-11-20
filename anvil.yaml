@@ -396,15 +396,15 @@ native_deps:
     <link rel="stylesheet" href="_/theme/app.css?v=34bb4320d2">
     <script src="_/theme/app-kit.js?v=9ddf8e5515"></script>
     <script src="_/theme/ark-music.js?v=4ee0f1e082"></script>
-    <script src="_/theme/cft-kit.js?v=81ba4b1c23"></script>
+    <script src="_/theme/cft-kit.js?v=fc8a73d7b8"></script>
     <!-- the game engine, loaded only when a page needs it (cft-kit.js reads these; tools/assets.py keeps ?v= current) -->
     <meta name="cft-asset" content="_/theme/three.min.js?v=a13f10ad8e">
     <meta name="cft-asset" content="_/theme/cft-post.js?v=59fe67cd9e">
     <meta name="cft-asset" content="_/theme/cft-gfx.js?v=d1ade57a08">
     <meta name="cft-asset" content="_/theme/three-gltf.js?v=a19eaa4fef">
-    <meta name="cft-asset" content="_/theme/cft-content.js?v=34ee95347d">
+    <meta name="cft-asset" content="_/theme/cft-content.js?v=c5b7d991b3">
     <meta name="cft-asset" content="_/theme/cft-tiles.js?v=e580641d28">
-    <meta name="cft-asset" content="_/theme/cft-world.js?v=06252fc269">
+    <meta name="cft-asset" content="_/theme/cft-world.js?v=701acea4a8">
     <meta name="cft-asset" content="_/theme/cft-fun.js?v=d680a1eb57">
     <meta name="cft-asset" content="_/theme/cft-rpg.js?v=c3ce4e89cd">
     <meta name="cft-asset" content="_/theme/cft-hero.js?v=bf5739a218">
@@ -412,9 +412,10 @@ native_deps:
     <meta name="cft-asset" content="_/theme/cft-camp.js?v=beae943dd0">
     <meta name="cft-asset" content="_/theme/cft-wild.js?v=875bb032dc">
     <meta name="cft-asset" content="_/theme/cft-aim.js?v=d515e1edde">
+    <meta name="cft-asset" content="_/theme/cft-stunt.js?v=cce8b850fc">
     <meta name="cft-asset" content="_/theme/cft-debug.js?v=fac2552f4c">
-    <meta name="cft-asset" content="_/theme/cft-ui.js?v=4e5096a99d">
-    <meta name="cft-asset" content="_/theme/cft-game.js?v=774b3e08f5">
+    <meta name="cft-asset" content="_/theme/cft-ui.js?v=1cf4e39b7d">
+    <meta name="cft-asset" content="_/theme/cft-game.js?v=ba85bcda07">
 package_name: City_Fun_Time
 runtime_options:
   client_version: '3'

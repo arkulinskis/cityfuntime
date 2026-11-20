@@ -2140,6 +2140,7 @@ function mount(root, opts) {
     if (G.camp) G.camp.tick(dt, paused || rt.busy);
     if (G.wild) G.wild.tick(dt, paused || rt.busy);
     if (G.aim) G.aim.tick(dt, paused || rt.busy);
+    if (G.stunt) G.stunt.tick(dt, paused || rt.busy);
     rt.promptTimer -= dt;
     if (rt.promptTimer <= 0) { rt.promptTimer = 0.15; rt.interact = (paused || rt.busy) ? null : findInteraction(); U.prompt(rt.interact ? rt.interact.t : null); }
     // goal beam + arrow
@@ -2228,6 +2229,7 @@ function mount(root, opts) {
     if (window.CFTCamp && G.fun) G.camp = window.CFTCamp.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; }, travel, setState: v => { state = v; } });  // the campaign update (cft-camp.js)
     if (window.CFTWild && G.fun) G.wild = window.CFTWild.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the open-air update (cft-wild.js)
     if (window.CFTAim && G.fun) G.aim = window.CFTAim.attach(G, { bump });  // the aim update (cft-aim.js): right-mouse sight, slots 1-4, the web, rainbow guides
+    if (window.CFTStunt && G.fun) G.stunt = window.CFTStunt.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; } });  // the stunt update (cft-stunt.js): ramps + rings of fire pop up when you drive
     if (window.CFTDebug) G.debug = window.CFTDebug.attach(G);  // the play-test panel: only with ?debug=1
     // driving into things smashes them (borrowed cars and your own rides alike)
     W.onDriveHit = (e, speed, dir) => { if (G.fun) G.fun.smashProp(e, speed > 9 ? 99 : speed * 0.5, dir, true); };
@@ -2284,6 +2286,7 @@ function mount(root, opts) {
       if (G.camp) G.camp.destroy();
       if (G.wild) G.wild.destroy();
       if (G.aim) G.aim.destroy();
+      if (G.stunt) G.stunt.destroy();
       if (G.debug) G.debug.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();
