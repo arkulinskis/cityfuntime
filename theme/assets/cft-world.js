@@ -2957,6 +2957,34 @@ varying float vGL; varying vec2 vGUV;
       AR.x = 0; AR.z = 2.5 + s * 0.12; ER.x = 0; ER.z = 0.55 + s * 0.45; H.z = -0.08; H.y = 0;
       return;
     }
+    // cut-scene poses (cft-cine.js): talk (u.talk 0..1 = how loud the voice is right now: the hands move with it),
+    // cheer (both arms up, a little hop: a mission accepted or done), phone (right hand at the ear)
+    if (pose === 'talk') {
+      const k = u.talk || 0;
+      u.phase += dt * (2.2 + k * 4);
+      u.talkK = (u.talkK || 0) + (k - (u.talkK || 0)) * Math.min(1, dt * 6);
+      const s = Math.sin(u.phase), s2 = Math.sin(u.phase * 0.63 + 1.3), kk = u.talkK;
+      L.x = R.x = KL.x = KR.x = 0;
+      AR.x = 0.25 + kk * 0.75 + s * 0.2 * kk; AR.z = ARM_Z + 0.12 + s2 * 0.1 * kk; ER.x = 0.55 + kk * 0.9 + s2 * 0.3 * kk;
+      AL.x = 0.12 + kk * 0.45 * (0.5 + 0.5 * s2); AL.z = -ARM_Z - 0.05 * kk; EL.x = 0.3 + kk * 0.7;
+      H.x = -0.03 + Math.sin(u.phase * 1.7) * 0.07 * kk; H.y = Math.sin(u.phase * 0.37) * 0.14; H.z = s2 * 0.05 * kk;
+      B.rotation.y = Math.sin(u.phase * 0.29) * 0.07; B.rotation.x = -0.03 * kk;
+      return;
+    }
+    if (pose === 'cheer') {
+      u.phase += dt * 9;
+      const s = Math.abs(Math.sin(u.phase));
+      AL.x = AR.x = 2.75; AL.z = -0.5 - s * 0.15; AR.z = 0.5 + s * 0.15; EL.x = ER.x = 0.25 + s * 0.2;
+      L.x = R.x = s * 0.25; KL.x = KR.x = -s * 0.5; B.position.y = s * 0.16; H.x = -0.15;
+      return;
+    }
+    if (pose === 'phone') {
+      u.phase += dt;
+      AR.x = 1.05; AR.z = ARM_Z + 0.45; ER.x = 2.45; ER.z = 0; AL.x = 0.15; EL.x = 0.25;   // elbow forward and out, forearm folded back up to the ear
+      H.z = 0.12; H.y = Math.sin(u.phase * 0.6) * 0.12; H.x = Math.sin(u.phase * 0.9) * 0.05;
+      L.x = R.x = KL.x = KR.x = 0;
+      return;
+    }
     if (pose === 'dance') {
       u.phase += dt * 7;
       const s = Math.sin(u.phase), c = Math.cos(u.phase);
@@ -2985,6 +3013,25 @@ varying float vGL; varying vec2 vGUV;
   };
   // Animals: dog, cat, pigeon, duck (realism pass 2026-11-17: rounded bodies, snouts, floppy or pointed ears, tails, wings).
   // userData: {kind: 'animal', legs (4 pivots; none for birds), head, tail, bird}. Faces -z.
+  // A mouth that opens with the voice (cft-cine.js): made the first time someone talks in a cut-scene, a dark oval
+  // between the lips (over a beard), 0 = closed and hidden, 1 = wide open. The head is merged, so the mouth is its own mesh.
+  let MOUTH = null;
+  W.mouth = function (fig, k) {
+    const u = fig && fig.userData;
+    if (!u || u.kind !== 'person' || !u.head) return;
+    if (!u.mouth) {
+      if (!k) return;
+      if (!MOUTH) MOUTH = { g: new THREE.SphereGeometry(1, 14, 10), m: new THREE.MeshBasicMaterial({ color: 0x3a1418 }), t: new THREE.MeshBasicMaterial({ color: 0xf4f1ea }) };
+      const mo = new THREE.Group(), cav = new THREE.Mesh(MOUTH.g, MOUTH.m), teeth = new THREE.Mesh(MOUTH.g, MOUTH.t);
+      cav.scale.set(0.026, 0.016, 0.008); teeth.scale.set(0.02, 0.004, 0.006); teeth.position.set(0, 0.009, -0.002);
+      mo.add(cav, teeth);
+      mo.position.set(0, 0.056, -0.108);
+      u.head.add(mo); u.mouth = mo;
+    }
+    const o = Math.max(0, Math.min(1, k || 0));
+    u.mouth.visible = o > 0.04;
+    u.mouth.scale.set(0.85 + o * 0.25, 0.25 + o * 1.25, 1);
+  };
   W.animal = function (kind, color) {
     const g = new THREE.Group(), body = new Merge(), { sph: S, sm: SM, cap: CAP } = PRIM_LO;
     const c = color || (kind === 'dog' ? 0xc8894a : kind === 'cat' ? 0x6b6b6b : kind === 'duck' ? 0x8a6a3a : 0x8b8f9c);
@@ -4075,6 +4122,7 @@ varying float vGL; varying vec2 vGUV;
     return null;
   };
   function updateCamera(dt) {
+    if (W.cine) { cineCamera(dt); return; }
     const target = _v.set(player.pos.x, player.pos.y + (ride.mode === 'drive' ? 1.4 : 1.6), player.pos.z);
     // aiming (2026-11-19): the camera slides over your right shoulder and closes in; the screen centre is the sight
     cam.aimK += ((W.aiming && ride.mode !== 'drive' && !W.showOff ? 1 : 0) - cam.aimK) * Math.min(1, dt * 12);
@@ -4103,6 +4151,22 @@ varying float vGL; varying vec2 vGUV;
     avatar.visible = cam.cur > 1.1;
     camera.getWorldDirection(aimDirV); W.aimRay = { ox: camera.position.x, oy: camera.position.y, oz: camera.position.z, dx: aimDirV.x, dy: aimDirV.y, dz: aimDirV.z, from: cam.cur };
     if (W.showOff) { avatar.rotation.y = cam.yaw + Math.PI + Math.sin(performance.now() / 1400) * 0.5; avatar.rotation.x = 0; if (body && !ride.kind) W.animate(body, 0, dt); }
+    followLight();
+  }
+  // Mission cut-scenes (cft-cine.js, 2026-11-20): W.cine = {pos, look, fov, face, pose} places the camera exactly; you are
+  // always drawn, turned to `face` (yaw) and posed (`pose`: 'phone' on a call). Set to null and the normal camera returns.
+  function cineCamera(dt) {
+    const c = W.cine;
+    camera.position.set(c.pos.x, Math.max(groundAt(c.pos.x, c.pos.z) + 0.3, c.pos.y), c.pos.z);
+    camera.lookAt(c.look.x, c.look.y, c.look.z);
+    if (c.fov && Math.abs(c.fov - camera.fov) > 0.05) { camera.fov = c.fov; camera.updateProjectionMatrix(); }
+    avatar.visible = true;
+    if (c.face != null && !ride.kind) { avatar.rotation.y = c.face; avatar.rotation.x = 0; }
+    if (body && !ride.kind) W.animate(body, 0, dt, c.pose || null);
+    cam.cur = cam.dist;   // the normal camera comes back at full distance
+    followLight();
+  }
+  function followLight() {
     const snap = 240 / 2048;
     const px = Math.round(player.pos.x / snap) * snap, pz = Math.round(player.pos.z / snap) * snap, py = Math.round(player.pos.y / snap) * snap;
     sun.target.position.set(px, py, pz);

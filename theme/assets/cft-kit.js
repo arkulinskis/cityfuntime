@@ -35,7 +35,7 @@
   }
   function chain(list) { return list.reduce(function (p, n) { return p.then(function () { return script(n); }); }, Promise.resolve()); }
   var DATA = ['cft-content.js', 'cft-game.js'];
-  var ALL = ['three.min.js', 'cft-post.js', 'cft-gfx.js', 'three-gltf.js', 'cft-content.js', 'cft-tiles.js', 'cft-world.js', 'cft-ui.js', 'cft-fun.js', 'cft-rpg.js', 'cft-hero.js', 'cft-chaos.js', 'cft-camp.js', 'cft-wild.js', 'cft-aim.js', 'cft-stunt.js', 'cft-debug.js', 'cft-game.js'];
+  var ALL = ['three.min.js', 'cft-post.js', 'cft-gfx.js', 'three-gltf.js', 'cft-content.js', 'cft-tiles.js', 'cft-world.js', 'cft-ui.js', 'cft-fun.js', 'cft-rpg.js', 'cft-hero.js', 'cft-chaos.js', 'cft-camp.js', 'cft-wild.js', 'cft-aim.js', 'cft-stunt.js', 'cft-vo.js', 'cft-cine.js', 'cft-debug.js', 'cft-game.js'];
 
   function get(k, dflt) { try { var v = localStorage.getItem(STORE + k); return v == null ? dflt : JSON.parse(v); } catch (e) { return dflt; } }
   function set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch (e) { /* storage full or blocked */ } }

@@ -488,6 +488,7 @@ function attach(G, api) {
   H.tick = function (dt, paused) {
     if (!alive) return;
     updatePointers();
+    if (W.cine) for (const b of blips.values()) { b.beam.visible = false; b.label.visible = false; }   // a mission cut-scene: no beams in the shot
     if (paused) return;
     updateFan(dt);
     if (mainT > 0) {

@@ -12,6 +12,8 @@
     python -I tools/live/game_test.py --aimshots [OUTDIR] no tests: the sight on a wall, the web pulling, a 360° swing, a rainbow guide, the Dex gallery
     python -I tools/live/game_test.py --stunt [OUTDIR]    only stunttest.js (courses pop up in a car, boost, ramp launch, ring of fire, flips, rolls, wipeout, hop, fire alley, phone app)
     python -I tools/live/game_test.py --stuntshots [OUTDIR] no tests: a stunt course popping up, the car through a ring of fire, a flip, a MEGA ramp, a fire alley, the phone app
+    python -I tools/live/game_test.py --cine [OUTDIR]     only cinetest.js (every mission line voiced, a mission intro as a scene, title + chapter cards, subtitles, skip, phone calls, MISSION COMPLETE, settings)
+    python -I tools/live/game_test.py --cineshots [OUTDIR] no tests: the voiced mission scenes (chapter card, title card, a close-up with subtitles, over the shoulder, a phone call, MISSION COMPLETE)
     python -I tools/live/game_test.py --campshots [OUTDIR] no tests: pictures of the campaign update (HUD desktop + phone, the opening, a MEGA figment, fire, a storm, a secret)
     python -I tools/live/game_test.py --chaosshots [OUTDIR] no tests: the chaos update (decor, critters, brainrot, toys, the sky, a jetpack, ranged fights)
     python -I tools/live/game_test.py --boro [OUTDIR]     only borotest.js (borough names, looks, HUD chip, banners, discovery)
@@ -298,6 +300,34 @@ STUNTSHOTS = (
     + scene("s6-phone", STUNT_PRE + "TS.count = 7; G.ui.phone('stunt');", 3, 2000)
 )
 
+# Voiced cinematic missions (2026-11-20): a scene is started without waiting for it and held (CFT_TEST.cineHold: only
+# clicks move it on, software rendering is far too slow for its timing), then photographed at each moment
+CINE_PRE = "if (G.cine) G.cine.skip(); window.CFT_TEST.cine = true; window.CFT_TEST.cineHold = true; s.clock = 17.2; for (const id of G.activeMissions()) G.abandon(id); const home = G.homeSpot(); W.teleport(home.x + 3, home.z + 2); G.stepSim(40);" \
+           "const mx = [...G.rt.actors.values()].find(a => a.who === 'max'); if (mx) W.teleport(mx.obj.position.x + 1.5, mx.obj.position.z + 0.4); G.stepSim(3); const M = CFT_DATA.MISSIONS[0];"
+CINE_PLAY = "G.cine.play({ who: 'max', raw: M.intro, kind: 'intro', m: M, actor: mx && mx.obj, vplace: CFTCine.introPlace(M, CFT_DATA), ctx: { place: CFTCine.introPlace(M, CFT_DATA) }%s });"
+NEXT = {"eval": "(() => { const w = document.querySelector('.cft-cine-wrap'); if (w) w.click(); return 'next'; })()"}
+
+
+def cine_at(name, cond, settle=2500):
+    return [{"waitFor": cond, "timeout": 30000}, {"wait": settle}, {"shot": name}]
+
+
+SUB_ON = "(() => { const s = document.querySelector('[data-csub]'); return s && !s.hidden; })()"
+CINESHOTS = (
+    scene("c0-setup", CINE_PRE + CINE_PLAY % ", chapter: CFT_DATA.CHAPTERS[0]", 2, 200)[:-1]
+    + cine_at("c1-chapter-card", "document.querySelector('.cft-cine-card.chapter.in')")
+    + [NEXT] + cine_at("c2-title-card", "document.querySelector('.cft-cine-card.title.in')")
+    + [NEXT] + cine_at("c3-close-up", SUB_ON, 3500)
+    + [{"eval": "(() => { window.__t = document.querySelector('[data-ctext]').textContent; return 'mark'; })()"}, NEXT]
+    + cine_at("c4-over-the-shoulder", "document.querySelector('[data-ctext]') && document.querySelector('[data-ctext]').textContent !== window.__t", 3500)
+    + [{"eval": "(() => { window.__t = document.querySelector('[data-ctext]').textContent; return 'mark'; })()"}, NEXT]
+    + cine_at("c5-third-shot", "document.querySelector('[data-ctext]') && document.querySelector('[data-ctext]').textContent !== window.__t", 3500)
+    + scene("c6-setup", CINE_PRE + "W.teleport(home.x + 70, home.z + 60); G.stepSim(5); G.cine.play({ who: 'sam', raw: ['Sam (in a text): Happy anniversary!! Don\\'t you dare forget.'], kind: 'say', m: CFT_DATA.MISSIONS.find(x => x.giver === 'sam') });", 2, 200)[:-1]
+    + cine_at("c6-phone-call", "document.querySelector('.cft-cine-call.in')", 3500)
+    + scene("c7-setup", CINE_PRE + "G.cine.play({ who: 'max', raw: [M.outro[0]], kind: 'outro', m: M, actor: mx && mx.obj });", 2, 200)[:-1]
+    + cine_at("c7-outro-line", SUB_ON, 3000)
+    + [NEXT] + cine_at("c8-mission-complete", "document.querySelector('.cft-cine-card.stamp.in')", 2000)
+)
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
 elif "--campshots" in flags:
@@ -306,6 +336,8 @@ elif "--aimshots" in flags:
     steps = START + AIMSHOTS
 elif "--stuntshots" in flags:
     steps = START + STUNTSHOTS
+elif "--cineshots" in flags:
+    steps = START + CINESHOTS
 elif "--chaosshots" in flags:
     steps = START + CHAOS
 elif "--boroshots" in flags:
@@ -346,6 +378,8 @@ else:
         steps += script("aimtest.js", "__aimDone", "__aimOut", 600000)
     elif "--stunt" in flags:
         steps += script("stunttest.js", "__stuntDone", "__stuntOut", 600000)
+    elif "--cine" in flags:
+        steps += script("cinetest.js", "__cineDone", "__cineOut", 300000)
     else:
         if "--fun" not in flags:
             steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
@@ -360,6 +394,7 @@ else:
             steps += script("wildtest.js", "__wildDone", "__wildOut", 900000)
             steps += script("aimtest.js", "__aimDone", "__aimOut", 600000)
             steps += script("stunttest.js", "__stuntDone", "__stuntOut", 600000)
+            steps += script("cinetest.js", "__cineDone", "__cineOut", 300000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"
@@ -376,13 +411,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

@@ -119,6 +119,10 @@ function create(G, root) {
     return entry;
   }
   U.closeAll = () => { while (stack.length) stack[stack.length - 1].close(); };
+  // for cft-cine.js: its own overlay (pauses the game like any dialog), "is it on top?", and the HUD fading out
+  U.overlay = overlay;
+  U.isTop = entry => stack[stack.length - 1] === entry;
+  U.cineMode = on => { if (on) shell.setAttribute('data-cine', ''); else shell.removeAttribute('data-cine'); };
 
   // ------------------------------------------------------------------ small notices
   let toastT = 0;
@@ -266,7 +270,7 @@ function create(G, root) {
         if (done) return;
         if (typing) { clearInterval(typing); typing = null; tx.textContent = full; return; }
         i++;
-        if (i < lines.length) { show(lines[i]); return; }
+        if (i < lines.length) { show(lines[i]); if (o.onLine && !o.askAgain && o.result === undefined) o.onLine(i); return; }   // onLine: the voice for line i (cft-cine.js, scenes turned off)
         if (o.ask) return ask();
         finish(true);
       }
@@ -295,7 +299,7 @@ function create(G, root) {
         o.result = !!a.good;
         o.ask = null;
       }
-      function finish(v) { done = true; clearInterval(typing); ov.close(); document.removeEventListener('keydown', key, true); resolve(o.result !== undefined ? o.result : v); }
+      function finish(v) { done = true; clearInterval(typing); if (o.onClose) o.onClose(); ov.close(); document.removeEventListener('keydown', key, true); resolve(o.result !== undefined ? o.result : v); }
       ov.el.addEventListener('click', e => {
         const b = e.target.closest('[data-k]');
         if (b) { choose(+b.dataset.k); return; }
@@ -787,7 +791,7 @@ function create(G, root) {
     if (stack.length) {
       if (e.code === 'Escape' || ((e.code === 'KeyP' || e.code === 'Tab') && stack[stack.length - 1].el.classList.contains('cft-phone-wrap')) || (e.code === 'KeyI' && stack[stack.length - 1].el.classList.contains('cft-wardwrap'))) {
         const top = stack[stack.length - 1];
-        if (top.el.classList.contains('cft-dlg-wrap') || top.el.classList.contains('cft-fade')) return;
+        if (top.el.classList.contains('cft-dlg-wrap') || top.el.classList.contains('cft-fade') || top.el.classList.contains('cft-cine-wrap')) return;
         e.preventDefault(); top.close();
       }
       return;
@@ -1159,6 +1163,8 @@ function create(G, root) {
       (s.pref ? '<div class="cft-row"><span>Looking for: <b>' + (s.pref === 'bf' ? 'a boyfriend' : 'a girlfriend') + '</b></span><button type="button" class="cft-btn sm" data-act="pref">Switch</button></div>' : '') + '</div>' +
       '<div class="cft-sec"><h4>Game</h4><label class="cft-check"><input type="checkbox" data-set="sound" ' + (st.sound ? 'checked' : '') + '> Sound effects</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="music" ' + (st.music !== false ? 'checked' : '') + '> Music</label>' +
+      '<label class="cft-check"><input type="checkbox" data-set="voice" ' + (st.voice !== false ? 'checked' : '') + '> Voiced missions</label>' +
+      '<label class="cft-check"><input type="checkbox" data-set="cine" ' + (st.cine !== false ? 'checked' : '') + '> Cinematic mission scenes</label>' +
       '<div class="cft-row"><span>Compliments and hype</span><div class="cft-chips">' + [['max', 'Max'], ['some', 'Some'], ['off', 'Off']].map(q => '<button type="button" class="cft-chipb ' + ((st.hype || 'max') === q[0] ? 'on' : '') + '" data-act="hype" data-id="' + q[0] + '">' + q[1] + '</button>').join('') + '</div></div>' +
       '<div class="cft-row"><span>Graphics</span><div class="cft-chips">' + ['auto', 'high', 'low'].map(q => '<button type="button" class="cft-chipb ' + (st.quality === q ? 'on' : '') + '" data-act="quality" data-id="' + q + '">' + q + '</button>').join('') + '</div></div>' +
       '<div class="cft-row"><span>Map size (N)</span><div class="cft-chips">' + MAP_SIZES.map(q => '<button type="button" class="cft-chipb ' + ((st.mapSize || 'm') === q ? 'on' : '') + '" data-act="mapsize" data-id="' + q + '">' + MAP_NAMES[q] + '</button>').join('') + '</div></div>' +

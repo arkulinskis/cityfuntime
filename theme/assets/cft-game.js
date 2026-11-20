@@ -610,7 +610,7 @@ function mount(root, opts) {
     ms.deadline = null;
     G.sfx.pick();
     if (step.get) { if (step.get.energy) addEnergy(step.get.energy); if (step.get.money) addMoney(step.get.money); }
-    if (step.say && !quiet) await U.dialog({ who: m.giver, lines: step.say.map(l => G.text(l, { place: ms.tg && ms.tg.name })) });
+    if (step.say && !quiet) await sayLines({ who: m.giver, raw: step.say, ctx: { place: ms.tg && ms.tg.name }, kind: 'say', m: MISSION[id] ? m : null });
     if (ms.st >= m.steps.length) return completeMission(id);
     U.feed('✅', G.text(step.text || 'Step done', { place: ms.tg && ms.tg.name, n: '' }));
     beginStep(id);
@@ -628,7 +628,7 @@ function mount(root, opts) {
     if (save.track === id) save.track = G.activeMissions()[0] || null;
     updateBeam();
     U.confetti();
-    if (m.outro && m.outro.length) await U.dialog({ who: m.giver, lines: m.outro.map(l => G.text(l)) });
+    if (m.outro && m.outro.length) await sayLines({ who: m.giver, raw: m.outro, kind: 'outro', m: MISSION[id] ? m : null });
     U.banner('🏆 ' + m.title, parts.join(' · ') || 'Mission complete!', 'done');
     if (G.hero) G.hero.event('mission', { m });
     if (save.dyn[id]) { delete save.dyn[id]; delete save.m[id]; }
@@ -1159,7 +1159,7 @@ function mount(root, opts) {
         const s = spots.get(key);
         a.open = s.open; a.active = s.active; a.place = s.place;
         const show = s.open.length || s.active.length || s.who === 'boss';
-        a.mark.visible = !!show;
+        a.mark.visible = !!show && !W.cine; a.markShow = !!show;
         if (show) {
           const txt = s.who === 'boss' ? '⚔️' : s.active.length ? '💬' : '!';
           if (a.markTxt !== txt) {
@@ -1173,11 +1173,33 @@ function mount(root, opts) {
     for (const a of rt.actors.values()) {
       const d = Math.hypot(a.x - p.x, a.z - p.z);
       a.obj.rotation.y = d < 12 ? Math.atan2(p.x - a.x, p.z - a.z) + Math.PI : a.obj.rotation.y;
-      W.animate(a.obj, 0, dt, d < 6 && (a.open && a.open.length) ? 'wave' : null);
-      a.nm.visible = d < 45;
+      const u = a.obj.userData;
+      if (!u.cine) {   // in a cut-scene cft-cine.js animates them (talking, the mouth)
+        if (u.cheerT > 0) u.cheerT -= dt;   // just accepted a mission: arms up!
+        W.animate(a.obj, 0, dt, u.cheerT > 0 ? 'cheer' : d < 6 && (a.open && a.open.length) ? 'wave' : null);
+      }
+      a.nm.visible = d < 45 && !W.cine;   // no name tags or ! marks in the shot
+      if (a.mark && a.markShow !== undefined) a.mark.visible = a.markShow && !W.cine;
       if (a.mark) { a.mark.position.y = 3.2 / (a.obj.scale.y || 1) + Math.sin(rt.t * 3 + a.phase) * 0.12; const s = Math.max(0.9, d / 30); a.mark.scale.set(0.9 * s * a.mark.material.map.userData.aspect, 0.9 * s, 1); }
     }
   }
+
+  // ------------------------------------------------------------------ voiced mission scenes (cft-cine.js)
+  // Story and side missions play as voiced cut-scenes; odd jobs and everything else keep the dialogue box.
+  function sayLines(o) {
+    if (G.cine && o.m) return G.cine.play(o);
+    return U.dialog({ who: o.who, lines: o.raw.map(l => G.text(l, o.ctx)) });
+  }
+  // the figure of a cast member near you (a mission giver standing at their spot, or someone walking with you)
+  G.actorOf = function (who, maxD) {
+    if (!who) return null;
+    const p = P();
+    let best = null, bd = maxD || 40;
+    for (const a of rt.actors.values()) if (a.who === who) { const d = Math.hypot(a.obj.position.x - p.x, a.obj.position.z - p.z); if (d < bd) { bd = d; best = a.obj; } }
+    if (best) return best;
+    const f = rt.followers.find(x => x.who === who);
+    return f && f.obj.userData && f.obj.userData.kind === 'person' && Math.hypot(f.obj.position.x - p.x, f.obj.position.z - p.z) < (maxD || 40) ? f.obj : null;
+  };
 
   // ------------------------------------------------------------------ talking to people
   async function talkTo(a) {
@@ -1205,9 +1227,9 @@ function mount(root, opts) {
         }
         const place = m.steps[0] && (m.steps[0].at || m.steps[0].to);
         const placeName = place && D.KINDS[place] ? 'a ' + D.KINDS[place].n.toLowerCase() + ' nearby' : 'a spot nearby';
-        await U.dialog({ who, lines: m.intro.map(l => G.text(l, { place: placeName })) });
+        await sayLines({ who, raw: m.intro, ctx: { place: placeName }, vplace: placeName, kind: 'intro', m: MISSION[id] ? m : null, actor: a.obj, chapter: G.cine && MISSION[id] ? G.cine.chapterFor(m) : null });
         const ok = await U.choose({ who, text: '📜 ' + m.title + rewardLine(m.reward), opts: [{ t: '✅ Let\'s do it', v: 'y' }, { t: 'Maybe later', v: 'n' }] });
-        if (ok === 'y') { accept(id); U.toast('📜 New mission: ' + m.title); }
+        if (ok === 'y') { accept(id); U.toast('📜 New mission: ' + m.title); if (a.obj && a.obj.userData) a.obj.userData.cheerT = 1.3; }
       } else if (v === 'chat') {
         const last = save.counters['chat_' + who] || -999;
         if (save.gameMin - last > 60) { addRel(who, 2); save.counters['chat_' + who] = save.gameMin; }
@@ -2146,8 +2168,9 @@ function mount(root, opts) {
     // goal beam + arrow
     rt.goalT = (rt.goalT || 0) - dt;
     if (rt.goalT <= 0 || rt.goalDirty) { rt.goalT = 0.25; rt.goalDirty = false; rt.goal = currentGoal(); }
-    if (rt.beam) { rt.beam.visible = !!rt.goal && !rt.race; if (rt.goal) rt.beam.position.set(rt.goal.x, W.groundAt(rt.goal.x, rt.goal.z), rt.goal.z); }
+    if (rt.beam) { rt.beam.visible = !!rt.goal && !rt.race && !W.cine; if (rt.goal) rt.beam.position.set(rt.goal.x, W.groundAt(rt.goal.x, rt.goal.z), rt.goal.z); }
     updateArrow();
+    if (W.cine && rt.arrow) rt.arrow.visible = false;   // a mission cut-scene: no beam or arrow in the shot
     if (rt.flag) rt.flag.userData.cloth.rotation.y = Math.sin(rt.t * 2) * 0.25;
     if (rt.dirtyT > 0) { rt.dirtyT -= dt; if (rt.dirtyT <= 0) doSave('auto'); }
     rt.saveTimer += dt;
@@ -2230,6 +2253,7 @@ function mount(root, opts) {
     if (window.CFTWild && G.fun) G.wild = window.CFTWild.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the open-air update (cft-wild.js)
     if (window.CFTAim && G.fun) G.aim = window.CFTAim.attach(G, { bump });  // the aim update (cft-aim.js): right-mouse sight, slots 1-4, the web, rainbow guides
     if (window.CFTStunt && G.fun) G.stunt = window.CFTStunt.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; } });  // the stunt update (cft-stunt.js): ramps + rings of fire pop up when you drive
+    if (window.CFTCine) G.cine = window.CFTCine.attach(G);  // voiced cinematic mission scenes (cft-cine.js + the clip list cft-vo.js)
     if (window.CFTDebug) G.debug = window.CFTDebug.attach(G);  // the play-test panel: only with ?debug=1
     // driving into things smashes them (borrowed cars and your own rides alike)
     W.onDriveHit = (e, speed, dir) => { if (G.fun) G.fun.smashProp(e, speed > 9 ? 99 : speed * 0.5, dir, true); };
@@ -2287,6 +2311,7 @@ function mount(root, opts) {
       if (G.wild) G.wild.destroy();
       if (G.aim) G.aim.destroy();
       if (G.stunt) G.stunt.destroy();
+      if (G.cine) G.cine.destroy();
       if (G.debug) G.debug.destroy();
       cancelAnimationFrame(raf);
       if (W) W.destroy();

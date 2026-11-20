@@ -1471,3 +1471,72 @@ anvil-dropzone { display: contents; }
 .cft-dexp.got.rare { border-color: #38bdf8; box-shadow: 2px 2px 0 #38bdf8; }
 .cft-dexp.got.legendary { border-color: #e8a317; background: #fff7d6; box-shadow: 2px 2px 0 #e8a317; }
 @media (max-width: 720px) { .cft-hotbar { grid-template-columns: repeat(3, 44px); } }
+
+/* ===== voiced cinematic missions (2026-11-20, cft-cine.js): letterbox bars, title cards, subtitles, the phone call ===== */
+.cft[data-cine] > :not(.cft-layer):not(.cft-canvas):not(.cft-vignette):not(canvas) { opacity: 0 !important; pointer-events: none !important; transition: opacity var(--dur-slow) var(--ease-out); }
+.cft-cine-wrap { background: none; cursor: pointer; overflow: hidden; }
+.cft-cine { position: absolute; inset: 0; --bar: clamp(46px, 12vh, 124px); color: #fff; }
+.cft-cine-bar { position: absolute; left: 0; right: 0; height: var(--bar); background: #0b0918; transition: transform var(--dur-hero) var(--ease-expo); }
+.cft-cine-bar.top { top: 0; transform: translateY(-101%); display: flex; align-items: center; justify-content: flex-end; padding: 0 16px; }
+.cft-cine-bar.bot { bottom: 0; transform: translateY(101%); display: flex; align-items: center; justify-content: center; padding: 6px 56px 6px 16px; }
+.cft-cine.in .cft-cine-bar { transform: none; }
+.cft-cine.out .cft-cine-bar { transition-duration: var(--dur-slow); transition-timing-function: var(--ease-out); }
+.cft-cine-skip { font: 700 .82rem/1 var(--font-body); color: rgba(255, 255, 255, .72); background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .22); border-radius: 999px; padding: 7px 12px; cursor: pointer; transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out); }
+.cft-cine-skip:hover { background: rgba(255, 255, 255, .18); color: #fff; }
+.cft-cine-skip:active { transform: scale(.96); }
+.cft-cine-skip:focus-visible { outline: 3px solid #ffc21f; outline-offset: 2px; }
+.cft-cine-skip kbd { font: inherit; font-size: .7rem; opacity: .7; margin-left: 4px; border: 1px solid rgba(255, 255, 255, .3); border-radius: 4px; padding: 1px 4px; }
+.cft-cine-sub { width: min(860px, 100%); text-align: center; }
+.cft-cine-sub[hidden] { display: none; }
+.cft-cine-who { display: block; font: 700 .8rem/1.1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--who, #ffc21f); margin-bottom: 4px; }
+.cft-cine-who[hidden] { display: none; }
+.cft-cine-sub p { margin: 0; font: 700 clamp(.98rem, 2.1vw, 1.32rem)/1.35 var(--font-body); text-wrap: balance; text-shadow: 0 2px 0 rgba(0, 0, 0, .5); }
+.cft-cine-sub p span { opacity: .18; transition: opacity var(--dur-fast) var(--ease-out); }
+.cft-cine-sub p span.on { opacity: 1; }
+.cft-cine-sub.pop { animation: cine-sub var(--dur-base) var(--ease-out); }
+@keyframes cine-sub { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.cft-cine-next { position: absolute; right: 18px; bottom: 50%; transform: translateY(50%); font-size: .8rem; color: rgba(255, 255, 255, .55); animation: cine-blink 1.2s ease-in-out infinite; }
+@keyframes cine-blink { 50% { opacity: .15; } }
+/* title card (intro), chapter card (narrator), stamp (outro) */
+.cft-cine-card { position: absolute; left: 0; right: 0; top: calc(var(--bar) + 6vh); display: grid; justify-items: start; gap: 6px; padding: 0 clamp(16px, 7vw, 96px); pointer-events: none; }
+.cft-cine-card[hidden] { display: none; }
+.cft-cine-card small { font: 700 .82rem/1 var(--font-display); letter-spacing: .22em; text-transform: uppercase; color: #ffc21f; text-shadow: 0 2px 0 #1f1a3d; opacity: 0; transform: translateX(-18px); transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-hero) var(--ease-expo); }
+.cft-cine-card strong { position: relative; font: 700 clamp(2rem, 6.4vw, 4.4rem)/1 var(--font-display); color: #fff; text-shadow: 3px 3px 0 #1f1a3d, 0 0 26px rgba(0, 0, 0, .45); opacity: 0; transform: translateX(-28px); transition: opacity var(--dur-slow) var(--ease-out) 80ms, transform var(--dur-hero) var(--ease-expo) 80ms; }
+.cft-cine-card strong::after { content: ""; position: absolute; left: 0; bottom: -10px; width: min(220px, 60%); height: 5px; border-radius: 3px; background: #ffc21f; box-shadow: 2px 2px 0 #1f1a3d; transform: scaleX(0); transform-origin: left; transition: transform var(--dur-hero) var(--ease-expo) 260ms; }
+.cft-cine-card em, .cft-cine-card p { margin: 10px 0 0; font: 700 1rem/1.4 var(--font-body); font-style: normal; color: rgba(255, 255, 255, .92); text-shadow: 0 2px 0 rgba(0, 0, 0, .55); max-width: 34em; opacity: 0; transition: opacity var(--dur-slow) var(--ease-out) 360ms; }
+.cft-cine-card.in small, .cft-cine-card.in strong { opacity: 1; transform: none; }
+.cft-cine-card.in strong::after { transform: scaleX(1); }
+.cft-cine-card.in em, .cft-cine-card.in p { opacity: 1; }
+.cft-cine-card.chapter { top: 0; bottom: 0; align-content: center; justify-items: center; text-align: center; background: radial-gradient(ellipse at center, rgba(11, 9, 24, .2), rgba(11, 9, 24, .72)); }
+.cft-cine-card.chapter small, .cft-cine-card.chapter strong { transform: translateY(12px); }
+.cft-cine-card.chapter.in small, .cft-cine-card.chapter.in strong { transform: none; }
+.cft-cine-card.chapter strong::after { left: 50%; translate: -50% 0; transform-origin: center; }
+.cft-cine-card.chapter strong span { display: inline-block; margin-right: .1em; }
+.cft-cine-card.stamp { top: 0; bottom: 0; align-content: center; justify-items: center; }
+.cft-cine-card.stamp strong { padding: 10px 24px 14px; border: 5px solid #ffc21f; border-radius: 16px; background: rgba(31, 26, 61, .55); color: #ffc21f; text-transform: uppercase; font-size: clamp(1.7rem, 6vw, 3.6rem); rotate: -5deg; transform: scale(1.8); transition: opacity var(--dur-fast) ease, transform var(--dur-slow) var(--ease-expo); }
+.cft-cine-card.stamp strong::after { display: none; }
+.cft-cine-card.stamp.in strong { transform: scale(1); }
+.cft-cine-card.stamp small { order: 2; color: #fff; letter-spacing: .12em; margin-top: 12px; transform: translateY(8px); transition-delay: 240ms; }
+.cft-cine-card.stamp.in small { transform: none; }
+/* the phone call: the caller's portrait talks */
+.cft-cine-call { position: absolute; right: clamp(16px, 4vw, 48px); top: calc(var(--bar) + 18px); display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 10px; background: rgba(11, 9, 24, .78); border: 2px solid rgba(255, 255, 255, .2); border-radius: 999px; opacity: 0; transform: translateY(-10px); transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-slow) var(--ease-expo); --ring: 1; }
+.cft-cine-call[hidden] { display: none; }
+.cft-cine-call.in { opacity: 1; transform: none; }
+.cft-cine-call small { display: block; font: 700 .72rem/1 var(--font-body); color: #9ee6b8; margin-bottom: 4px; }
+.cft-cine-call strong { font: 700 1.05rem/1.1 var(--font-display); }
+.cft-cine-ring { position: relative; width: 56px; height: 56px; display: grid; place-items: center; }
+.cft-cine-ring b { position: relative; z-index: 1; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: #fff6e9; border: 3px solid #ffc21f; font-size: 1.7rem; }
+.cft-cine-ring i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(255, 194, 31, .55); transform: scale(calc(1 + (var(--ring) - 1) * 1)); }
+.cft-cine-ring i:nth-child(2) { transform: scale(calc(1 + (var(--ring) - 1) * 1.7)); opacity: .6; }
+.cft-cine-ring i:nth-child(3) { transform: scale(calc(1 + (var(--ring) - 1) * 2.4)); opacity: .3; }
+@media (max-width: 720px) {
+  .cft-cine { --bar: clamp(42px, 10vh, 84px); }
+  .cft-cine-bar.bot { padding: 6px 40px 6px 12px; }
+  .cft-cine-next { right: 12px; }
+  .cft-cine-card { top: calc(var(--bar) + 3vh); }
+  .cft-cine-card em, .cft-cine-card p { font-size: .9rem; }
+  .cft-cine-call { top: calc(var(--bar) + 10px); padding: 6px 14px 6px 6px; }
+  .cft-cine-ring, .cft-cine-ring b { width: 44px; height: 44px; font-size: 1.3rem; }
+}
+@media (max-height: 500px) { .cft-cine { --bar: 40px; } .cft-cine-card em, .cft-cine-card p { display: none; } }
+@media (prefers-reduced-motion: reduce) { .cft-cine-next, .cft-cine-sub.pop { animation: none; } .cft-cine-card small, .cft-cine-card strong, .cft-cine-call { transform: none !important; } .cft-cine-bar { transition-duration: var(--dur-fast); } }
