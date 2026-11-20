@@ -235,7 +235,7 @@ function create(opts) {
   // `real` of the photo's own hues. m = metres one photo covers (their real size), k = how strong the detail is.
   // Without WebGL2, or until the photos load, the ground looks as it did before (plain colours).
   const TEX = [
-    { f: 'asphalt', m: 3.0, k: 1.0, real: 0.1 },    // 0 car roads, service lanes, cycleways, road paint
+    { f: 'asphalt', m: 7.0, k: 1.0, real: 0, draw: cartoonRoad },  // 0 car roads, service lanes, cycleways, road paint (drawn, not a photo)
     { f: 'sidewalk', m: 1.8, k: 1.0, real: 0.25 },  // 1 pavements + kerbs (slabs laid along the street)
     { f: 'grass', m: 2.4, k: 0.95, real: 0.4 },     // 2 grass, parks, pitches, cemeteries
     { f: 'forest', m: 3.0, k: 0.9, real: 0.45 },    // 3 woods
@@ -283,7 +283,7 @@ varying float vGL; varying vec2 vGUV;
   function loadGround() {
     if (!renderer.capabilities.isWebGL2) return;
     const S = LOW ? 512 : 1024;
-    const load = t => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = '_/theme/ground-' + t.f + '.jpg?v=1'; });
+    const load = t => t.draw ? Promise.resolve(t.draw(S)) : new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = '_/theme/ground-' + t.f + '.jpg?v=1'; });
     Promise.all(TEX.map(load)).then(ims => {
       if (destroyed || ims.some(im => !im)) return;
       const cv = document.createElement('canvas'); cv.width = cv.height = S;
@@ -306,10 +306,46 @@ varying float vGL; varying vec2 vGUV;
       W.groundTextures = true;
     });
   }
+  // The road surface as a cartoon (2026-11-20, the photo felt too serious): flat slate with soft blotches, rounded
+  // pebbles and a few chunky outlined cracks and tar patches. Drawn once on a canvas, seamless (every shape is drawn
+  // again one tile over on each side). The shader divides by its average colour, so roads keep ROAD_STYLE's colours.
+  function cartoonRoad(S) {
+    const c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d'), u = S / 512;
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const wrap = fn => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { g.save(); g.translate(ox, oy); fn(); g.restore(); } };
+    g.fillStyle = '#6c7180'; g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 9; i++) { // big soft blotches, a shade lighter or darker
+      const x = rnd() * S, y = rnd() * S, r = (60 + rnd() * 90) * u, lt = rnd() < 0.5;
+      wrap(() => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, lt ? 'rgba(150,156,175,0.35)' : 'rgba(60,64,78,0.3)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); });
+    }
+    g.lineJoin = g.lineCap = 'round';
+    for (let i = 0; i < 4; i++) { // tar patches: rounded blobs, darker, outlined
+      const x = rnd() * S, y = rnd() * S, w = (26 + rnd() * 30) * u, h = (14 + rnd() * 16) * u, a = rnd() * Math.PI;
+      wrap(() => { g.save(); g.translate(x, y); g.rotate(a); g.beginPath(); g.ellipse(0, 0, w, h, 0, 0, Math.PI * 2); g.fillStyle = '#585d6c'; g.fill(); g.lineWidth = 3 * u; g.strokeStyle = '#3a3e4b'; g.stroke(); g.restore(); });
+    }
+    for (let i = 0; i < 5; i++) { // cracks: a zigzag with a dark line and a light edge
+      const pts = [[rnd() * S, rnd() * S]];
+      let a = rnd() * Math.PI * 2;
+      for (let j = 0; j < 4; j++) { a += (rnd() - 0.5) * 1.6; const l = (14 + rnd() * 18) * u, q = pts[pts.length - 1]; pts.push([q[0] + Math.cos(a) * l, q[1] + Math.sin(a) * l]); }
+      const line = (dx, dy) => { g.beginPath(); pts.forEach((p, j) => j ? g.lineTo(p[0] + dx, p[1] + dy) : g.moveTo(p[0] + dx, p[1] + dy)); g.stroke(); };
+      wrap(() => { g.lineWidth = 2.5 * u; g.strokeStyle = 'rgba(170,176,194,0.7)'; line(1.5 * u, 1.5 * u); g.lineWidth = 4 * u; g.strokeStyle = '#33363f'; line(0, 0); });
+    }
+    for (let i = 0; i < 70; i++) { // pebbles: little rounded stones with an outline and a shine
+      const x = rnd() * S, y = rnd() * S, r = (2.5 + rnd() * 4.5) * u, a = rnd() * Math.PI, lt = rnd() < 0.7;
+      wrap(() => {
+        g.beginPath(); g.ellipse(x, y, r * 1.3, r, a, 0, Math.PI * 2);
+        g.fillStyle = lt ? '#9097aa' : '#555a68'; g.fill(); g.lineWidth = 1.6 * u; g.strokeStyle = '#3a3e4b'; g.stroke();
+        if (lt) { g.beginPath(); g.arc(x - r * 0.35, y - r * 0.35, r * 0.35, 0, Math.PI * 2); g.fillStyle = 'rgba(255,255,255,0.45)'; g.fill(); }
+      });
+    }
+    return c;
+  }
   const CAR = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'service', 'track']);
   const MAJOR = new Set(['motorway', 'trunk', 'primary', 'secondary']);
   const ROAD_STYLE = {
-    car: { col: new THREE.Color(0x46484d), y: 0.08, l: TL.asphalt }, service: { col: new THREE.Color(0x56585c), y: 0.075, l: TL.asphalt },
+    car: { col: new THREE.Color(0x4a4f60), y: 0.08, l: TL.asphalt }, service: { col: new THREE.Color(0x5a5e6c), y: 0.075, l: TL.asphalt },
     pedestrian: { col: new THREE.Color(0xc4baa6), y: 0.065, l: TL.bricks }, footway: { col: new THREE.Color(0xbab5ab), y: 0.05, l: TL.path },
     steps: { col: new THREE.Color(0xa69d8f), y: 0.055, l: TL.bricks }, cycleway: { col: new THREE.Color(0x6e7c74), y: 0.06, l: TL.asphalt },
   };
@@ -1443,8 +1479,10 @@ varying float vGL; varying vec2 vGUV;
         }
       }
     }
+    s.names = [];  // named car streets in this sub-tile, painted on the road by streetNames()
     for (const nm of r.nm) {
       const p = conv(nm.p);
+      if (nm.c) s.names.push({ n: nm.n, p });
       for (let i = 0; i + 3 < p.length; i += 2) {
         const sg = { x1: p[i], z1: p[i + 1], x2: p[i + 2], z2: p[i + 3], name: nm.n, car: nm.c };
         addToBuckets(nameBuckets, Math.min(sg.x1, sg.x2) - 12, Math.min(sg.z1, sg.z2) - 12, Math.max(sg.x1, sg.x2) + 12, Math.max(sg.z1, sg.z2) + 12, sg);
@@ -2037,6 +2075,7 @@ varying float vGL; varying vec2 vGUV;
       }
     }
     if (!flat.empty) { const m = new THREE.Mesh(flat.build(), MAT.drape); m.receiveShadow = true; group.add(m); }
+    streetNames(s, group);
     const walls = new Geo(true), roofs = new Geo(false);
     const wc = new THREE.Color(), rc = new THREE.Color(), gray = new THREE.Color(0x8c8b88), hsl = {}, gfc = new THREE.Color(), shopfront = new THREE.Color(0x3b3344), ccol = new THREE.Color(), white = new THREE.Color(0xffffff);
     s.buildings.forEach((b, idx) => {
@@ -2416,6 +2455,113 @@ varying float vGL; varying vec2 vGUV;
   // Centre lines. The borough's look picks the colour and pattern (dash 3 m every 9 m, long 6 every 9, dots 0.6 every 2.4,
   // double = two solid lines), so each borough's streets read differently at a glance.
   const DASH = { dash: [3, 9, 0.09], long: [6, 9, 0.11], dots: [0.6, 2.4, 0.16], double: [0, 0, 0.07] };
+  // ---------------------------------------------------------------- street names on the road (2026-11-20)
+  // The street's name lies on the road like a carpet: yellow letters with a black outline, the capitals half the street
+  // wide, running along it and following its bends and hills. One label per NAME_GAP metres of a street, only where the
+  // street bends gently over the label's length. Each name is one canvas texture (cached, the oldest dropped past NAME_MAX).
+  const NAME_GAP = 160, NAME_MAX = 160, NAME_H = 128, NAME_CAP = 0.56, nameMats = new Map();
+  const nameTint = new THREE.Color(1, 1, 1);  // shared by every name's material, set by the time of day
+  const nameSpots = W.nameSpots = [];  // where labels lie (tests, debug)
+  function nameMat(name) {
+    let m = nameMats.get(name);
+    if (m) { nameMats.delete(name); nameMats.set(name, m); return m; }
+    const c = document.createElement('canvas'), g = c.getContext('2d');
+    const font = '900 ' + Math.round(NAME_H * 0.78) + 'px "Arial Rounded MT Bold", "Arial Black", "Trebuchet MS", system-ui, sans-serif';
+    g.font = font;
+    const tw = Math.ceil(g.measureText(name).width) + 40;
+    c.width = Math.min(2048, tw); c.height = NAME_H;
+    g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    g.setTransform(Math.min(1, c.width / tw), 0, 0, 1, c.width / 2, NAME_H / 2 + 5);
+    g.lineWidth = 16; g.strokeStyle = '#111'; g.strokeText(name, 0, 0);
+    g.fillStyle = '#ffd21f'; g.fillText(name, 0, 0);
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = Math.min(LOW ? 2 : 8, renderer.capabilities.getMaxAnisotropy());
+    // unlit paint, dimmed by W.setClock (nameTint): a lit material came out nearly black under the high-quality lighting
+    m = new THREE.MeshBasicMaterial({ map: tex, color: 0xffffff, alphaTest: 0.5, side: THREE.DoubleSide,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 });
+    // turned round on the GPU when the camera looks at it from the other side, so it never reads upside down
+    m.onBeforeCompile = sh => {
+      sh.vertexShader = 'attribute vec2 lup;\n' + sh.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>
+	vec3 camBack = vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+	if (dot(-camBack.xz, lup) < 0.0) vUv = vec2(1.0) - vUv;`);
+    };
+    m.customProgramCacheKey = () => 'cft-street-name';
+    m.color = nameTint;
+    m.userData.aspect = c.width / NAME_H;
+    nameMats.set(name, m);
+    if (nameMats.size > NAME_MAX) { const [k, old] = nameMats.entries().next().value; nameMats.delete(k); old.map.dispose(); old.dispose(); }
+    return m;
+  }
+  function streetNames(s, group) {
+    if (!s.names || !s.names.length) return;
+    const placed = [];  // [name, x, z] so two pieces of one street don't both get a label close together
+    for (const nm of s.names) {
+      const p = nm.p, n = p.length / 2;
+      if (n < 2) continue;
+      const cum = [0];
+      for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(p[2 * i] - p[2 * i - 2], p[2 * i + 1] - p[2 * i - 1]));
+      const total = cum[n - 1];
+      const at = d => { // point + direction d metres along the line
+        d = Math.max(0, Math.min(total, d));
+        let i = 1; while (i < n - 1 && cum[i] < d) i++;
+        const L = cum[i] - cum[i - 1] || 1, t = (d - cum[i - 1]) / L;
+        const dx = p[2 * i] - p[2 * i - 2], dz = p[2 * i + 1] - p[2 * i - 1];
+        return [p[2 * i - 2] + dx * t, p[2 * i - 1] + dz * t, dx / L, dz / L];
+      };
+      const mid = at(total / 2), road = nearestRoad(s, mid[0], mid[1]);
+      if (!road || !CAR.has(road.t) || road.t === 'track' || road.w < 4) continue;
+      const mat = nameMat(nm.n), Q = road.w / 2 / NAME_CAP, len = Q * mat.userData.aspect;
+      if (len + 4 > total) continue;
+      const count = Math.max(1, Math.floor(total / NAME_GAP));
+      for (let c = 0; c < count; c++) {
+        const cMid = total * (c + 0.5) / count, s0 = cMid - len / 2, s1 = cMid + len / 2;
+        // only where the street bends gently under the label
+        const a0 = at(s0), a1 = at(s1), am = at(cMid);
+        if (a0[2] * am[2] + a0[3] * am[3] < 0.94 || a1[2] * am[2] + a1[3] * am[3] < 0.94) continue;
+        if (placed.some(q => q[0] === nm.n && Math.hypot(q[1] - am[0], q[2] - am[1]) < NAME_GAP * 0.7)) continue;
+        const r = nearestRoad(s, am[0], am[1]);
+        if (!r || !CAR.has(r.t)) continue;
+        placed.push([nm.n, am[0], am[1]]);
+        nameSpots.push({ n: nm.n, x: am[0], z: am[1], ux: am[2], uz: am[3] }); if (nameSpots.length > 400) nameSpots.shift();
+        const flip = am[2] < 0;  // read left to right on the map
+        const hf = r.deck || groundAt, lift = roadStyle(r.t).y + 0.06;
+        const steps = Math.max(2, Math.ceil(len / 1.5)), pos = [], uv = [], idx = [], up = [], ugx = flip ? -am[3] : am[3], ugz = flip ? am[2] : -am[2];
+        for (let j = 0; j <= steps; j++) {
+          const d = s0 + len * j / steps, a = at(d), b = at(d - 1.2), e = at(d + 1.2);
+          let ux = e[0] - b[0], uz = e[1] - b[1]; const l = Math.hypot(ux, uz) || 1; ux /= l; uz /= l;
+          if (flip) { ux = -ux; uz = -uz; }
+          const nx = uz * Q / 2, nz = -ux * Q / 2, u = flip ? 1 - j / steps : j / steps;
+          for (const [sx, v] of [[1, 1], [-1, 0]]) {
+            const x = a[0] + nx * sx, z = a[1] + nz * sx;
+            pos.push(x, (hf === groundAt ? groundFace(x, z) : hf(x, z)) + lift, z); uv.push(u, v); up.push(ugx, ugz);
+          }
+          if (j) { const k = 2 * j; idx.push(k - 2, k - 1, k, k - 1, k + 1, k); }
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        geo.setAttribute('lup', new THREE.Float32BufferAttribute(up, 2));
+        geo.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0).map((_, i) => i % 3 === 1 ? 1 : 0), 3));
+        geo.setIndex(idx); geo.computeBoundingSphere();
+        const m = new THREE.Mesh(geo, mat);
+        m.receiveShadow = true; m.renderOrder = 2; m.raycast = () => {};
+        group.add(m);
+      }
+    }
+  }
+  function nearestRoad(s, x, z) { // the sub-tile's road closest to (x, z), within its half width + 2 m
+    let best = null, bd = Infinity;
+    for (const r of s.roads) {
+      const p = r.p;
+      for (let i = 0; i + 3 < p.length; i += 2) {
+        const dx = p[i + 2] - p[i], dz = p[i + 3] - p[i + 1], L = dx * dx + dz * dz;
+        let t = L > 0 ? ((x - p[i]) * dx + (z - p[i + 1]) * dz) / L : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const d = Math.hypot(x - p[i] - t * dx, z - p[i + 1] - t * dz) - r.w / 2;
+        if (d < bd) { bd = d; best = r; }
+      }
+    }
+    return bd < 2 ? best : null;
+  }
   function dashes(geo, x, z, ux, uz, L, hf, lift, lk) {
     const [len, step, hw] = DASH[lk ? lk.dash : 'dash'], col = lk ? lk.lc : dashCol;
     const line = (off, a, b) => {
@@ -4194,6 +4340,7 @@ varying float vGL; varying vec2 vGUV;
     hemi.intensity = (0.4 + 0.3 * day) * (GFX ? 0.5 : 1);   // high quality: the sky's environment map does much of the fill
     hemi.color.setHex(day > 0.5 ? 0xe4f0ff : 0xa9b6f0);
     sun.intensity = 0.16 + 0.56 * day;
+    nameTint.setScalar(0.4 + 0.55 * day);  // street names painted on the road
     sun.color.setHex(day < 0.15 ? 0x9fb4ff : h < 9 || h > 17 ? 0xffc79a : 0xfff0d8);  // moonlight is blue
     const a = (h - 6) / 12 * Math.PI;  // sun travels east -> west
     sunDir.set(Math.cos(a) * 0.6, Math.max(0.25, Math.sin(Math.max(0.2, Math.min(Math.PI - 0.2, a)))), 0.46).normalize();

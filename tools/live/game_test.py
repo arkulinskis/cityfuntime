@@ -204,6 +204,8 @@ GROUND = (
     + scene("g5-wood-sand", AREA_SHOT % ("['wood', 'sand', 'playground']", 100, "0.4", 8), 60)
     + scene("g6-overview", "const q = W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.75; W.cam.dist = W.cam.cur = 38;", 60)
     + scene("g7-dusk", "s.clock = 19.2; W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 9;", 60)
+    + scene("g8-street-name", "s.clock = 12; const pp = W.player.pos, q = W.nameSpots.slice().sort((a, b) => Math.hypot(a.x - pp.x, a.z - pp.z) - Math.hypot(b.x - pp.x, b.z - pp.z))[0];"
+            " if (q) W.teleport(q.x + q.uz * 4, q.z - q.ux * 4, Math.atan2(-q.uz, q.ux)); W.cam.pitch = 0.95; W.cam.dist = W.cam.cur = 18; console.log('[label] ' + (q ? q.n : 'none') + ' of ' + W.nameSpots.length);", 80)
 )
 
 # Boroughs (2026-11-17): a street in the home borough, a street in the next one (its banner showing), from above, the map.

@@ -26,4 +26,6 @@ ranged weapons · shooters/flyers · jetpack/glide · toys · critters/Dex · fa
 ## Done
 
 <!-- "- [x] 12. (combat) ... → what changed (commit abc1234)" -->
+- [x] 2. (buildings/graphics) "make the street floor more cartoonish, the current tile is too serious" → the road photo is replaced by a drawn cartoon tile (cartoonRoad in cft-world: flat slate, soft blotches, outlined pebbles, chunky cracks, tar patches), roads a touch bluer. (commit b340d89)
+- [x] 3. (buildings/graphics) "write the street name on the actual street... like a carpet... yellow with black outline... half the street width in its height... parallel with the street" → streetNames/nameMat in cft-world: each named car street gets its name lying on the road every ~160 m, capitals half the road wide, following gentle bends and hills, turned round on the GPU so it never reads upside down; unlit paint dimmed at night. Scene g8-street-name in --ground. (commit b340d89)
 - [x] 1. (sweethearts) "when the character is small it still says flirt in the options... if the character looks like a child, let's make sure there is no way to flirt" → kids (ped type 'kid' or height under 0.78, W.isKid) get a "🧒 A kid" menu with no Flirt; flirt() refuses them; passing compliments from them are never flirty; same if your own look is child-sized (F.noFlirt). Test in funtest.js. (commit 84487bb)
