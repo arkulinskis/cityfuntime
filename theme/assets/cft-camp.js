@@ -43,7 +43,7 @@ function attach(G, api) {
   const quiet = () => G.rt.busy || U.isOpen() || G.state() !== 'play';
   const onFoot = () => W.ride().mode !== 'drive';
   const lvl = () => G.level();
-  const lvlMul = () => 1 + 0.15 * (lvl() - 1);   // your damage grows like this (cft-fun.js F.attack)
+  const lvlMul = () => D.calc.dmgMul(lvl());   // your damage grows like this (cft-fun.js F.attack)
   const word = (t, tone, sub, big) => { if (G.hero) G.hero.word(t, tone, sub, big); };
   const mayhem = k => { if (G.chaos) G.chaos.add(k); };
   const sfx = k => { if (G.chaos && G.chaos.sfx && G.chaos.sfx[k]) G.chaos.sfx[k](); };
@@ -330,14 +330,14 @@ function attach(G, api) {
     if (isShooter(inHand)) { if (!K._shootTip) { K._shootTip = 1; U.toast('🎯 F shoots your ' + (worn ? worn.n : D.ITEMS[s.equip.weapon].n) + '. Hold the right mouse button first to aim it at the crosshair.'); } return; }
     const owned = Object.keys(s.owned).filter(id => s.owned[id] && D.ITEMS[id] && isShooter(D.ITEMS[id].weapon));
     if (!owned.length) {
-      s.owned.w_straw = true;
-      const bare = !worn && !s.equip.weapon;
-      if (bare && G.wearShop) G.wearShop('w_straw');
-      U.banner('🥤 A Spitball straw was in the crate!', bare ? 'Ammo is for things that shoot. Press F to shoot (hold the right mouse button first to aim).' : 'Ammo is for things that shoot. Wear it from the 👕 Wardrobe (I, weapon slot), then F shoots.', 'done');
-      U.feed('🥤', 'Shooters: fast food 🥤🌭, toy shops 🎈🐔, gift shops 🎉💨, groceries 🍌, clothes 👕, hardware 🥔🍄');
+      // since 2026-11-21 shooters sit in slot 5 (cft-aim), so the straw goes there instead of your hand
+      if (G.aim) G.aim.addGun('w_straw', 'found'); else { s.owned.w_straw = true; if (!worn && !s.equip.weapon && G.wearShop) G.wearShop('w_straw'); }
+      U.banner('🥤 A Spitball straw was in the crate!', 'Ammo is for things that shoot. Press 5 for the shooter slot, hold the right mouse button to aim, left click to fire.', 'done');
+      U.feed('🥤', 'More shooters lie around town (🎯 on the map) · shops: fast food 🥤🌭, toys 🎈🐔, gifts 🎉💨, groceries 🍌, clothes 👕, hardware 🥔🍄');
       G.dirty();
-    } else if (!K._wearTip) { K._wearTip = 1; const it = D.ITEMS[owned[0]]; U.toast('🎯 Ammo is for things that shoot. Wear your ' + it.e + ' ' + it.n + ' (👕 Wardrobe: I, weapon slot), then press F to shoot.'); }
+    } else if (!K._wearTip) { K._wearTip = 1; U.toast('🎯 Ammo is for your shooters: press 5, hold the right mouse button to aim, left click to fire. The scroll wheel switches shooters.'); }
   }
+  K.addAmmo = function (n) { const c = st(); c.ammo = Math.min(T.ammoMax, c.ammo + Math.max(0, n | 0)); G.dirty(); return c.ammo; };   // shooters found around town (cft-aim)
   K.charges = () => { const c = st(); return { ammo: c.ammo, water: c.water, volt: c.volt, foam: c.foam }; };
 
   // ------------------------------------------------------------------ powers: water (1), lightning (2), the extinguisher (hold 3)
@@ -379,7 +379,7 @@ function attach(G, api) {
       const d = inCone(p, f, m.x, m.z, T.waterRange + m.r, 0.72);
       if (d < 0) continue;
       m.wet = G.rt.t + 8;
-      F.hitMonster(m, { dmg: 0.5 * lvlMul(), knock: T.waterKnock, stun: 1.1, word: pick(['SPLASH!', 'SPLOOSH!', 'SOAKED!']), puff: '💦' }, f);
+      F.hitMonster(m, { dmg: 0.5 * lvlMul(), type: 'water', knock: T.waterKnock, stun: 1.1, word: pick(['SPLASH!', 'SPLOOSH!', 'SOAKED!']), puff: '💦' }, f);
       hits++;
     }
     for (const m of K.megas) { if (m.dead) continue; if (inCone(p, f, m.x, m.z, T.waterRange + m.r, 0.5) >= 0) { m.wet = G.rt.t + 10; W.pop(m.x, gy(m.x, m.z) + m.h * 0.5, m.z, 'SOAKED!', '#9fdcff', 2); hits++; } }
@@ -439,7 +439,7 @@ function attach(G, api) {
       if (!from) bolt(cur.x, top + 24, cur.z, cur.x, top, cur.z, 0.3);
       else bolt(from.x, from.obj.position.y + 1, from.z, cur.x, top - 0.4, cur.z, 0.16);
       const wet = cur.wet > G.rt.t;
-      F.hitMonster(cur, { dmg: dmg * (wet ? T.wetMul : 1), knock: 4, stun: 1.6, word: wet ? 'SUPERCHARGED!' : pick(['ZAP!', 'KZZZT!', 'BZZT!']), puff: '⚡' }, f);
+      F.hitMonster(cur, { dmg: dmg * (wet ? T.wetMul : 1), type: 'volt', knock: 4, stun: 1.6, word: wet ? 'SUPERCHARGED!' : pick(['ZAP!', 'KZZZT!', 'BZZT!']), puff: '⚡' }, f);
       api.bump('zaps');
       from = cur; n++; dmg *= 0.7;
       let next = null, nd = 1e9;
@@ -455,7 +455,7 @@ function attach(G, api) {
     const e = W.propNear(x, z, 2.6);
     if (e) { F.smashProp(e, 3, null, false); if (Math.random() < fireChance && ['tree', 'bench', 'bin', 'couch', 'cart', 'picnic', 'cafe'].includes(e.k)) K.spawnFire(e.x, e.z, 0.9); }
     else if (Math.random() < fireChance * 0.4) K.spawnFire(x, z, 0.5);
-    for (const m of F.monsters.slice()) if (!m.dead && Math.hypot(m.x - x, m.z - z) < 3.5) F.hitMonster(m, { dmg: T.voltDmg * lvlMul() * 0.8, knock: 6, stun: 1.4, word: 'ZAP!', puff: '⚡' }, { x: (m.x - x) || 0.1, z: (m.z - z) || 0.1 });
+    for (const m of F.monsters.slice()) if (!m.dead && Math.hypot(m.x - x, m.z - z) < 3.5) F.hitMonster(m, { dmg: T.voltDmg * lvlMul() * 0.8, type: 'volt', knock: 6, stun: 1.4, word: 'ZAP!', puff: '⚡' }, { x: (m.x - x) || 0.1, z: (m.z - z) || 0.1 });
   }
   function sprayTick(dt) {
     const c = st(), inf = K.inIntro();
@@ -534,7 +534,7 @@ function attach(G, api) {
         f.burn = 2.5;
         const e = W.propNear(f.x, f.z, 1.4 + f.size * 0.4);
         if (e) F.smashProp(e, 1, null, false);
-        for (const m of F.monsters.slice()) if (!m.dead && Math.hypot(m.x - f.x, m.z - f.z) < 1.2 + f.size * 0.6) F.hitMonster(m, { dmg: 0.4 * lvlMul(), knock: 1.5, stun: 0.3, word: pick(['TOASTY!', 'HOT HOT HOT!', 'OUCH!']), puff: '🔥' }, { x: (m.x - f.x) || 0.1, z: (m.z - f.z) || 0.1 });
+        for (const m of F.monsters.slice()) if (!m.dead && Math.hypot(m.x - f.x, m.z - f.z) < 1.2 + f.size * 0.6) F.hitMonster(m, { dmg: 0.4 * lvlMul(), type: 'fire', knock: 1.5, stun: 0.3, word: pick(['TOASTY!', 'HOT HOT HOT!', 'OUCH!']), puff: '🔥' }, { x: (m.x - f.x) || 0.1, z: (m.z - f.z) || 0.1 });
         const ped = W.nearestPed(f.x, f.z, 9); if (ped && !ped.ctl && Math.random() < 0.3) W.say(ped.obj, pick(['FIRE!!', 'Is that... fire?', 'Somebody do something!', 'Hot hot hot!']), 1.8);
       }
     }
@@ -639,7 +639,7 @@ function attach(G, api) {
     const tag = W.label('💥 WEAK SPOT!', { bg: '#ffc21f', fg: '#1f1a3d', size: 44, height: 0.9, border: '#1f1a3d', depthTest: false });
     tag.visible = false; W.scene.add(tag);
     // always equally hard for your level: its health is a fixed number of a basic weapon's hits on the weak spot
-    const ref = D.SLAP.dmg * 1.6 * (1 + 0.15 * (L - 1));
+    const ref = D.SLAP.dmg * 1.6 * D.calc.dmgMul(L);
     const mhp = T.megaHits * ref * T.megaWeak * (intro ? 0.35 : 1);
     const m = { def, obj, heart, label, tag, x, z, hp: mhp, mhp, atk: T.megaAtk * baseHp(L), lvl: L + 3, size, h: (obj.userData.h || 1.6) * size, r: size * 0.55,
       state: 'walk', t: 0, cd: 4, expose: 0, wet: 0, stepT: 0, n: 0, intro: !!intro, hx: x, hy: 0, hz: z, rings: [] };
@@ -743,7 +743,7 @@ function attach(G, api) {
           if (p.y - gy(p.x, p.z) > 0.7) { word('JUMPED IT!', 'mint'); mayhem('dodge'); if (G.hero) G.hero.swag(4); }
           else { F.hurt(m.atk, null); W.player.vy = 9; W.player.grounded = false; const k = 10 / Math.max(1, dp); W.player.vel.x += (p.x - tx) * k; W.player.vel.z += (p.z - tz) * k; }
         }
-        for (const q of F.monsters.slice()) if (!q.dead && Math.hypot(q.x - tx, q.z - tz) < R) F.hitMonster(q, { dmg: 1.5 * lvlMul(), knock: 8, stun: 1, word: 'SQUASH!', puff: '💨' }, { x: (q.x - tx) || 0.1, z: (q.z - tz) || 0.1 });
+        for (const q of F.monsters.slice()) if (!q.dead && Math.hypot(q.x - tx, q.z - tz) < R) F.hitMonster(q, { dmg: 1.5 * lvlMul(), type: 'stomp', knock: 8, stun: 1, word: 'SQUASH!', puff: '💨' }, { x: (q.x - tx) || 0.1, z: (q.z - tz) || 0.1 });
         for (let i = 0; i < 4; i++) { const a = Math.random() * 6.283, e = W.propNear(tx + Math.cos(a) * R * 0.6, tz + Math.sin(a) * R * 0.6, 4, { cars: true }); if (e) W.hitProp(e, 99, { x: Math.cos(a), z: Math.sin(a) }); }
         for (const r2 of m.rings) W.scene.remove(r2.mesh); m.rings = [];
         dizzy(m);   // after a stomp it's stuck and dizzy: the weak spot pops out
@@ -862,7 +862,7 @@ function attach(G, api) {
       if (m.dead || m.def.fly) continue;
       const top = m.obj.position.y + (m.obj.userData.h || 1.4) * (m.obj.userData.size || 1);
       if (Math.hypot(m.x - x, m.z - z) < m.r + 0.35 && y < top + 0.7 && y > top - 0.9) {
-        F.hitMonster(m, { dmg: 1.4 * lvlMul(), knock: 2, stun: 1.8, word: pick(['STOMP!', 'BOING!', 'HEADBONK!']), puff: '⭐' }, { x: 0, z: 1 });
+        F.hitMonster(m, { dmg: 1.4 * lvlMul(), type: 'stomp', knock: 2, stun: 1.8, word: pick(['STOMP!', 'BOING!', 'HEADBONK!']), puff: '⭐' }, { x: 0, z: 1 });
         api.bump('stomps'); mayhem('bounce');
         return 13;
       }

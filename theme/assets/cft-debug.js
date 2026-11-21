@@ -54,7 +54,7 @@ function attach(G) {
       ['🔊 Hype Max/Some/Off', () => { const v = s().settings.hype || 'max'; s().settings.hype = v === 'max' ? 'some' : v === 'some' ? 'off' : 'max'; U.toast('🐞 Hype: ' + s().settings.hype); }],
     ]],
     ['Chaos', [   // the chaos update (cft-chaos.js)
-      ['🎯 Ranged weapons', () => { story(); for (const k of Object.keys(D.ITEMS)) if (D.ITEMS[k].weapon && D.ITEMS[k].weapon.ranged === 'proj') s().owned[k] = true; s().equip.weapon = 'w_balloon'; if (G.rpg) G.rpg.unequip('weapon'); U.toast('🐞 All ranged weapons: swap them in phone → Chaos'); }],
+      ['🎯 Ranged weapons', () => { story(); for (const k of Object.keys(D.ITEMS)) if (D.ITEMS[k].weapon && D.ITEMS[k].weapon.ranged === 'proj') s().owned[k] = true; if (G.aim) { G.aim.pickGun('w_balloon', true); G.aim.select('gun'); } if (G.camp && G.camp.addAmmo) G.camp.addAmmo(60); U.toast('🐞 Every shooter is in slot 5: hold the right mouse button, scroll to switch, left click to fire'); }],
       ['🫘 Jetpack', () => { story(); s().owned.jetpack = true; G.wearShop('jetpack'); }],
       ['☂️ Glide-brella', () => { story(); s().owned.glidebrella = true; G.wearShop('glidebrella'); }],
       ['🍅 Shooters', () => { story(); const p = P(), f = facing(); ['tomato', 'spitter', 'gull', 'wifi'].forEach((k, i) => G.fun.spawnMonster(k, p.x + f.x * (9 + i * 2) + f.z * (i - 1.5) * 4, p.z + f.z * (9 + i * 2) - f.x * (i - 1.5) * 4)); }],

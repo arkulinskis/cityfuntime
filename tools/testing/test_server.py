@@ -177,6 +177,40 @@ as_user(ana)
 ok(call("reset_save"))
 assert call("get_save")["save"] is None
 
+# ---------------------------------------------------------------------------------- balance (Admin > Balance, Balance.py)
+as_user(None)
+assert call("get_balance")["values"] == {}, "no overrides at first"
+assert denied("admin_balance_get") and denied("admin_balance_save", {}) and denied("admin_balance_restore", 0)
+as_user(ana)
+try:
+    call("admin_balance_save", {"TUNE.combat.parry": 0.4})
+    raise AssertionError("a player must not publish balance values")
+except anvil.server.PermissionDenied:
+    pass
+as_user(admin)
+bad(call("admin_balance_save", "nope"))
+bad(call("admin_balance_save", {"__proto__.x": 1}), "no prototype paths")
+bad(call("admin_balance_save", {"TUNE": 1}), "a path needs a dot")
+bad(call("admin_balance_save", {"TUNE.combat.parry": "lots"}), "numbers only")
+bad(call("admin_balance_save", {"TUNE.combat.parry": float("inf")}), "finite numbers only")
+bad(call("admin_balance_save", {"k%d.x" % i: 1 for i in range(3001)}), "a cap on how many")
+r = ok(call("admin_balance_save", {"TUNE.combat.parry": 0.4, "MONSTERS.slime.hp": 3}, "First try"))
+assert r["values"]["MONSTERS.slime.hp"] == 3.0
+as_user(None)
+assert call("get_balance")["values"] == {"TUNE.combat.parry": 0.4, "MONSTERS.slime.hp": 3.0}, "every game gets the published values"
+assert "@" not in json.dumps(call("get_balance")), "no emails in the public balance"
+as_user(admin)
+assert M["Game"].level_of(5200) == 12
+ok(call("admin_balance_save", {"TUNE.player.xpBase": 120, "TUNE.player.xpExp": 1.8}, "Slower levels"))
+assert M["Game"].level_of(5200) < 12, "the leaderboard follows the published level curve"
+g = call("admin_balance_get")
+assert len(g["history"]) == 1 and g["history"][0]["note"] == "First try" and g["by"] == "The Admin"
+ok(call("admin_balance_restore", 0))
+assert call("get_balance")["values"]["MONSTERS.slime.hp"] == 3.0 and M["Game"].level_of(5200) == 12, "restoring an older version"
+bad(call("admin_balance_restore", 99))
+ok(call("admin_balance_save", {}, "Defaults"))
+assert call("get_balance")["values"] == {}
+
 # ---------------------------------------------------------------------------------- map tile backup (Tiles.py)
 import base64  # noqa: E402
 import gzip  # noqa: E402
@@ -245,7 +279,7 @@ if "legal_server" in M:
 
 # ---------------------------------------------------------------------------------- every callable is covered by a permission check
 # A callable that changes data without require_user / a C.require_* check is a security hole. List the public ones here.
-PUBLIC = {"log_client_error", "session_ping", "get_me", "submit_feedback", "leaderboard", "legal_state", "legal_accept", "tile_archive", "tile_backup"}
+PUBLIC = {"log_client_error", "session_ping", "get_me", "submit_feedback", "leaderboard", "legal_state", "legal_accept", "tile_archive", "tile_backup", "get_balance"}
 for name, (f, need) in sorted(anvil.server.CALLABLES.items()):
     if name in PUBLIC:
         continue

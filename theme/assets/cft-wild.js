@@ -165,7 +165,7 @@ function attach(G, api) {
       const ey = gy(e.x, e.z) + (k === 'lamp' ? 3 : 1.1);
       if (G.camp && G.camp.bolt) G.camp.bolt(x, y0, z, e.x, ey, e.z, 0.12);
       W.burst(e.x, ey, e.z, '⚡', 3, { spread: 1.5, up: 2, size: 0.45 });
-      for (const m of F.monsters.slice()) if (!m.dead && Math.hypot(m.x - e.x, m.z - e.z) < T.arcHit) { F.hitMonster(m, { dmg: dmg * 0.6, knock: 3, stun: 1.2, word: pick(['ARC!', 'BZZZT!', 'SHOCKING!']), puff: '⚡' }, { x: (m.x - e.x) || 0.1, z: (m.z - e.z) || 0.1 }); api.bump('arcs'); }
+      for (const m of F.monsters.slice()) if (!m.dead && Math.hypot(m.x - e.x, m.z - e.z) < T.arcHit) { F.hitMonster(m, { dmg: dmg * 0.6, type: 'volt', knock: 3, stun: 1.2, word: pick(['ARC!', 'BZZZT!', 'SHOCKING!']), puff: '⚡' }, { x: (m.x - e.x) || 0.1, z: (m.z - e.z) || 0.1 }); api.bump('arcs'); }
       if (k === 'lamp' && Math.random() < 0.3) W.pop(e.x, ey + 1, e.z, 'FLICKER!', '#fff07a', 0.7);
     }
     if (n && !st().tips.arc) tip('arc', '⚡ Lightning jumps through metal: lamps, bins, mailboxes, hydrants and cars zap figments standing next to them.');

@@ -103,20 +103,58 @@ function attach(G, api) {
   // ------------------------------------------------------------------ weapons
   function weapon() { const lw = G.rpg && G.rpg.weapon(); if (lw) return lw; const it = D.ITEMS[save().equip.weapon]; return it && it.weapon ? Object.assign({ e: it.e, n: it.n }, it.weapon) : Object.assign({ e: '🖐️', n: 'Bare hands' }, D.SLAP); }
   function syncWeapon() {
-    const lw = G.rpg && G.rpg.weapon(), id = (lw ? 'loot:' + G.rpg.weaponId() : save().equip.weapon || null) + (onFoot() ? '' : ':ride');
+    const ov = F.handOverride || null, lw = G.rpg && G.rpg.weapon(), id = (lw ? 'loot:' + G.rpg.weaponId() : save().equip.weapon || null) + (onFoot() ? '' : ':ride') + (ov ? ':ov:' + ov : '');
     if (id === weaponOn) return;
     weaponOn = id;
     const it = D.ITEMS[save().equip.weapon];
-    W.setWeapon(!onFoot() ? null : lw ? lw.mesh : it && it.weapon ? it.weapon.mesh : null);
+    W.setWeapon(!onFoot() ? null : ov ? ov : lw ? lw.mesh : it && it.weapon ? it.weapon.mesh : null);
+    if (ov) return;   // a shooter in hand only while aiming with slot 5: not a weapon change
     // a new weapon in hand shows how far it reaches: a gold ring on the ground (2026-11-19)
     const wk = id.replace(':ride', ''), changed = weaponHeld !== undefined && wk !== weaponHeld; weaponHeld = wk;
-    if (changed && onFoot() && W.showReach) { const w = weapon(); W.showReach(w.reach); if (!w.ranged) W.pop(P().x, P().y + 2.3, P().z, 'REACH ' + w.reach.toFixed(1) + ' m', '#ffc21f', 0.7); }
+    if (changed && onFoot() && W.showReach) { const w = weapon(); W.showReach(F.trueReach(w)); if (!w.ranged) W.pop(P().x, P().y + 2.3, P().z, 'REACH ' + F.trueReach(w).toFixed(1) + ' m', '#ffc21f', 0.7); }
   }
   // Guarding: G or the 🛡️ button, held (the right mouse button aims since 2026-11-19: cft-aim.js). On foot only.
   F.setBlock = function (on) {
     on = !!on && alive && onFoot() && !F.dying;
     if (on && !F.blocking) F.blockStart = G.rt.t;
     F.blocking = on; W.blocking = on;
+  };
+  // The real reach (2026-11-21, the user: "a visual indication how far the melee attack reaches... I don't think the end of the
+  // weapon is the real distance"): F.attack hits a figment when the distance between your middle and its middle is within
+  // reach + its body radius, so the line you see is drawn at reach + an ordinary figment's radius (REACH_BODY). Bigger figments
+  // (brutes, blobs, champions, guardians) can be hit from a little further out.
+  const REACH_BODY = 0.6;
+  F.REACH_BODY = REACH_BODY;
+  F.trueReach = w => (w || weapon()).reach + REACH_BODY;
+  F.reachInfo = function () {
+    const w = weapon(), p = P(), f = facing();
+    const arc = w.arc || (w.ranged === 'cone' ? 66 : 160), arcDot = Math.cos(arc / 2 * Math.PI / 180);
+    let hot = false;
+    for (const m of F.monsters) {
+      if (m.dead || m.obj.position.y - p.y > 2.6) continue;
+      const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
+      if (d <= w.reach + m.r && (d < 0.8 || (dx * f.x + dz * f.z) / d >= arcDot)) { hot = true; break; }
+    }
+    return { r: w.reach + REACH_BODY, arc: Math.min(360, arc), hot, ranged: !!w.ranged && w.ranged !== 'cone' };
+  };
+  // Fire a shooter that isn't in your hand (cft-aim slot 5): the same rules as shooting from the hand in F.attack.
+  F.shoot = function (w0) {
+    if (!alive || quiet() || F.dying) return false;
+    if (!onFoot()) return false;
+    const w = G.rpg ? G.rpg.modWeapon(Object.assign({}, w0)) : Object.assign({}, w0);
+    w.dmg *= D.calc.dmgMul(G.level());
+    if (G.hero) w.dmg *= G.hero.dmgMul();
+    if (G.camp && !G.camp.useAmmo(w)) return false;   // out of ammo: *click*
+    if (w.ranged === 'proj' && G.chaos) return G.chaos.fire(w);
+    if (w.ranged === 'shot') {
+      const p = P(), f = facing(), sp = W.emojiSprite(w.puff || '🫧', 0.7);
+      sp.position.set(p.x + f.x * 0.8, p.y + 1.3, p.z + f.z * 0.8);
+      W.scene.add(sp);
+      F.shots.push({ sp, x: sp.position.x, z: sp.position.z, vx: f.x * 26, vz: f.z * 26, left: w.reach, w });
+      W.swing(); G.sfx.swing();
+      return true;
+    }
+    return false;
   };
   F.blockPower = () => clamp(CB.block + (G.rpg ? G.rpg.bonus('block') : 0), 0.4, 0.92);
   F.parryWindow = () => CB.parry + (G.rpg ? G.rpg.bonus('block') : 0) * 0.6;
@@ -133,7 +171,7 @@ function attach(G, api) {
     if (!lined) { const f0 = facing(); for (const m of F.monsters) { if (m.dead || high(m)) continue; const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz) - m.r; if (d < ad && (d < w.reach * 0.6 || (dx * f0.x + dz * f0.z) / (d + m.r + 1e-6) > -0.2)) { ad = d; aim = m; } } }
     if (aim) { W.player.face = Math.atan2(-(aim.x - p.x), -(aim.z - p.z)); if (ad > w.reach * 0.8 && ad < w.reach + 2.6) { const L = Math.max(0, ad - w.reach * 0.7), f1 = facing(); p.x += f1.x * Math.min(L, 1.8); p.z += f1.z * Math.min(L, 1.8); W.collide(p, 0.4); } }
     const f = facing();
-    w.dmg *= 1 + 0.15 * (G.level() - 1);  // you grow stronger with every level (monsters do too)
+    w.dmg *= D.calc.dmgMul(G.level());  // you grow stronger with every level (monsters do too): D.TUNE.player.dmgPerLevel
     if (G.hero) w.dmg *= G.hero.dmgMul();  // main character mode
     // ranged weapons need ammo (cft-camp.js): crates around town, figment drops, secrets
     if ((w.ranged === 'proj' || w.ranged === 'shot') && G.camp && !G.camp.useAmmo(w)) { cool = 0.45; return false; }
@@ -144,7 +182,7 @@ function attach(G, api) {
     if (flurry) { w.dmg *= 1.6; w.word = pick(['FLURRY!', 'HIYAA!', 'ORA!', 'BOP BOP BOP!']); w.reach += 1.2; G.wild.flurryHit(); }
     cool = (w.ranged === 'shot' ? 0.32 : (w.cd || 0.42)) * (flurry ? 0.12 : 1);
     const arc = w.arc || (w.ranged === 'cone' ? 66 : 160), arcDot = Math.cos(arc / 2 * Math.PI / 180), spin = arc >= 300;
-    W.swing(w.ranged ? 0 : w.reach, arc);
+    W.swing(w.ranged ? 0 : w.reach + REACH_BODY, arc);
     G.sfx.swing();
     let hits = 0;
     if (w.ranged === 'shot') {
@@ -219,6 +257,7 @@ function attach(G, api) {
   F.smashProp = smashProp;
   F.removeMonster = (m, poof) => removeMonster(m, poof);
   F.hitMonster = (m, w, f) => hitMonster(m, w, f || { x: 0, z: 1 });  // outposts + tests
+  F.weakMul = (m, type) => { const wk = (m.def && m.def.weak) || (D.MONSTERS[m.kind] || {}).weak; const v = wk && wk[type]; return typeof v === 'number' && v > 0 ? v : 1; };
   function bonkPed(ped, w) {
     if (ped.bonked && G.rt.t - ped.bonked < 4) return;
     ped.bonked = G.rt.t;
@@ -264,13 +303,9 @@ function attach(G, api) {
   // damage bonuses: gear still helps, it just doesn't trivialise them) and their hits follow your health and armour, so the
   // number of hits to win or lose stays about the same at every level. Further from home = stronger (monsterLevel).
   F.scaleFor = function (lvl) {
-    const L = G.level(), rel = Math.max(-1, (lvl || L) - L), w = weapon();
+    const L = G.level(), w = weapon();
     const gear = clamp(w.dmg * (1 + (G.rpg ? G.rpg.bonus('dmg') : 0)) / D.SLAP.dmg, 1, 40);
-    const grow = 1 + 0.15 * (L - 1), push = 1 + Math.min(TM.challengeMax, TM.challenge * (L - 1));
-    const hpK = grow * Math.pow(gear, TM.gearShare) * (1 + TM.hpPerLevel * rel) * push;
-    const tough = Math.pow(Math.max(1, F.maxHp() / 71), TM.lifeShare) * Math.pow(1 + F.armor() / 100, TM.armorShare);
-    const atkK = tough * (1 + TM.atkPerLevel * rel) * push;
-    return { hp: hpK, atk: atkK };
+    return D.calc.scale(L, lvl || L, gear, F.maxHp(), F.armor());   // the formula lives in cft-content.js (the Balance wiki shows it)
   };
   function spawnMonster(kind, x, z, o) {
     const base = D.MONSTERS[kind];
@@ -278,15 +313,15 @@ function attach(G, api) {
     o = o || {};
     const def = o.def || Object.assign({}, base, { n: F.localName(kind) });
     const lvl = o.lvl || monsterLevel(x, z) + (o.champ ? 1 : 0);
-    const size = (o.size || def.size || 1) * (o.champ ? 1.15 : 1);
+    const size = (o.size || def.size || 1) * (o.champ ? TM.champSize : 1);
     const obj = W.monster(kind);
     obj.userData.size = size; obj.scale.setScalar(size);
     const sc = F.scaleFor(lvl);
-    const hp = (o.hp || def.hp) * sc.hp * (o.champ ? 2.5 : 1);
-    const atk = (def.atk || 6) * sc.atk * (o.champ ? 1.4 : 1) * (o.atkMul || 1);
+    const hp = (o.hp || def.hp) * sc.hp * (o.champ ? TM.champHp : 1);
+    const atk = (def.atk || 6) * sc.atk * (o.champ ? TM.champAtk : 1) * (o.atkMul || 1);
     const m = Object.assign({ kind, obj, x, z, carry: 0, state: 'idle', t: 0, stun: 0, kx: 0, kz: 0, grab: 0, wanderA: Math.random() * 6.28,
       r: (kind === 'blob' ? 1.6 : kind === 'brute' || kind === 'worm' ? 0.85 : 0.6) * size, born: G.rt.t, say: 2 + Math.random() * 6 }, o,
-      { def, hp, mhp: hp, atk, atkK: sc.atk, lvl, xpv: def.xp * (1 + 0.12 * (lvl - 1)) * (o.champ ? 2.5 : 1) });
+      { def, hp, mhp: hp, atk, atkK: sc.atk, lvl, xpv: D.calc.xpFor(def, lvl, o.champ) });
     place(obj, x, z, Math.random() * 6.28);
     W.scene.add(obj);
     if (def.boss) { const tag = nameTag(def.e + ' ' + def.n, 3.7); obj.add(tag); }
@@ -308,6 +343,9 @@ function attach(G, api) {
   const isNight = () => { const h = save().clock; return h >= 21.5 || h < 5; };
   function hitMonster(m, w, f) {
     if (m.dead) return;
+    // weaknesses (D.MONSTERS[kind].weak, 2026-11-21): bonk / shot / water / volt / fire / stomp
+    const wk = F.weakMul(m, w.type || (w.ranged === 'proj' || w.ranged === 'shot' ? 'shot' : 'bonk'));
+    if (wk !== 1) { w = Object.assign({}, w, { dmg: w.dmg * wk }); if (wk >= 1.2) W.pop(m.x - 0.6, m.obj.position.y + (m.obj.userData.h || 1.4) * (m.obj.userData.size || 1) + 1.9, m.z, 'WEAK!', '#ff5c8a', 0.75); else if (wk <= 0.85) W.pop(m.x - 0.6, m.obj.position.y + (m.obj.userData.h || 1.4) * (m.obj.userData.size || 1) + 1.9, m.z, 'RESISTS', '#b0a9c8', 0.6); }
     m.hp -= w.dmg; m.stun = Math.max(m.stun, 0.5 + (w.stun || 0) * (m.guard ? 0.25 : 1));
     F.lastFoe = m; foeT = 0;
     m.kx = f.x * (w.knock || 3) * 2.2; m.kz = f.z * (w.knock || 3) * 2.2;
@@ -394,7 +432,7 @@ function attach(G, api) {
       if (!onFoot() && Math.abs(W.player.speed) > CB.runOver && d < m.r + 1.6 && !(m.runT > G.rt.t)) { // driving into one
         m.runT = G.rt.t + 0.8;
         const hx = -Math.sin(W.player.heading), hz = -Math.cos(W.player.heading);
-        hitMonster(m, { dmg: Math.abs(W.player.speed) * 0.28 * (1 + 0.15 * (G.level() - 1)), knock: 9, stun: 1.2, word: pick(['SPLAT!', 'BEEP BEEP!', 'VROOM!', 'BOINK!']) }, { x: hx, z: hz });
+        hitMonster(m, { dmg: Math.abs(W.player.speed) * 0.28 * D.calc.dmgMul(G.level()), type: 'bonk', knock: 9, stun: 1.2, word: pick(['SPLAT!', 'BEEP BEEP!', 'VROOM!', 'BOINK!']) }, { x: hx, z: hz });
         api.bump('runover'); W.shake(0.35);
         if (m.dead || !F.monsters.includes(m)) continue;
       }
@@ -520,7 +558,7 @@ function attach(G, api) {
     G.dirty();
   }
   // ------------------------------------------------------------------ health: armour, regeneration, healing, blacking out
-  F.maxHp = () => Math.round(60 + G.level() * 8 + G.stat('fit') * 3 + (G.rpg ? G.rpg.bonus('life') : 0) + (G.hero ? G.hero.hpBonus() : 0));
+  F.maxHp = () => D.calc.maxHp(G.level(), G.stat('fit'), (G.rpg ? G.rpg.bonus('life') : 0) + (G.hero ? G.hero.hpBonus() : 0));   // D.TUNE.player.hp*
   function hp() { const f = fun(); if (typeof f.hp !== 'number' || f.hp !== f.hp) f.hp = F.maxHp(); return f.hp; }
   F.hp = hp;
   F.armor = () => Math.round(G.rpg ? G.rpg.bonus('armor') : 0);
@@ -618,8 +656,8 @@ function attach(G, api) {
     const kind = kinds[Math.abs(seed) % kinds.length], base = D.MONSTERS[kind];
     const where = F.stationName(pl);
     const name = D.GUARDIANS[kind] + ' of ' + where;
-    const def = Object.assign({}, base, { n: name, e: '🚇', guard: true, night: false, xp: base.xp * 10, steal: [0, 0], coins: base.coins });
-    const g = spawnMonster(kind, pl.pin.x, pl.pin.z, { def, hp: base.hp * 8 + 8, atkMul: 1.3, size: 2.4, event: 1e9, aggro: 24, leash: 30, home: { x: pl.pin.x, z: pl.pin.z }, guard: pl.id, station: pl, lvl: monsterLevel(pl.pin.x, pl.pin.z) + 1 });
+    const TB = D.TUNE.bosses, def = Object.assign({}, base, { n: name, e: '🚇', guard: true, night: false, xp: base.xp * TB.guardXp, steal: [0, 0], coins: base.coins });
+    const g = spawnMonster(kind, pl.pin.x, pl.pin.z, { def, hp: base.hp * TB.guardHp + TB.guardHpAdd, atkMul: TB.guardAtk, size: TB.guardSize, event: 1e9, aggro: 24, leash: 30, home: { x: pl.pin.x, z: pl.pin.z }, guard: pl.id, station: pl, lvl: monsterLevel(pl.pin.x, pl.pin.z) + 1 });
     if (!g) return;
     const tag = W.label('🚇 ' + name, { size: 34, height: 0.55, bg: 'rgba(255,194,31,.95)', fg: '#1f1a3d', border: '#1f1a3d' });
     tag.position.y = 2.6; g.obj.add(tag);
@@ -1362,6 +1400,7 @@ function attach(G, api) {
     cool -= dt; slow -= dt;
     if (F.boost > 0) { F.boost -= dt; if (Math.random() < dt * 14) W.burst(P().x, P().y + 0.2, P().z, '💨', 1, { spread: 0.6, up: 0.6, size: 0.4, life: 0.4 }); }
     syncWeapon();
+    if (W.reachMarker) W.reachMarker(onFoot() && !F.dying && save().settings.reach !== false ? F.reachInfo() : null);   // the bonk reach on the ground
     if (F.blocking && (!onFoot() || F.dying)) F.setBlock(false);
     updateMonsters(dt);
     updateShots(dt);

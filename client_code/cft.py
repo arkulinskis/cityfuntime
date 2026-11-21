@@ -8,6 +8,7 @@ from Python. Pages reach the engine only through this module:
                            "mission" (arg = mission id), "album"
     cft.track(id)          follow a mission in the game (saved at once)
     cft.mount_game(el, exit, reload)   the 3D game in a DOM node (Components/Game); returns a controller with destroy()
+    cft.mount_wiki(el)     Admin > Balance: the wiki of characters and numbers (cft-wiki.js); a controller with destroy()
 """
 import json
 
@@ -63,3 +64,7 @@ def mount_game(node, exit_fn, reload_fn):
     hooks.exit = exit_fn
     hooks.reload = reload_fn
     return window.CFT.mountGame(node, hooks)
+
+
+def mount_wiki(node):
+    return window.CFT.mountWiki(node)

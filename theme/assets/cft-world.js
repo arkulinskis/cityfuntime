@@ -854,7 +854,7 @@ varying float vGL; varying vec2 vGUV;
       if ((bz - az) * (cx - ax) - (bx - ax) * (cz - az) <= 0) { let t = bx; bx = cx; cx = t; t = bz; bz = cz; cz = t; }
       this.dvert(ax, az, hf, lift, col); this.dvert(bx, bz, hf, lift, col); this.dvert(cx, cz, hf, lift, col);
     }
-    dquad(x1, z1, x2, z2, x3, z3, x4, z4, hf, lift, col) { this.dtri(x1, z1, x2, z2, x3, z3, hf, lift, col); this.dtri(x1, z1, x3, z3, x4, z4, hf, lift, col); }
+    dquad(x1, z1, x2, z2, x3, z3, x4, z4, hf, lift, col, maxE) { this.dtri(x1, z1, x2, z2, x3, z3, hf, lift, col, maxE); this.dtri(x1, z1, x3, z3, x4, z4, hf, lift, col, maxE); }
     dpolygon(outer, holes, hf, lift, col, maxE) {
       const toV = p => { const a = []; for (let i = 0; i < p.length; i += 2) a.push(new THREE.Vector2(p[i], p[i + 1])); return a; };
       const contour = toV(outer);
@@ -883,7 +883,7 @@ varying float vGL; varying vec2 vGUV;
   let origin = null, gen = 0;
   const tiles = new Map();
   let allSubs = [], inflight = 0;
-  const buckets = new Map(), nameBuckets = new Map(), hchunks = new Map(), rchunks = new Map(), pchunks = new Map(), segBuckets = new Map(), bridgeBuckets = new Map();
+  const buckets = new Map(), nameBuckets = new Map(), hchunks = new Map(), rchunks = new Map(), pchunks = new Map(), lchunks = new Map(), segBuckets = new Map(), bridgeBuckets = new Map();
   const player = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), vy: 0, grounded: true, face: 0, phase: 0, speed: 0, heading: 0, moved: 0, footMoved: 0, slope: 0, pitch: 0 };
   const cam = { yaw: 0, pitch: 0.32, dist: 7.5, cur: 7.5, lookT: 0, shake: 0, aimK: 0 };
   const input = { f: 0, b: 0, l: 0, r: 0, sprint: false, jump: false, hold: false, jx: 0, jy: 0 };  // hold = Space (or the jump button) held down: jetpacks, gliding
@@ -1263,7 +1263,7 @@ varying float vGL; varying vec2 vGUV;
     const g = standAt(x, z);
     if (!bridgeBuckets.size) return g;
     const d = deckAt(x, z);
-    return d > g + 0.25 && (y == null || y > d - 1.6) ? d : g;
+    return d > g + 0.25 && (y == null || y > d - 1.6) ? d + roadLift(x, z) : g;   // the deck's road surface (lift) too
   }
   // Every hills tile under this sub-tile is loaded (or given up). With fetch, the missing ones are requested:
   // a sub-tile reaches further than the prefetch radius (it's built when its nearest edge is within SHOW_R).
@@ -1388,17 +1388,27 @@ varying float vGL; varying vec2 vGUV;
   }
   const heightAt = (x, z) => gridGet(hchunks, x, z);
   const roadAt = (x, z) => gridGet(rchunks, x, z);
+  // Feet on the road (2026-11-21, the user: "check why feet sometimes go through the ground"): roads are drawn ROAD_STYLE.y +
+  // 0.03 above the terrain (car roads 11 cm), but people stood on the bare terrain, so on every road their shoes sank in
+  // (measured: 42% of steps more than 3 cm, worst 34 cm in the middle of wide roads, which were only shaped at their edges).
+  // lchunks (a 0.5 m grid) keeps the drawn lift in centimetres, pavements use the same fine grid; road quads are split so
+  // the surface follows the hill across.
+  const LCELL = 0.5;   // the road-surface grid (lchunks) is finer than CELL so feet don't float or sink at road edges
+  const roadLift = (x, z) => { const i = Math.floor(x / LCELL), j = Math.floor(z / LCELL), a = lchunks.get(ckey(i, j)); return a ? a[(j - Math.floor(j / CH) * CH) * CH + (i - Math.floor(i / CH) * CH)] / 100 : 0; };
+  W.roadLift = (x, z) => roadLift(x, z);
+  const roadLiftCm = rd => Math.max(1, Math.round((roadStyle(rd.t).y + 0.03 + (rd.br ? 0.006 : 0)) * 100));
   // pavements (the raised strips with a kerb along streets with cars, drawn KERB_Y above the ground in buildSub): people
   // standing on them stand on top, not 13 cm into them (2026-11-18, "legs in the ground")
-  const paveAt = (x, z) => !LOW && gridGet(pchunks, x, z) && !roadAt(x, z);
-  const standAt = (x, z) => groundAt(x, z) + (paveAt(x, z) ? 0.13 : 0);
+  const paveAt = (x, z) => { if (LOW) return 0; const i = Math.floor(x / LCELL), j = Math.floor(z / LCELL), a = pchunks.get(ckey(i, j)); return a && a[(j - Math.floor(j / CH) * CH) * CH + (i - Math.floor(i / CH) * CH)] && !roadLift(x, z) ? 1 : 0; };   // fine grid (LCELL) like the road surface
+  const standAt = (x, z) => { const r = roadLift(x, z); return groundAt(x, z) + (r || (paveAt(x, z) ? 0.13 : 0)); };
   W.standAt = standAt; W.paveAt = paveAt;
-  function rasterize(rings, fn) {
+  function rasterize(rings, fn, cell) {
+    const CELL_ = cell || CELL;
     let zmin = Infinity, zmax = -Infinity;
     for (const p of rings) for (let i = 1; i < p.length; i += 2) { zmin = Math.min(zmin, p[i]); zmax = Math.max(zmax, p[i]); }
-    const j0 = Math.ceil(zmin / CELL - 0.5), j1 = Math.floor(zmax / CELL - 0.5), xs = [];
+    const j0 = Math.ceil(zmin / CELL_ - 0.5), j1 = Math.floor(zmax / CELL_ - 0.5), xs = [];
     for (let j = j0; j <= j1; j++) {
-      const zc = (j + 0.5) * CELL;
+      const zc = (j + 0.5) * CELL_;
       xs.length = 0;
       for (const p of rings) {
         const n = p.length / 2;
@@ -1409,7 +1419,7 @@ varying float vGL; varying vec2 vGUV;
       }
       xs.sort((a, b) => a - b);
       for (let q = 0; q + 1 < xs.length; q += 2) {
-        const i0 = Math.ceil(xs[q] / CELL - 0.5), i1 = Math.floor(xs[q + 1] / CELL - 0.5);
+        const i0 = Math.ceil(xs[q] / CELL_ - 0.5), i1 = Math.floor(xs[q + 1] / CELL_ - 0.5);
         for (let i = i0; i <= i1; i++) fn(i, j);
       }
     }
@@ -1472,11 +1482,17 @@ varying float vGL; varying vec2 vGUV;
         const nx = -(z2 - z1) / L, nz = (x2 - x1) / L;
         rasterize([[x1 + nx * hw, z1 + nz * hw, x2 + nx * hw, z2 + nz * hw, x2 - nx * hw, z2 - nz * hw, x1 - nx * hw, z1 - nz * hw]],
           (i, j) => gridSet(rchunks, Uint8Array, i, j, 1));
+        { const lc = roadLiftCm(rd), dw = rd.w / 2; rasterize([[x1 + nx * dw, z1 + nz * dw, x2 + nx * dw, z2 + nz * dw, x2 - nx * dw, z2 - nz * dw, x1 - nx * dw, z1 - nz * dw]],
+          (i, j) => gridSet(lchunks, Uint8Array, i, j, lc), LCELL); }   // the drawn lift in cm on a finer grid (the drawn width, not hw): standAt
         if (!LOW && !rd.br && CAR.has(rd.t) && rd.t !== 'service' && rd.t !== 'track') { // the same pavement bands buildSub draws
           const a = rd.w / 2, b = a + (rd.t === 'residential' ? 2.0 : 2.6);
           for (const sd of [1, -1]) rasterize([[x1 + nx * a * sd, z1 + nz * a * sd, x2 + nx * a * sd, z2 + nz * a * sd, x2 + nx * b * sd, z2 + nz * b * sd, x1 + nx * b * sd, z1 + nz * b * sd]],
-            (i, j) => gridSet(pchunks, Uint8Array, i, j, 1));
+            (i, j) => gridSet(pchunks, Uint8Array, i, j, 1), LCELL);
         }
+      }
+      { // the round joints buildSub draws at every bend and end (disk): part of the road surface too
+        const lc = roadLiftCm(rd), dw = rd.w / 2;
+        for (let i = 0; i + 1 < p.length; i += 2) { const ring = []; for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; ring.push(p[i] + Math.cos(a) * dw, p[i + 1] + Math.sin(a) * dw); } rasterize([ring], (ii, jj) => gridSet(lchunks, Uint8Array, ii, jj, lc), LCELL); }
       }
     }
     s.names = [];  // named car streets in this sub-tile, painted on the road by streetNames()
@@ -2034,7 +2050,7 @@ varying float vGL; varying vec2 vGUV;
         const nx = -dz / L * hw, nz = dx / L * hw, k = Math.max(1, Math.ceil(L / GS));
         for (let q = 0; q < k; q++) { // short pieces so the road follows the slope
           const ax = x1 + dx * q / k, az = z1 + dz * q / k, bx = x1 + dx * (q + 1) / k, bz = z1 + dz * (q + 1) / k;
-          flat.dquad(ax + nx, az + nz, bx + nx, bz + nz, bx - nx, bz - nz, ax - nx, az - nz, hf, lift, st.col);
+          flat.dquad(ax + nx, az + nz, bx + nx, bz + nz, bx - nx, bz - nz, ax - nx, az - nz, hf, lift, st.col, hw > GS * 0.6 ? GS : 0);   // wide roads: split across too
         }
         if (marking || bline) dashes(flat, x1, z1, dx / L, dz / L, L, hf, lift + 0.012, lk);
         if (!LOW && !r.br && marking && hw > 3.2) { // solid white lines along the edges of bigger roads
@@ -3739,6 +3755,44 @@ varying float vGL; varying vec2 vGUV;
   W.swing = function (reach, arc) { swingT = 0.3; if (reach) arcFx(reach, arc || 160, player.pos.y + 1.05, 0xfff6d0, 0.26); };
   W.showReach = function (reach) { if (reach) arcFx(reach, 360, player.pos.y + 0.3, 0xffc21f, 1.6, true); };
   W.arcCount = () => arcs.length;
+  // The bonk reach on the ground, all the time (2026-11-21, the user: "a visual indication how far the melee attack reaches").
+  // cft-fun.js feeds W.reachMarker({r, arc, hot, ranged}) every tick (r = the real hit distance for an ordinary figment,
+  // arc = the weapon's swing in degrees). A faint fan + a gold edge in front of you; pink and pulsing when a figment is
+  // inside it (a swing now would hit). Hidden on rides, while aiming, in cut-scenes, in the wardrobe; null hides it.
+  const reachFill = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+  const reachEdge = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xffc21f, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+  const reachLine = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0x1f1a3d, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide, fog: false }));   // a dark rim: the gold reads on bright paint too
+  reachFill.renderOrder = 2; reachLine.renderOrder = 3; reachEdge.renderOrder = 4; reachFill.visible = reachEdge.visible = reachLine.visible = false;
+  scene.add(reachFill, reachLine, reachEdge);
+  const reachGeos = new Map();
+  let reachInfo = null, reachKey = '';
+  function reachGeo(r, deg, edge) {
+    const key = (edge || 'f') + r.toFixed(2) + ':' + Math.round(deg);
+    let g = reachGeos.get(key);
+    if (!g) {
+      const a = Math.min(Math.PI * 2, deg * Math.PI / 180), seg = Math.max(10, Math.round(deg / 6));
+      const [r0, r1] = edge === 'o' ? [r + 0.04, r + 0.12] : edge ? [Math.max(0.2, r - 0.11), r + 0.04] : [0.55, r - 0.11];
+      g = new THREE.RingGeometry(r0, r1, seg, 1, -a / 2, a); g.rotateX(-Math.PI / 2); reachGeos.set(key, g);
+    }
+    return g;
+  }
+  W.reachMarker = function (info) { reachInfo = info; };
+  W.reachShown = () => reachEdge.visible;
+  W.reachRadius = () => (reachInfo ? reachInfo.r : 0);
+  function updateReach() {
+    const i = reachInfo;
+    const show = !!i && !i.ranged && ride.mode === 'foot' && !W.aiming && !W.cine && !W.showOff && avatar.visible && !player.climb && !W.tether;
+    reachFill.visible = reachEdge.visible = reachLine.visible = show;
+    if (!show) return;
+    const key = i.r.toFixed(2) + ':' + Math.round(i.arc);
+    if (key !== reachKey) { reachKey = key; reachFill.geometry = reachGeo(i.r, i.arc, null); reachEdge.geometry = reachGeo(i.r, i.arc, 'e'); reachLine.geometry = reachGeo(i.r, i.arc, 'o'); }
+    const y = player.pos.y + 0.05, rot = player.face + Math.PI / 2;
+    reachFill.position.set(player.pos.x, y, player.pos.z); reachLine.position.set(player.pos.x, y + 0.004, player.pos.z); reachEdge.position.set(player.pos.x, y + 0.008, player.pos.z);
+    reachFill.rotation.y = reachEdge.rotation.y = reachLine.rotation.y = rot;
+    const pulse = i.hot ? 0.75 + 0.25 * Math.sin(performance.now() / 90) : 1;
+    reachEdge.material.color.setHex(i.hot ? 0xff5c8a : 0xffc21f); reachEdge.material.opacity = i.hot ? 0.95 * pulse : 0.75;
+    reachFill.material.color.setHex(i.hot ? 0xff5c8a : 0xffffff); reachFill.material.opacity = i.hot ? 0.16 : 0.07;
+  }
   // Rainbow light guides on the floor (2026-11-19, the user: "when a monster is nearby a little wave of rainbow energy
   // emanates towards it on the floor... the arrow on the head is for missions"): chevrons run from you to (x, z) in two waves.
   const CHEV = (() => { const g = new THREE.BufferGeometry(), v = [-0.9, 0, 0.35, 0, 0, -0.55, 0, 0, -0.05, -0.9, 0, 0.35, 0, 0, -0.05, -0.9, 0, 0.8, 0.9, 0, 0.35, 0, 0, -0.05, 0, 0, -0.55, 0.9, 0, 0.35, 0.9, 0, 0.8, 0, 0, -0.05];
@@ -3761,6 +3815,7 @@ varying float vGL; varying vec2 vGUV;
   };
   W.guides = () => guides.length;
   function updateArcs(dt) {
+    updateReach();
     for (let i = arcs.length - 1; i >= 0; i--) {
       const a = arcs[i]; a.t += dt; const k = a.t / a.life;
       if (k >= 1) { scene.remove(a.m); a.m.material.dispose(); arcs.splice(i, 1); continue; }
@@ -4325,6 +4380,37 @@ varying float vGL; varying vec2 vGUV;
   const SKY = [[0, 0x0d1236], [4.5, 0x151c48], [6, 0x6e5a8f], [7, 0xf3b58d], [8.5, 0xaecde9], [16.5, 0xaecde9], [18.5, 0xf6a46c], [19.6, 0x9a5d8f], [20.8, 0x2a2660], [22, 0x0d1236], [24, 0x0d1236]];
   const SKY_TOP = [[0, 0x040618], [4.5, 0x0a1030], [6, 0x2b3f86], [7.2, 0x4f86d8], [9, 0x3f84e6], [16.5, 0x3f84e6], [18.5, 0x4a5fb0], [19.8, 0x2a2a70], [21, 0x0a1030], [22, 0x040618], [24, 0x040618]];
   const ca = new THREE.Color(), cb = new THREE.Color();
+  // The light through the day (2026-11-21, the user: "change lighting throughout the day... it needs to be more apparent").
+  // Key hours: [hour, sun colour, sun strength, sky light colour, ground bounce colour, sky light strength, exposure x, warmth,
+  // saturation x]. Blue moonlight at night, a pink-orange sunrise with long shadows, crisp morning, bright white noon, warm
+  // afternoon, an orange golden hour, a red sunset, a purple dusk, then the blue hour. Exposure / warmth / saturation go to
+  // the post-processing grade on high quality (cft-post.js); low quality gets the colours of the lights and the fog.
+  const LIGHT = [
+    [0, 0x7f98ff, 0.14, 0x5a6cc0, 0x1c1a30, 0.42, 0.80, -3.5, 0.78],
+    [4.6, 0x8a98ff, 0.16, 0x5f6ab8, 0x221e36, 0.44, 0.81, -3, 0.8],
+    [5.6, 0xb59cff, 0.2, 0x8a86d0, 0x3a3048, 0.5, 0.88, -1.5, 0.9],
+    [6.5, 0xff8456, 0.5, 0xffb8a0, 0x5a4040, 0.56, 0.95, 4.5, 1.14],
+    [7.6, 0xffad70, 0.68, 0xffd8b8, 0x6a5a48, 0.62, 1.0, 3, 1.08],
+    [9.5, 0xfff2de, 0.76, 0xe6f0ff, 0x6e685d, 0.68, 1.03, 0.8, 1.02],
+    [12.5, 0xffffff, 0.84, 0xf0f6ff, 0x7a7466, 0.74, 1.08, 0, 0.95],
+    [15.5, 0xfff0d0, 0.78, 0xf2eedf, 0x76705e, 0.7, 1.05, 1.5, 1.02],
+    [17.6, 0xffa052, 0.74, 0xffd2a0, 0x6a5040, 0.62, 1.0, 5.5, 1.17],
+    [18.8, 0xff6a3d, 0.52, 0xff9e8c, 0x503448, 0.55, 0.95, 4.5, 1.2],
+    [19.7, 0xc46aa6, 0.3, 0xa07ac8, 0x302848, 0.48, 0.9, 0.5, 1.02],
+    [20.7, 0x7a8cff, 0.18, 0x6a74c8, 0x22203a, 0.44, 0.84, -2.5, 0.85],
+    [22, 0x7f98ff, 0.14, 0x5a6cc0, 0x1c1a30, 0.42, 0.80, -3.5, 0.78],
+    [24, 0x7f98ff, 0.14, 0x5a6cc0, 0x1c1a30, 0.42, 0.80, -3.5, 0.78],
+  ];
+  const lc = new THREE.Color(), ld = new THREE.Color();
+  let postBase = null;
+  function lightAt(h) { // interpolated LIGHT row
+    let i = 0;
+    while (i < LIGHT.length - 2 && LIGHT[i + 1][0] <= h) i++;
+    const A = LIGHT[i], B = LIGHT[i + 1], t = (h - A[0]) / (B[0] - A[0]), mix = (a, b) => a + (b - a) * t;
+    const col = k => lc.setHex(A[k]).lerp(ld.setHex(B[k]), t).getHex();
+    return { sun: col(1), sunI: mix(A[2], B[2]), sky: col(3), gnd: col(4), skyI: mix(A[5], B[5]), exp: mix(A[6], B[6]), warm: mix(A[7], B[7]), sat: mix(A[8], B[8]) };
+  }
+  W.lightAt = lightAt; W.sunDir = sunDir;   // tests read the sun height
   W.night = 0;
   W.setClock = function (h) {
     h = ((h % 24) + 24) % 24;
@@ -4337,13 +4423,21 @@ varying float vGL; varying vec2 vGUV;
     scene.fog.color.copy(skyCol);
     const day = smooth(5.5, 8, h) * (1 - smooth(18.3, 21, h));
     W.night = 1 - day;
-    hemi.intensity = (0.4 + 0.3 * day) * (GFX ? 0.5 : 1);   // high quality: the sky's environment map does much of the fill
-    hemi.color.setHex(day > 0.5 ? 0xe4f0ff : 0xa9b6f0);
-    sun.intensity = 0.16 + 0.56 * day;
+    const L = lightAt(h);
+    W.light = L;
+    hemi.intensity = L.skyI * (GFX ? 0.5 : 1);   // high quality: the sky's environment map does much of the fill
+    hemi.color.setHex(L.sky); hemi.groundColor.setHex(L.gnd);
+    sun.intensity = L.sunI;
     nameTint.setScalar(0.4 + 0.55 * day);  // street names painted on the road
-    sun.color.setHex(day < 0.15 ? 0x9fb4ff : h < 9 || h > 17 ? 0xffc79a : 0xfff0d8);  // moonlight is blue
+    sun.color.setHex(L.sun);  // moonlight is blue, sunrise pink-orange, noon white, golden hour orange
     const a = (h - 6) / 12 * Math.PI;  // sun travels east -> west
-    sunDir.set(Math.cos(a) * 0.6, Math.max(0.25, Math.sin(Math.max(0.2, Math.min(Math.PI - 0.2, a)))), 0.46).normalize();
+    // low sun = long shadows at sunrise and in the golden hour; at night the moon stands high in the south-west
+    if (day > 0.02) sunDir.set(Math.cos(a) * 0.6, Math.max(0.16, Math.sin(Math.max(0.12, Math.min(Math.PI - 0.12, a)))), 0.46).normalize();
+    else sunDir.set(-0.35, 0.8, 0.5).normalize();
+    if (POST) { // the colour grade follows the hour
+      if (!postBase) postBase = { exposure: POST.params.exposure, sat: POST.params.sat };
+      POST.params.exposure = postBase.exposure * L.exp; POST.params.sat = postBase.sat * L.sat; POST.params.warm = L.warm;
+    }
     MAT.walls.emissiveIntensity = Math.max(0, (W.night - 0.3) * 1.3);
     if (GFX) { GFX.U.uNight.value = W.night; GFX.U.uDay.value = day; }
     scene.fog.near = 120 - W.night * 40; scene.fog.far = 600 - W.night * 180;
@@ -4777,7 +4871,7 @@ varying float vGL; varying vec2 vGUV;
     if (document.pointerLockElement === canvas) look(e.movementX, e.movementY, 0.0024);
     else if (drag) { look(e.clientX - drag.x, e.clientY - drag.y, 0.005); drag.x = e.clientX; drag.y = e.clientY; }
   });
-  on(canvas, 'wheel', e => { cam.dist = Math.max(2.5, Math.min(30, cam.dist * (e.deltaY > 0 ? 1.12 : 1 / 1.12))); e.preventDefault(); }, { passive: false });
+  on(canvas, 'wheel', e => { e.preventDefault(); if (W.onWheel && W.onWheel(e.deltaY, e)) return; cam.dist = Math.max(2.5, Math.min(30, cam.dist * (e.deltaY > 0 ? 1.12 : 1 / 1.12))); }, { passive: false });   // W.onWheel: cft-aim (shooters)
   // Touch: left half = joystick, right half = look. The game supplies the joystick elements.
   const touches = {};
   W.touchUI = { joy: null, knob: null };
@@ -4821,7 +4915,7 @@ varying float vGL; varying vec2 vGUV;
     gen++;
     for (const s of allSubs) if (s.group) dropSub(s);
     tiles.clear(); allSubs = []; inflight = 0;
-    buckets.clear(); nameBuckets.clear(); hchunks.clear(); rchunks.clear(); pchunks.clear(); segBuckets.clear(); bridgeBuckets.clear();
+    buckets.clear(); nameBuckets.clear(); hchunks.clear(); rchunks.clear(); pchunks.clear(); lchunks.clear(); segBuckets.clear(); bridgeBuckets.clear();
     terr.tiles.clear(); terr.src.clear(); nodes.clear(); terr.inflight = 0; terr.h0 = null; terr.off = false; terr.minY = 0;
     W.places.length = 0; W.placeIds.clear();
     boro.tiles.clear(); boro.pts.length = 0; boro.stale.clear();

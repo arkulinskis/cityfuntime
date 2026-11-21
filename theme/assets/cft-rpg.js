@@ -431,10 +431,10 @@ function attach(G, api) {
     const c = (G.fun.streetSpot ? G.fun.streetSpot(p.x, p.z, 30, 70) : null) || W.randomWalkSpot(p.x, p.z, 30, 90);
     if (!c || Math.hypot(c.x - home.x, c.z - home.z) < 30) return null;
     const rr = which || pick(X.RARES), base = D.MONSTERS[rr.kind];
-    const def = Object.assign({}, base, { n: rr.n, hp: base.hp * 4 + 2, xp: base.xp * 6, coins: [base.coins[0] * 2, base.coins[1] * 2], rare: true, night: false });
+    const TB = D.TUNE.bosses, def = Object.assign({}, base, { n: rr.n, hp: base.hp * TB.rareHp + TB.rareHpAdd, xp: base.xp * TB.rareXp, coins: [base.coins[0] * 2, base.coins[1] * 2], rare: true, night: false });
     const m = G.fun.spawnMonster(rr.kind, c.x, c.z, { def, hp: def.hp, event: 240, aggro: 22 });
     if (!m) return null;
-    m.obj.userData.size = (base.size || 1) * 1.45; m.r *= 1.45;
+    m.obj.userData.size = (base.size || 1) * TB.rareSize; m.r *= TB.rareSize;
     const tag = W.label('💀 ' + rr.n, { size: 34, height: 0.52, bg: 'rgba(214,219,227,.95)', fg: '#1f1a3d', border: '#5b6270' });
     tag.position.y = 2.6; m.obj.add(tag);
     U.banner('💀 A rare monster: ' + rr.n, 'Silver name tag, deep pockets. It always drops something Rare or better.', 'fail');

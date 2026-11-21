@@ -206,9 +206,9 @@ window.__aimOut = []; window.__aimDone = false;
     for (const id of Object.keys(s.owned)) if (D.ITEMS[id] && D.ITEMS[id].weapon && D.ITEMS[id].weapon.ranged) delete s.owned[id];
     delete s.equip.weapon; if (G.rpg && G.rpg.unequip) G.rpg.unequip('weapon'); sim(5);
     K.collect({ type: 'ammo' }); await sleep(100);
-    ok(s.owned.w_straw && s.equip.weapon === 'w_straw', 'ammo with empty hands: the crate had a Spitball straw (worn)');
-    const sh0 = c('shots'); window.CFT_TEST.ammo = true; const am0 = s.camp.ammo; sim(20); G.attack(); sim(2); delete window.CFT_TEST.ammo;
-    ok(c('shots') > sh0 && s.camp.ammo < am0, 'F shoots it and uses ammo (' + am0 + ' -> ' + s.camp.ammo + ')');
+    ok(s.owned.w_straw && A.gun() === 'w_straw' && !s.equip.weapon, 'ammo without a shooter: the crate had a Spitball straw (in slot 5, hands stay free)');
+    const sh0 = c('shots'); window.CFT_TEST.ammo = true; const am0 = s.camp.ammo; sim(20); A.test.gunCd = 0; A.tap('gun', true); A.tap('gun', false); sim(2); delete window.CFT_TEST.ammo;
+    ok(c('shots') > sh0 && s.camp.ammo < am0, 'slot 5 shoots it and uses ammo (' + am0 + ' -> ' + s.camp.ammo + ')');
     U.clearBanners();
 
     // ---------- the Dex gallery

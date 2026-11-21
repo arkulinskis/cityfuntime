@@ -14,9 +14,9 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const fmt$ = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[Math.floor(Math.random() * a.length)];
-function xpAt(l) { return Math.round(60 * Math.pow(Math.max(0, l - 1), 1.8)); }
+function xpAt(l) { const C = window.CFT_DATA && window.CFT_DATA.calc; return C ? C.xpAt(l) : Math.round(60 * Math.pow(Math.max(0, l - 1), 1.8)); }  // D.TUNE.player.xpBase / xpExp (Admin > Balance)
 // no level cap (2026-11-19, the user: "remove level cap"): start from the closed form, then settle on the exact step
-function levelOf(xp) { xp = Math.max(0, +xp || 0); let l = Math.max(1, Math.floor(1 + Math.pow(xp / 60, 1 / 1.8)) - 1); while (xpAt(l + 1) <= xp) l++; while (l > 1 && xpAt(l) > xp) l--; return l; }
+function levelOf(xp) { const C = window.CFT_DATA && window.CFT_DATA.calc; if (C) return C.levelOf(xp); xp = Math.max(0, +xp || 0); let l = 1; while (xpAt(l + 1) <= xp) l++; return l; }
 const MISSION = {}; D.MISSIONS.forEach(m => { MISSION[m.id] = m; });
 const BIZ = {}; D.BUSINESSES.forEach(b => { BIZ[b.id] = b; });
 const CREW = {}; D.CREWS.forEach(c => { CREW[c.id] = c; });
@@ -111,6 +111,20 @@ function mount(root, opts) {
   const rt = G.rt = { pickups: [], actors: new Map(), followers: [], escorts: {}, race: null, chase: null, signs: new Map(), posters: new Map(),
     labels: [], timers: {}, t: 0, busy: false, last: performance.now(), placeTimer: 0, actorTimer: 0, missionTimer: 0, promptTimer: 0, saveTimer: 0,
     dirtyT: 0, interact: null, vpins: new Map(), visitedNear: new Set(), chatCooldown: 0, beam: null };
+  // Balance (Admin > Balance, 2026-11-21): the published values (opts.balance, from the server through cft-kit.js) plus this
+  // browser's "try it" draft (localStorage cityfuntime.balance.draft, written by the wiki) go into D before anything reads it.
+  // The wiki writes the draft again on every change; the storage event re-applies it here, so an open game follows live.
+  const BAL_KEY = 'cityfuntime.balance.draft';
+  function balanceDraft() { try { const d = JSON.parse(localStorage.getItem(BAL_KEY) || 'null'); return d && typeof d === 'object' && d.on !== false ? (d.values || {}) : {}; } catch (e) { return {}; } }
+  G.applyBalance = function () {
+    const n = D.applyBalance(Object.assign({}, opts.balance || {}, balanceDraft()));
+    G.balanceDraft = Object.keys(balanceDraft()).length;
+    if (G.fun && G.save) { const f = G.save.fun || {}; if (f.hp > G.fun.maxHp()) f.hp = G.fun.maxHp(); }
+    return n;
+  };
+  G.applyBalance();
+  const onBalance = e => { if (e.key === BAL_KEY && alive) { G.applyBalance(); if (G.ui && G.ui.toast && G.balanceDraft) G.ui.toast('⚖️ Balance draft updated (' + G.balanceDraft + ' changed values)'); } };
+  window.addEventListener('storage', onBalance);
   const U = G.ui = window.CFTUI.create(G, root);
   let W = null, raf = 0, alive = true, state = 'start', save = null;
   G.state = () => state;
@@ -1307,7 +1321,8 @@ function mount(root, opts) {
     switch (it.type) {
       case 'food': addEnergy((it.energy || 0) * G.foodMul()); if (it.happy) addHappy(it.happy); if (it.stats) for (const k in it.stats) addStat(k, it.stats[k], true); U.feed(it.e, 'Yum! +' + Math.round((it.energy || 0) * G.foodMul()) + ' ⚡'); break;
       case 'snack': case 'gift': case 'quest': giveItem(it.give || id, 1); U.feed(it.e, it.n + ' added to your bag'); break;
-      case 'gear': { save.owned[id] = true; const was = wornIn(it.slot); wearShop(id); U.feed(it.e, (it.weapon ? 'Armed with: ' : 'Wearing ') + it.n + (it.weapon ? (it.weapon.ranged === 'proj' || it.weapon.ranged === 'shot' ? ' (F shoots; hold the right mouse button to aim; ammo from crates)' : ' (F to bonk)') : '') + (was ? ' · ' + was.n + ' went to your wardrobe' : '')); if (it.happy) addHappy(it.happy); break; }
+      case 'gear': { save.owned[id] = true; if (G.aim && G.aim.isShooter(it.weapon)) { G.aim.addGun(id, 'bought'); if (it.happy) addHappy(it.happy); break; }   // shooters go on the slot-5 belt (2026-11-21)
+        const was = wornIn(it.slot); wearShop(id); U.feed(it.e, (it.weapon ? 'Armed with: ' : 'Wearing ') + it.n + (it.weapon ? (it.weapon.ranged === 'proj' || it.weapon.ranged === 'shot' ? ' (F shoots; hold the right mouse button to aim; ammo from crates)' : ' (F to bonk)') : '') + (was ? ' · ' + was.n + ' went to your wardrobe' : '')); if (it.happy) addHappy(it.happy); break; }
       case 'vehicle': save.owned[id] = true; setRide(id); U.banner(it.e + ' ' + it.n + '!', 'Press V (or the ride button) to hop on and off.', 'done'); log('Bought a ' + it.n, it.e); break;
       case 'furniture': save.owned[id] = true; if (it.energy) save.maxE = (save.maxE || 0) + it.energy; U.feed(it.e, it.n + ' delivered home. +' + it.happy + ' 😊 every day'); log('Bought ' + it.n, it.e); break;
       case 'pet': save.pets.push({ kind: it.pet, name: it.pet === 'dog' ? 'Biscuit' : 'Mochi', since: save.day }); addHappy(10); refreshFollowers(); U.banner(it.e + ' New best friend!', 'Your ' + it.pet + ' follows you everywhere.', 'friend'); log('Adopted a ' + it.pet, it.e); break;
@@ -1367,6 +1382,7 @@ function mount(root, opts) {
   function wearShop(id) {
     const it = D.ITEMS[id];
     if (!it || it.type !== 'gear' || !owned(id)) return false;
+    if (G.aim && G.aim.isShooter(it.weapon)) return G.aim.pickGun(id);   // shooters live in slot 5, not in your hand
     if (G.rpg) G.rpg.unequip(it.slot, true);
     save.equip[it.slot] = id;
     if (it.slot !== 'weapon') W.setLook(playerLook());
@@ -1382,7 +1398,7 @@ function mount(root, opts) {
   function slotOptions(slot) {
     const out = [], cur = wornIn(slot);
     if (cur) out.push(Object.assign({ on: true }, cur));
-    for (const id of Object.keys(save.owned)) { const it = D.ITEMS[id]; if (it && it.type === 'gear' && it.slot === slot && !(cur && cur.id === id)) out.push({ src: 'shop', id, it, n: it.n, e: it.e }); }
+    for (const id of Object.keys(save.owned)) { const it = D.ITEMS[id]; if (it && it.type === 'gear' && it.slot === slot && !(cur && cur.id === id) && !(G.aim && G.aim.isShooter(it.weapon))) out.push({ src: 'shop', id, it, n: it.n, e: it.e }); }
     if (G.rpg) for (const lt of G.rpg.spare(slot)) out.push({ src: 'loot', id: lt.id, it: lt, n: lt.n, e: lt.e, q: lt.q });
     return out;
   }
@@ -2302,6 +2318,7 @@ function mount(root, opts) {
     destroy() {
       if (save && state === 'play') doSave('exit');
       alive = false;
+      window.removeEventListener('storage', onBalance);
       if (window.ArkMusic) window.ArkMusic.stop();
       if (G.fun) G.fun.destroy();
       if (G.rpg) G.rpg.destroy();

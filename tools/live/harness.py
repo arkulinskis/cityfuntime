@@ -5,7 +5,7 @@
 The page loads app.css, ark-music.js and cft-kit.js like the real app, lists the engine files as <meta name="cft-asset">
 tags and mounts the game full screen (CFT.mountGame). The server side is faked in the page: a guest (no account), a
 map-backup stub that remembers which tiles it was asked to keep. Map tiles come from the real services, so it needs
-internet. tools/live/game_test.py starts this by itself.
+internet. tools/live/game_test.py starts this by itself. ?wiki=1 shows Admin > Balance (cft-wiki.js) instead of the game.
 """
 import http.server
 import pathlib
@@ -34,11 +34,16 @@ PAGE = """<!doctype html>
     var args = JSON.parse(argsJson || '[]'); window.HARNESS.calls.push(fn);
     if (fn === 'tile_archive') { window.HARNESS.archived = window.HARNESS.archived.concat(args[0]); return JSON.stringify({ result: { have: args[0], full: false } }); }
     if (fn === 'tile_backup') return JSON.stringify({ result: { found: false } });
+    // Admin > Balance (cft-wiki.js): the published values live in the page
+    if (fn === 'get_balance') return JSON.stringify({ result: { values: window.HARNESS.balance || {} } });
+    if (fn === 'admin_balance_get') return JSON.stringify({ result: { values: window.HARNESS.balance || {}, updated: window.HARNESS.balUpdated || null, by: 'Harness', history: window.HARNESS.balHistory || [] } });
+    if (fn === 'admin_balance_save') { window.HARNESS.balHistory = [{ i: 0, updated: window.HARNESS.balUpdated, by: 'Harness', n: Object.keys(window.HARNESS.balance || {}).length }]; window.HARNESS.balance = args[0]; window.HARNESS.balUpdated = new Date().toISOString(); return JSON.stringify({ result: { ok: true, values: args[0], updated: window.HARNESS.balUpdated } }); }
     return JSON.stringify({ result: { ok: true } });
   } };
   if (/[?&]music=0/.test(location.search) && window.ArkMusic) window.ArkMusic.enabled(false);
   if (/[?&]fresh=1/.test(location.search)) localStorage.removeItem('cityfuntime.save.guest');
-  window.CFT_GAME_CTL = CFT.mountGame(document.getElementById('root'), { exit: function () { document.title = 'exited'; }, reload: function () { location.reload(); } });
+  if (/[?&]wiki=1/.test(location.search)) { document.querySelector('.cft-host').className = 'ui-wrap'; window.CFT_WIKI = CFT.mountWiki(document.getElementById('root')); }   // Admin > Balance on its own
+  else window.CFT_GAME_CTL = CFT.mountGame(document.getElementById('root'), { exit: function () { document.title = 'exited'; }, reload: function () { location.reload(); } });
 </script>
 </body></html>
 """

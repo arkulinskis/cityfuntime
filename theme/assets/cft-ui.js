@@ -75,6 +75,7 @@ function create(G, root) {
           <button type="button" class="cft-hb volt" data-pw="volt" title="Lightning power (2): zaps and chains between figments, double on wet ones. Refill: lightning orbs, storms" aria-label="Lightning power"><span>🌩️</span><em data-pwn="volt"></em><kbd>2</kbd></button>
           <button type="button" class="cft-hb foam" data-pw="foam" title="Fire extinguisher (3, then hold right mouse + hold left click): puts out fires fast. Found near fires" aria-label="Fire extinguisher"><span>🧯</span><em data-pwn="foam"></em><kbd>3</kbd></button>
           <button type="button" class="cft-hb web" data-pw="web" title="Web shooter (4, then hold right mouse + left click): sticks to a wall and pulls you to it. Jump to let go" aria-label="Web shooter"><span>🕸️</span><em data-pwn="web"></em><kbd>4</kbd></button>
+          <button type="button" class="cft-hb gun empty" data-pw="gun" title="Shooter (5): none yet. Find one around town (🎯 on the map)" aria-label="Shooter"><span data-gunicon>🎯</span><em data-pwn="gun"></em><kbd>5</kbd></button>
           <button type="button" class="cft-hb" data-quaff title="Eat or drink to heal (Q)" aria-label="Heal"><span>🍵</span><kbd>Q</kbd></button>
         </div>
         <div class="cft-btns">
@@ -450,8 +451,8 @@ function create(G, root) {
     const t = shell.classList.contains('touch');
     const ov = overlay('<div class="cft-card cft-help"><h3>' + (first ? '👋 Welcome to the city!' : '🎮 How to play') + '</h3>' +
       (first ? '<p>Cousin Max is waiting by the 🏠 flag with a big yellow <b>!</b> over his head. Walk up and talk to him to start your new life.</p>' : '') +
-      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone (👕 Wardrobe: what you wear)</div><div><kbd>💧 🌩️ 🧯 🕸️</kbd> water, lightning, extinguisher (hold), web (pulls you to the wall you face)</div><div><kbd>⤒</kbd> jump: off walls, onto roofs, bounce off everything</div>'
-        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things) · with a shooter in hand (🥤🎈🍌...) <kbd>F</kbd> shoots: hold <kbd>right mouse</kbd> to aim it, ammo 🎯 comes from crates</div><div><kbd>G</kbd> held: block (time it for a PERFECT PARRY)</div><div><kbd>Right mouse</kbd> held: aim with the sight · <kbd>left click</kbd> uses the slot you chose with <kbd>1</kbd>–<kbd>4</kbd> (💧 water, 🌩️ lightning, 🧯 extinguisher, 🕸️ web: sticks to walls and pulls you in) · let go = back to bonking</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>B</kbd> toot (yes, really)</div><div><kbd>Space</kbd> held in the air: jetpack / glide</div><div><kbd>Space</kbd> while climbing a wall: jump off it (<kbd>Shift</kbd> + <kbd>Space</kbd>: jump up it)</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div>In a car: ramps 🛹 and rings of fire 🔥 pop up · <kbd>Space</kbd> hop · in the air <kbd>W</kbd>/<kbd>S</kbd> flip, <kbd>A</kbd>/<kbd>D</kbd> spin, <kbd>Space</kbd> barrel roll · land wheels down</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>1</kbd> water power · <kbd>2</kbd> lightning · <kbd>3</kbd> held: extinguisher</div><div><kbd>Space</kbd> at a wall in the air: wall jump; benches, bins and heads are bouncy</div><div><kbd>M</kbd> minimap zoom · <kbd>N</kbd> map size · <kbd>Esc</kbd> pause</div>') +
+      '<div class="cft-keys">' + (t ? '<div><kbd>Left thumb</kbd> walk</div><div><kbd>Right thumb</kbd> look</div><div><kbd>Action button</kbd> talk, shop, tag</div><div><kbd>🖐️</kbd> bonk monsters (they come out at night)</div><div><kbd>🛡️</kbd> hold to block: just before a hit = PERFECT PARRY</div><div><kbd>📱</kbd> your phone (👕 Wardrobe: what you wear)</div><div><kbd>💧 🌩️ 🧯 🕸️ 🎯</kbd> water, lightning, extinguisher (hold), web (pulls you to the wall you face), your shooter (hold to keep firing)</div><div><kbd>⤒</kbd> jump: off walls, onto roofs, bounce off everything</div>'
+        : '<div><kbd>W A S D</kbd> move</div><div><kbd>Shift</kbd> sprint</div><div><kbd>Space</kbd> jump (twice: double jump)</div><div><kbd>F</kbd> or click: bonk (and smash things) · the gold arc on the ground is how far your bonk reaches (pink = something is in reach)</div><div><kbd>G</kbd> held: block (time it for a PERFECT PARRY)</div><div><kbd>Right mouse</kbd> held: aim with the sight · <kbd>left click</kbd> uses the slot you chose with <kbd>1</kbd>–<kbd>5</kbd> (💧 water, 🌩️ lightning, 🧯 extinguisher, 🕸️ web: sticks to walls and pulls you in, 🎯 your shooter: hold to keep firing, ammo from crates) · let go = back to bonking</div><div><kbd>Scroll wheel</kbd> while aiming (or with slot 5 chosen): switch shooters · otherwise (and <kbd>Ctrl</kbd> + wheel): camera zoom</div><div><kbd>Q</kbd> eat or drink to heal</div><div><kbd>B</kbd> toot (yes, really)</div><div><kbd>Space</kbd> held in the air: jetpack / glide</div><div><kbd>Space</kbd> while climbing a wall: jump off it (<kbd>Shift</kbd> + <kbd>Space</kbd>: jump up it)</div><div><kbd>⭐</kbd> your level: talents, charms</div><div><kbd>Mouse</kbd> look (click to capture)</div><div><kbd>E</kbd> talk, shop, tag, interact</div><div><kbd>P</kbd> phone: quests, map, bag, people</div><div><kbd>V</kbd> hop on / off your ride</div><div>In a car: ramps 🛹 and rings of fire 🔥 pop up · <kbd>Space</kbd> hop · in the air <kbd>W</kbd>/<kbd>S</kbd> flip, <kbd>A</kbd>/<kbd>D</kbd> spin, <kbd>Space</kbd> barrel roll · land wheels down</div><div><kbd>I</kbd> wardrobe: one thing per slot</div><div><kbd>1</kbd> water power · <kbd>2</kbd> lightning · <kbd>3</kbd> held: extinguisher</div><div><kbd>Space</kbd> at a wall in the air: wall jump; benches, bins and heads are bouncy</div><div><kbd>M</kbd> minimap zoom · <kbd>N</kbd> map size · <kbd>Esc</kbd> pause</div>') +
       '</div><p class="muted">Watch for the red <b>❗</b> over a figment: it is about to strike. When its ring turns gold, block. Big gold <b>letters</b> on the map are people with missions; E next to a parked car borrows it. The <b>gold arrow</b> over your head always points to your current goal. Ranged weapons need ammo 🎯 (crates around town); nosy people find ✨ secrets in the tight gaps between buildings. Coins 🪙, books 📚, roses 🌹, dumbbells 🏋️, shades 🕶️ and spray cans 🎨 make you richer and better at things.</p>' +
       // not data-go: that attribute is the app-wide "navigate to a page" link (web/core.js) and sent players to the home page
       '<button type="button" class="cft-btn primary big" data-letsgo>Let\'s go!</button></div>', 'cft-center');
@@ -750,6 +751,7 @@ function create(G, root) {
     if (G.camp) G.camp.markers(markers);
     if (G.wild) G.wild.markers(markers);
     if (G.stunt) G.stunt.markers(markers);
+    if (G.aim && G.aim.markers) G.aim.markers(markers);   // shooters lying around town
     const goal = G.rt.goal;
     if (goal) markers.push({ x: goal.x, z: goal.z, color: '#6b4eff', r: 9, emoji: goal.e || '⭐', ring: '#ffc21f', edge: true });
     return { markers, rects };
@@ -805,14 +807,14 @@ function create(G, root) {
     else if (e.code === 'KeyM') toggleZoom();
     else if (e.code === 'KeyN') U.mapSize();
     // 1-4 choose what the sight fires (2026-11-19): hold the right mouse button to aim, left click to use it
-    else if (/^(Digit|Numpad)[1-4]$/.test(e.code)) { if (!e.repeat) { const k = SLOT_KEYS[+e.code.slice(-1) - 1]; if (G.aim) G.aim.select(k); else if (G.camp && k !== 'web') G.camp.power(k, true); } }
+    else if (/^(Digit|Numpad)[1-5]$/.test(e.code)) { if (!e.repeat) { const k = SLOT_KEYS[+e.code.slice(-1) - 1]; if (G.aim) G.aim.select(k); else if (G.camp && k !== 'web' && k !== 'gun') G.camp.power(k, true); } }
     else if (e.code === 'KeyH') U.help();
     else if (e.code === 'KeyI') U.wardrobe();
     else if (e.code === 'KeyB') { if (!e.repeat && G.chaos) G.chaos.fart(); }
   }
   document.addEventListener('keydown', onKey);
   const unblock = () => { if (G.fun && G.fun.blocking) G.fun.setBlock(false); };
-  const SLOT_KEYS = ['water', 'volt', 'foam', 'web'];
+  const SLOT_KEYS = ['water', 'volt', 'foam', 'web', 'gun'];
   function onKeyUp(e) { if (e.code === 'KeyG') unblock(); if ((e.code === 'Digit3' || e.code === 'Numpad3') && G.camp && !G.aim) G.camp.power('foam', false); }
   document.addEventListener('keyup', onKeyUp);
   const unaim = () => { if (G.aim) { G.aim.fire(false); G.aim.setAim(false); } };
@@ -850,9 +852,9 @@ function create(G, root) {
       e.preventDefault();
       if (G.state() !== 'play' || stack.length) return;
       if (G.aim) { if (e.pointerType === 'mouse') G.aim.select(k); else G.aim.tap(k, true); }
-      else if (G.camp && k !== 'web') G.camp.power(k, true);
+      else if (G.camp && k !== 'web' && k !== 'gun') G.camp.power(k, true);
     });
-    if (k === 'foam') for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { if (G.aim) G.aim.tap(k, false); else if (G.camp) G.camp.power('foam', false); });
+    if (k === 'foam' || k === 'gun') for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { if (G.aim) G.aim.tap(k, false); else if (G.camp && k === 'foam') G.camp.power('foam', false); });
   }
   $('[data-quest]').addEventListener('click', () => U.phone('quests'));
   $('[data-jump]').addEventListener('touchstart', e => { if (G.W) { G.W.input.jump = true; G.W.input.hold = true; } e.preventDefault(); }, { passive: false });
@@ -1071,8 +1073,8 @@ function create(G, root) {
     return '<div class="cft-pcard cft-aura"><b>😎 ' + v.aura.toLocaleString() + ' aura</b><span>Best mayhem: ' + (v.best ? v.best.toLocaleString() + ' pts (rank ' + esc(v.bestRank) + ')' : 'none yet') + '</span>' +
       '<small>Chain chaos without stopping (bonks, smashes, stunts, piñatas, launches, photos) and watch the meter at the top climb D → SSS. Stop for a few seconds and it cashes in. Getting pooped on by a seagull costs aura. Such is life.</small></div>' +
       '<div class="cft-sec"><h4>📸 The Dex · ' + v.dexGot + ' / ' + v.dexAll + '</h4><p class="muted small">Snap creatures with E when one is close. Your photos and what is left: the 📸 Dex app.</p><button type="button" class="cft-btn sm" data-app="dex">Open the Dex</button></div>' +
-      '<div class="cft-sec"><h4>🎯 Ranged weapons</h4>' + (v.ranged.length ? '<div class="cft-chips">' + v.ranged.map(k => '<button type="button" class="cft-chipb ' + (s.equip.weapon === k ? 'on' : '') + '" data-act="weapon" data-id="' + k + '">' + D.ITEMS[k].e + ' ' + esc(D.ITEMS[k].n) + '</button>').join('') + '</div>' : '') +
-      '<p class="muted small">' + (v.ranged.length ? 'F (or click with the mouse captured) fires. Aim helps itself to the nearest figment in front of you.' : 'Toy shops 🎈, fast food 🥤🌭, gift shops 🎉💨, groceries 🍌, clothes 👕 and hardware stores 🥔🍄 sell things that shoot.') +
+      '<div class="cft-sec"><h4>🎯 Shooters (slot 5)</h4>' + (v.ranged.length ? '<div class="cft-chips">' + v.ranged.map(k => '<button type="button" class="cft-chipb ' + ((G.aim ? G.aim.gun() : s.equip.weapon) === k ? 'on' : '') + '" data-act="weapon" data-id="' + k + '">' + D.ITEMS[k].e + ' ' + esc(D.ITEMS[k].n) + '</button>').join('') + '</div>' : '') +
+      '<p class="muted small">' + (v.ranged.length ? 'Tap one to put it in slot 5. Key 5 picks the slot; hold the right mouse button to aim and left click to fire (hold to keep firing); the scroll wheel switches shooters while you aim.' : 'Shooters lie around town (🎯 on the map, under an orange beam). Toy shops 🎈, fast food 🥤🌭, gift shops 🎉💨, groceries 🍌, clothes 👕 and hardware stores 🥔🍄 sell them too.') +
       ' Figments throw things too: dodge, block, or block right as it lands to send it back. 🔁</p></div>' +
       '<div class="cft-sec"><h4>🛩️ Flying</h4><p class="muted small">' + fly + '</p></div>' +
       '<div class="cft-sec"><h4>Chaos so far</h4><div class="cft-grid2">' + v.stats.map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
@@ -1165,6 +1167,7 @@ function create(G, root) {
       '<label class="cft-check"><input type="checkbox" data-set="music" ' + (st.music !== false ? 'checked' : '') + '> Music</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="voice" ' + (st.voice !== false ? 'checked' : '') + '> Voiced missions</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="cine" ' + (st.cine !== false ? 'checked' : '') + '> Cinematic mission scenes</label>' +
+      '<label class="cft-check"><input type="checkbox" data-set="reach" ' + (st.reach !== false ? 'checked' : '') + '> Show how far my bonk reaches (gold arc on the ground)</label>' +
       '<div class="cft-row"><span>Compliments and hype</span><div class="cft-chips">' + [['max', 'Max'], ['some', 'Some'], ['off', 'Off']].map(q => '<button type="button" class="cft-chipb ' + ((st.hype || 'max') === q[0] ? 'on' : '') + '" data-act="hype" data-id="' + q[0] + '">' + q[1] + '</button>').join('') + '</div></div>' +
       '<div class="cft-row"><span>Graphics</span><div class="cft-chips">' + ['auto', 'high', 'low'].map(q => '<button type="button" class="cft-chipb ' + (st.quality === q ? 'on' : '') + '" data-act="quality" data-id="' + q + '">' + q + '</button>').join('') + '</div></div>' +
       '<div class="cft-row"><span>Map size (N)</span><div class="cft-chips">' + MAP_SIZES.map(q => '<button type="button" class="cft-chipb ' + ((st.mapSize || 'm') === q ? 'on' : '') + '" data-act="mapsize" data-id="' + q + '">' + MAP_NAMES[q] + '</button>').join('') + '</div></div>' +
@@ -1214,7 +1217,7 @@ function create(G, root) {
       case 'selljunk': G.rpg.sellJunk(); U.refreshPhone(); break;
       case 'title': G.rpg.setTitle(id || null); U.refreshPhone(); break;
       case 'claim': await G.rpg.claim(); U.refreshPhone(); break;
-      case 'weapon': if (s.equip.weapon === id) delete s.equip.weapon; else { s.equip.weapon = id; if (G.rpg) G.rpg.unequip('weapon'); } U.refreshPhone(); G.dirty(); break;
+      case 'weapon': if (G.aim && G.aim.isShooter(D.ITEMS[id] && D.ITEMS[id].weapon)) { G.aim.pickGun(id); if (G.aim.slot() !== 'gun') G.aim.select('gun'); } else if (s.equip.weapon === id) delete s.equip.weapon; else { s.equip.weapon = id; if (G.rpg) G.rpg.unequip('weapon'); } U.refreshPhone(); G.dirty(); break;
       case 'swap': await swapStickers(); U.refreshPhone(); break;
       case 'rename': { const n = await U.ask('Your name', s.name); if (n && n.trim()) { s.name = n.trim().slice(0, 20); G.dirty(); } U.refreshPhone(); break; }
       case 'look': phoneOv.close(); U.lookEditor(); break;

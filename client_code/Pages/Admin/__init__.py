@@ -1,13 +1,14 @@
 from anvil import *
 
 from ._anvil_designer import AdminTemplate
-from ... import state
+from ... import cft, state
 
-TABS = ["overview", "players", "maps", "feedback", "users", "demo"]
+TABS = ["overview", "players", "maps", "feedback", "users", "demo", "balance"]
 
 
 class Admin(AdminTemplate):
-    """#admin/<tab>: overview numbers, the old feedback inbox, users (admin / active switches) and the demo data.
+    """#admin/<tab>: overview numbers, the old feedback inbox, users (admin / active switches), the demo data and the
+    balance wiki (#admin/balance: theme/assets/cft-wiki.js, the game's characters and numbers, editable live).
     Each tab is its own address, so the browser's back button works."""
 
     def __init__(self, args=(), **properties):
@@ -15,17 +16,28 @@ class Admin(AdminTemplate):
         self.tab = args[0] if args and args[0] in TABS else "overview"
         self._filter = "new"
         self._cities = []
+        self.wiki = cft.NULL
         parts = {"overview": self.overview_part, "players": self.players_part, "maps": self.maps_part,
                  "feedback": self.feedback_part,
-                 "users": self.users_part, "demo": self.demo_part}
+                 "users": self.users_part, "demo": self.demo_part, "balance": self.balance_part}
         tabs = {"overview": self.tab_overview, "players": self.tab_players, "maps": self.tab_maps,
                 "feedback": self.tab_feedback,
-                "users": self.tab_users, "demo": self.tab_demo}
+                "users": self.tab_users, "demo": self.tab_demo, "balance": self.tab_balance}
         for name in TABS:
             parts[name].visible = name == self.tab
             tabs[name].classes["on"] = name == self.tab
         self.feedback_panel.add_event_handler("x-changed", self._feedback_changed)
         getattr(self, "_" + self.tab)()
+
+    # ---- balance: the wiki of characters and numbers (cft-wiki.js; values saved by server_code/Balance.py)
+    def _balance(self):
+        self.wiki = cft.mount_wiki(self.dom_nodes["wiki_root"])
+
+    @handle("", "hide")
+    def form_hide(self, **event_args):
+        if self.wiki is not None:
+            self.wiki.destroy()
+            self.wiki = cft.NULL
 
     # ---- overview
     def _overview(self):

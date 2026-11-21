@@ -1813,6 +1813,18 @@ D.TUNE = {
     challenge: 0.03, challengeMax: 0.3,   // extra toughness per level of yours (from level 2), capped
     levelEvery: 400,              // metres from home per extra monster level
     regenDelay: 5, regen: 0.025,  // you heal regen x max health per second, after regenDelay seconds out of a fight
+    hpGrow: 0.15,                 // figment health growth per level of yours (= player.dmgPerLevel: the same hits to win at every level)
+    champHp: 2.5, champAtk: 1.4, champXp: 2.5, champSize: 1.15,   // a champion (blue name tag) vs an ordinary figment
+  },
+  player: {                       // you, level by level (2026-11-21: tunable from Admin > Balance)
+    xpBase: 60, xpExp: 1.8,       // XP needed to reach level L = xpBase x (L - 1) ^ xpExp (the server's leaderboard uses the published values too)
+    hpBase: 60, hpPerLevel: 8, hpPerFit: 3,   // max health = hpBase + hpPerLevel x level + hpPerFit x Fitness (+ gear, outposts)
+    dmgPerLevel: 0.15,            // your hits grow by this share per level (x weapon damage)
+    xpPerMonsterLevel: 0.12,      // XP for a figment grows by this share per figment level
+  },
+  bosses: {                       // special figments built from an ordinary one (cft-fun guardians, cft-rpg rares)
+    guardHp: 8, guardHpAdd: 8, guardAtk: 1.3, guardXp: 10, guardSize: 2.4,   // metro guardian: health x guardHp + guardHpAdd (before scaling), hit x, XP x, size
+    rareHp: 4, rareHpAdd: 2, rareXp: 6, rareSize: 1.45,                      // rare (silver tag): the same idea
   },
   hype: {                         // cft-hero.js
     compliment: [6, 11], complimentSome: [14, 24],   // seconds between compliments (Max / Some)
@@ -1862,6 +1874,8 @@ D.TUNE = {
     webStun: 2.2,                 // seconds a webbed figment is stuck
     guideR: 48, megaR: 260, rotR: 110, critterR: 26,  // how near something is when its rainbow guide runs (figment, MEGA, weird creature, new animal)
     guideCd: 7, guideMax: 80,     // seconds between ordinary guides (special ones always run), longest trail (m)
+    gunDrops: 4, gunDropMin: 60, gunDropMax: 300,   // shooters lying around town (2026-11-21): how many, between these distances
+    gunAmmo: 8,                   // ammo inside a shooter you already own
   },
   stunt: {                        // cft-stunt.js + car air in cft-world.js (2026-11-19): ramps, rings of fire, car flips
     count: 7, countLow: 4,        // stunt courses kept around you while you drive
@@ -1892,6 +1906,74 @@ D.TUNE = {
   },
 };
 D.COMBAT = D.TUNE.combat;
+
+// ======================================================== weaknesses (2026-11-21, the user: "a wiki... characters, their power levels,
+// weaknesses... all their specs... adjust the math to make the game balanced and challenging")
+// Every figment takes damage x weak[type]: bonk (melee, kicks, being driven into), shot (anything you fire), water, volt
+// (lightning, arcs), fire, stomp (landing on its head). 1 = normal, above 1 = WEAK!, below 1 = resists. Read by cft-fun hitMonster.
+D.DMG_TYPES = [['bonk', '🏏', 'Bonk'], ['shot', '🎯', 'Shots'], ['water', '💧', 'Water'], ['volt', '🌩️', 'Lightning'], ['fire', '🔥', 'Fire'], ['stomp', '🦶', 'Stomp']];
+{
+  const WEAK = {
+    slime: { volt: 1.5, fire: 1.3, bonk: 0.8 }, cone: { fire: 1.5, water: 0.8 }, bin: { fire: 1.5, shot: 0.8 }, sock: { water: 1.5, bonk: 0.8 },
+    pigeon: { shot: 1.3, water: 1.3 }, blob: { volt: 1.3, bonk: 0.85 }, goose: { water: 0.6, bonk: 1.2 }, rat: { stomp: 1.5, water: 1.2 },
+    raccoon: { water: 1.4 }, wisp: { water: 1.6, volt: 0.6, bonk: 0.8 }, cart: { volt: 1.6, fire: 0.7 }, spider: { fire: 1.4, stomp: 1.4 },
+    worm: { fire: 1.3, shot: 0.8 }, gargoyle: { volt: 1.5, bonk: 0.7, shot: 0.7 }, brute: { water: 1.5, bonk: 0.75 },
+    spitter: { bonk: 1.3, water: 1.2 }, tomato: { fire: 1.5, bonk: 1.1 }, gull: { shot: 1.5, stomp: 0.5 }, wifi: { water: 1.6, volt: 0.5 },
+  };
+  for (const k in D.MONSTERS) { const w = Object.assign({}, WEAK[k] || {}, D.MONSTERS[k].weak || {}); D.MONSTERS[k].weak = {}; for (const t of D.DMG_TYPES) D.MONSTERS[k].weak[t[0]] = w[t[0]] || 1; }
+}
+
+// ======================================================== the formulas (one copy: the game and the Admin > Balance wiki both use them)
+D.calc = {
+  P: () => D.TUNE.player,
+  xpAt(l) { const P = D.TUNE.player; return Math.round(P.xpBase * Math.pow(Math.max(0, l - 1), P.xpExp)); },
+  levelOf(xp) {
+    const P = D.TUNE.player; xp = Math.max(0, +xp || 0);
+    let l = Math.max(1, Math.floor(1 + Math.pow(xp / Math.max(1, P.xpBase), 1 / Math.max(0.2, P.xpExp))) - 1);
+    while (D.calc.xpAt(l + 1) <= xp) l++;
+    while (l > 1 && D.calc.xpAt(l) > xp) l--;
+    return l;
+  },
+  maxHp(L, fit, extra) { const P = D.TUNE.player; return Math.round(P.hpBase + L * P.hpPerLevel + (fit || 0) * P.hpPerFit + (extra || 0)); },
+  dmgMul(L) { return 1 + D.TUNE.player.dmgPerLevel * (L - 1); },
+  // How tough a figment of level `lvl` is when you are level L. gear = your weapon damage x damage bonus / bare hands (>= 1),
+  // maxHp / armor = yours. Returns multipliers on the figment's base hp and atk (cft-fun spawnMonster).
+  scale(L, lvl, gear, maxHp, armor) {
+    const TM = D.TUNE.monsters, rel = Math.max(-1, (lvl || L) - L);
+    const grow = 1 + TM.hpGrow * (L - 1), push = 1 + Math.min(TM.challengeMax, TM.challenge * (L - 1));
+    const hp = grow * Math.pow(Math.max(1, Math.min(40, gear || 1)), TM.gearShare) * (1 + TM.hpPerLevel * rel) * push;
+    const tough = Math.pow(Math.max(1, (maxHp || 71) / 71), TM.lifeShare) * Math.pow(1 + (armor || 0) / 100, TM.armorShare);
+    return { hp, atk: tough * (1 + TM.atkPerLevel * rel) * push };
+  },
+  xpFor(def, lvl, champ) { return def.xp * (1 + D.TUNE.player.xpPerMonsterLevel * ((lvl || 1) - 1)) * (champ ? D.TUNE.monsters.champXp : 1); },
+  armorCut(n, armor) { return n * 100 / (100 + (armor || 0)); },
+};
+
+// ======================================================== balance overrides (Admin > Balance)
+// A flat map {"TUNE.combat.parry": 0.25, "MONSTERS.slime.hp": 3, "ITEMS.w_pan.weapon.dmg": 2.2}: numbers only, paths into D.
+// applyBalance(map) first puts back every value an earlier call changed, then applies the new map, so the same call works for
+// "publish", "try in my game" and "reset". Objects are changed in place (modules that keep D.TUNE.x keep seeing it).
+D.BAL_DEFAULTS = {};
+D.balancePath = function (path) {
+  if (typeof path !== 'string' || !/^[A-Za-z_][\w]*(\.[\w]+){1,5}$/.test(path) || /__proto__|prototype|constructor/.test(path)) return null;
+  const parts = path.split('.'); let o = D;
+  for (let i = 0; i < parts.length - 1; i++) { o = o[parts[i]]; if (!o || typeof o !== 'object') return null; }
+  const k = parts[parts.length - 1];
+  return Array.isArray(o) ? (/^\d+$/.test(k) && typeof o[+k] === 'number' ? { o, k: +k } : null) : (typeof o[k] === 'number' ? { o, k } : null);
+};
+D.balanceDefault = function (path) { if (path in D.BAL_DEFAULTS) return D.BAL_DEFAULTS[path]; const r = D.balancePath(path); return r ? r.o[r.k] : undefined; };
+D.applyBalance = function (map) {
+  for (const path in D.BAL_DEFAULTS) { const r = D.balancePath(path); if (r) r.o[r.k] = D.BAL_DEFAULTS[path]; }
+  D.BAL_DEFAULTS = {};
+  let n = 0;
+  for (const path in (map || {})) {
+    const v = +map[path], r = D.balancePath(path);
+    if (!r || !isFinite(v)) continue;
+    D.BAL_DEFAULTS[path] = r.o[r.k]; r.o[r.k] = v; n++;
+  }
+  D.BAL_ON = n;
+  return n;
+};
 
 window.CFT_DATA = D;
 })();

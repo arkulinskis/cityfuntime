@@ -76,6 +76,19 @@
       backup: function (key) { return CFT.api('tile_backup', [key], true); }
     },
     data: function () { return chain(DATA); },
+    // The published balance values (Admin > Balance): {path: number}. Never blocks the game: no answer = the defaults.
+    balance: function () {
+      return CFT.api('get_balance', [], true).then(function (r) { return (r && r.values) || {}; }, function () { return {}; });
+    },
+    wiki: function () { return chain(['cft-content.js', 'cft-game.js', 'cft-wiki.js']); },
+    // Admin > Balance (client_code/Pages/Admin): the wiki of characters and numbers, editable live (cft-wiki.js)
+    mountWiki: function (root) {
+      var ctl = { destroy: function () { if (ctl.w) ctl.w.destroy(); ctl.w = null; ctl.dead = true; } };
+      ctl.ready = CFT.wiki().then(function () { if (!ctl.dead) ctl.w = window.CFTWiki.mount(root, { api: CFT.api }); }, function (e) {
+        root.textContent = (e && e.message) || 'The wiki could not load. Check your connection and try again.';
+      });
+      return ctl;
+    },
     load: function () { return chain(ALL); },
     key: function () { return 'save.' + (CFT.me ? CFT.me.id : 'guest'); },
     local: function (who) { return get(who ? 'save.' + who : CFT.key(), null); },
@@ -150,12 +163,13 @@
           game = null; window.CFT_GAME = null;
         }
       };
-      ctl.ready = CFT.load().then(function () { return CFT.loadSave(); }).then(function (save) {
+      var balance = {};
+      ctl.ready = CFT.load().then(function () { return CFT.balance().then(function (b) { balance = b || {}; }); }).then(function () { return CFT.loadSave(); }).then(function (save) {
         if (dead) return;
         if (!save && CFT.adopt) { save = CFT.adopt; CFT.adopt = null; CFT.push(save); }
         root.innerHTML = '';
         game = window.CFTGame.mount(root, {
-          save: save, me: CFT.me,
+          save: save, me: CFT.me, balance: balance,
           onSave: function (s, reason) { CFT.persist(s, reason); },
           onPhoto: function (url, meta) { CFT.addPhoto(url, meta); },
           onExit: function () { hooks.exit(); },

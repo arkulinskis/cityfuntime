@@ -314,7 +314,7 @@ function attach(G, api) {
     const x = s.obj.position.x, y = s.obj.position.y, z = s.obj.position.z, w = s.w || {};
     if (s.owner === 'you') {
       if (w.splash) {
-        for (const m of F.monsters.slice()) { if (m.dead) continue; const d = Math.hypot(m.x - x, m.z - z); if (d > w.splash + m.r || Math.abs(monY(m) - y) > w.splash + 1) continue; const k = 1 - d / (w.splash + m.r) * 0.5, dir = { x: (m.x - x) / (d || 1), z: (m.z - z) / (d || 1) }; F.hitMonster(m, Object.assign({}, w, { dmg: w.dmg * k }), dir); C.add('hit'); }
+        for (const m of F.monsters.slice()) { if (m.dead) continue; const d = Math.hypot(m.x - x, m.z - z); if (d > w.splash + m.r || Math.abs(monY(m) - y) > w.splash + 1) continue; const k = 1 - d / (w.splash + m.r) * 0.5, dir = { x: (m.x - x) / (d || 1), z: (m.z - z) / (d || 1) }; F.hitMonster(m, Object.assign({}, w, { dmg: w.dmg * k, type: 'shot' }), dir); C.add('hit'); }
         for (const ped of W.life.peds) { const o = ped.obj.position; if (Math.hypot(o.x - x, o.z - z) < w.splash * 0.8) pedHit(s, ped); }
         for (const q of C.pinatas.slice()) if (Math.hypot(q.x - x, q.z - z) < w.splash) pinataHit(q, 1);
         for (const b of C.balls) { const d = Math.hypot(b.x - x, b.z - z); if (d < w.splash + 1) { b.vx += (b.x - x) / (d || 1) * 10; b.vz += (b.z - z) / (d || 1) * 10; b.vy += 8; } }
@@ -342,7 +342,7 @@ function attach(G, api) {
         const tx = m && F.monsters.includes(m) ? m.x : p.x - s.vx, ty = m && F.monsters.includes(m) ? monY(m) : p.y + 1, tz = m && F.monsters.includes(m) ? m.z : p.z - s.vz;
         const dx = tx - s.obj.position.x, dy = ty - s.obj.position.y, dz = tz - s.obj.position.z, L = Math.hypot(dx, dy, dz) || 1, sp = 30;
         s.vx = dx / L * sp; s.vy = dy / L * sp + 1; s.vz = dz / L * sp;
-        s.w = { dmg: Math.max(2, s.dmg / 2.2) * (1 + 0.15 * (G.level() - 1)), knock: 9, stun: 2.2, word: 'RETURN TO SENDER!', puff: '✨' };
+        s.w = { dmg: Math.max(2, s.dmg / 2.2) * D.calc.dmgMul(G.level()), type: 'shot', knock: 9, stun: 2.2, word: 'RETURN TO SENDER!', puff: '✨' };
         api.bump('reflects'); api.bump('parries');
         W.pop(p.x, p.y + 2.7, p.z, pick(['RETURN TO SENDER!', 'NO U!', 'REFLECTED!', 'DENIED!', 'UNO REVERSE!']), '#ffd23f', 1.2);
         W.burst(p.x, p.y + 1.4, p.z, '✨', 10, { spread: 3, up: 3 });
@@ -406,7 +406,7 @@ function attach(G, api) {
         if (Math.hypot(m.x - o.x, m.z - o.z) > r || Math.abs(my - o.y) > hh) continue;
         if (s.w.splash) { impact(s); done = true; break; }
         const sp = Math.hypot(s.vx, s.vz) || 1;
-        F.hitMonster(m, Object.assign({}, s.w), { x: s.vx / sp, z: s.vz / sp });
+        F.hitMonster(m, Object.assign({}, s.w, { type: 'shot' }), { x: s.vx / sp, z: s.vz / sp });
         C.add('hit');
         s.hit.add(m);
         if (s.pierce > 0) { s.pierce--; continue; }
@@ -597,7 +597,7 @@ function attach(G, api) {
     fartSound(1.0, 0.25);
     W.burst(x, y + 1.2, z, '💩', 6, { spread: 4, up: 4 }); W.burst(x, y + 1, z, '🧻', 5, { spread: 3, up: 5, size: 0.5 }); W.burst(x, y + 0.8, z, '🟢', 8, { spread: 5, up: 1.2, size: 1, life: 1.8, grav: -0.4 });
     W.pop(x, y + 3, z, 'STINK BOMB!', '#9be27a', 1.3);
-    for (const m of F.monsters.slice()) { const d = Math.hypot(m.x - x, m.z - z); if (d < 7) F.hitMonster(m, { dmg: 2 * (1 + 0.15 * (G.level() - 1)), knock: 6, stun: 2.5, word: 'STINKY!', puff: '💨' }, { x: (m.x - x) / (d || 1), z: (m.z - z) / (d || 1) }); }
+    for (const m of F.monsters.slice()) { const d = Math.hypot(m.x - x, m.z - z); if (d < 7) F.hitMonster(m, { dmg: 2 * D.calc.dmgMul(G.level()), knock: 6, stun: 2.5, word: 'STINKY!', puff: '💨' }, { x: (m.x - x) / (d || 1), z: (m.z - z) / (d || 1) }); }
     for (const ped of W.life.peds) { const o = ped.obj.position; if (Math.hypot(o.x - x, o.z - z) < 12 && !ped.ctl) { W.holdPed(ped, 2, 'air'); if (Math.random() < 0.4) W.say(ped.obj, pick(CH.FART), 2); } }
     C.add('stink'); if (you) C.aura(CH.AURA.stink);
   }
@@ -866,7 +866,7 @@ function attach(G, api) {
       if (b.y < g) { b.y = g; if (Math.abs(b.vy) > 1.5) { b.vy = Math.abs(b.vy) * 0.62; } else b.vy = 0; b.vx *= Math.exp(-1.6 * dt); b.vz *= Math.exp(-1.6 * dt); }
       const sp = Math.hypot(b.vx, b.vz);
       if (sp > 6) { // a fast ball bonks what it hits
-        for (const m of F.monsters) if (!m.dead && Math.hypot(m.x - b.x, m.z - b.z) < m.r + b.r && !(m.ballT > G.rt.t)) { m.ballT = G.rt.t + 0.6; F.hitMonster(m, { dmg: 1.5 * (1 + 0.15 * (G.level() - 1)), knock: 8, stun: 1.5, word: 'BALL!', puff: '⭐' }, { x: b.vx / sp, z: b.vz / sp }); C.add('ball'); b.vx *= -0.5; b.vz *= -0.5; b.vy = 7; }
+        for (const m of F.monsters) if (!m.dead && Math.hypot(m.x - b.x, m.z - b.z) < m.r + b.r && !(m.ballT > G.rt.t)) { m.ballT = G.rt.t + 0.6; F.hitMonster(m, { dmg: 1.5 * D.calc.dmgMul(G.level()), type: 'bonk', knock: 8, stun: 1.5, word: 'BALL!', puff: '⭐' }, { x: b.vx / sp, z: b.vz / sp }); C.add('ball'); b.vx *= -0.5; b.vz *= -0.5; b.vy = 7; }
         for (const ped of W.life.peds) { const o = ped.obj.position; if (!ped.ctl && Math.hypot(o.x - b.x, o.z - b.z) < b.r + 0.4 && !(ped.chaosHit > G.rt.t - 2)) { ped.chaosHit = G.rt.t; W.holdPed(ped, 1.4, 'air'); W.say(ped.obj, pick(['BONK!', 'Nice shot!', 'My head!', 'GOOOAL?']), 1.8); } }
       }
       b.obj.position.set(b.x, b.y, b.z);
@@ -1157,7 +1157,7 @@ function attach(G, api) {
   C.summary = function () {
     const c = st(), s = save(), k = s.counters;
     const dex = ALL_DEX.map(d => ({ id: d.id, n: d.n, e: d.e, rar: d.rar || 'neighbour', kind: d.kind, got: c.dex[d.id] || 0, line: d.line || '', night: !!d.night, fly: !!d.fly }));
-    const ranged = Object.keys(s.owned).filter(id => D.ITEMS[id] && D.ITEMS[id].weapon && D.ITEMS[id].weapon.ranged === 'proj');
+    const ranged = Object.keys(s.owned).filter(id => s.owned[id] && D.ITEMS[id] && D.ITEMS[id].weapon && (D.ITEMS[id].weapon.ranged === 'proj' || D.ITEMS[id].weapon.ranged === 'shot')).sort((a, b) => D.ITEMS[a].p - D.ITEMS[b].p);
     return { aura: c.aura, best: c.best, bestRank: c.bestRank || '', dex, dexGot: Object.keys(c.dex).length, dexAll: ALL_DEX.length, ranged, fly: flyGear(), weapon: s.equip.weapon || '',
       stats: [['🎯 Shots fired', k.shots || 0], ['💨 Toots', k.farts || 0], ['🪅 Piñatas popped', k.pinatas || 0], ['🕳️ Manhole launches', k.launches || 0], ['🛩️ Seconds flying', k.airtime || 0], ['⭕ Sky hoops', k.hoops || 0],
         ['🔁 Shots sent back', k.reflects || 0], ['🎈 Whoopee cushions', k.cushions || 0], ['🍄 Gnomes smashed', k.smash_gnome || 0], ['⚽ Balls kicked', k.kicks || 0], ['🚽 Porta-potty hides', k.hides || 0], ['🐾 Falling pets petted', k.pets || 0]] };

@@ -92,6 +92,13 @@
     await check('#admin/maps', () => /tiles kept/.test(text('.ad-maps')), 'admin map backup');
     await check('#admin/feedback', () => main(), 'admin feedback');
     await check('#admin/users', () => $$('.ad-user-row').length >= 1, 'admin users');
+    // Admin > Balance (cft-wiki.js): the wiki loads the game data, lists the figments, a number box edits, the bar sees it
+    await check('#admin/balance', () => $$('.wk-tab').length >= 6 && /defaults|changed/.test(text('.wk-status')), 'admin balance wiki');
+    $$('.wk-tab').find(b => /Figments/.test(b.textContent)).click();
+    await until(() => $$('.wk-fig tbody tr').length >= 15, 'balance wiki: every figment listed', 15000);
+    { const inp = document.querySelector('[data-path="MONSTERS.slime.hp"]'); inp.value = '3'; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+    await until(() => /1 value changed/.test(text('.wk-status')), 'balance wiki: an edit shows in the bar', 8000);
+    { const r = document.querySelector('[data-reset="MONSTERS.slime.hp"]'); if (r) r.click(); }
     await check('#admin/demo', () => /Status/.test(text('.ad-demo')), 'admin demo data');
     await check('#ranks', () => $$('.rk-row').length >= 1, 'ranks with demo players');
     log.push(bad.length ? 'PROBLEMS: ' + bad.join(' | ') : 'PASSED');
