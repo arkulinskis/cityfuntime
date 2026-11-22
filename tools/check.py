@@ -9,6 +9,7 @@
   2. node --check on the JavaScript engines in theme/assets.
   3. Asset hashes in anvil.yaml are current (tools/assets.py).
   4. Server tests (tools/testing/test_server.py, strict Anvil mock).
+  4b. Developer docs (docs/dev) only name functions, files and paths that exist (tools/doc_check.py).
   5. The design check (APP_MAKER/tools/design_check.py): printed as a note, never fails the run.
 The CLI: APP_MAKER/vendor/anvil-cli (found automatically), `anvil` on PATH, or ANVIL_CLI=<path>.
 """
@@ -87,6 +88,9 @@ def main():
     r = run([sys.executable, str(ROOT / "tools" / "testing" / "test_server.py")], timeout=600)
     step("server tests: " + (r.stdout.strip().splitlines() or ["?"])[-1], r.returncode == 0 and "ALL OK" in r.stdout,
          (r.stdout + r.stderr)[-3000:])
+    if (ROOT / "docs" / "dev").exists():  # developer docs must only name code that exists (docs/dev/README.md)
+        r = run([sys.executable, "-I", str(ROOT / "tools" / "doc_check.py")])
+        step("developer docs match the code (docs/dev)", r.returncode == 0, r.stdout[-3000:])
     design = pathlib.Path(r"C:\Users\arkvi\Documents\CLAUDE\APP_MAKER\tools\design_check.py")
     if design.exists():  # the design kit's source scan (APP_MAKER/design/README.md): reported, never fails the run
         r = run([sys.executable, "-I", str(design), str(ROOT), "--summary"])

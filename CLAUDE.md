@@ -10,3 +10,6 @@ The app standard every app follows: C:/Users/arkvi/Documents/CLAUDE/APP_MAKER/st
 **Small fixes and play-test notes:** use the `/cft-fix` skill. Read `FIX_INDEX.md` (where everything lives) and use
 `python -I tools/where.py <words>` for exact line ranges; skip the guide, the map and ANVIL_NOTES. Notes inbox:
 `PLAYTEST.md`. Balance numbers: `D.TUNE` at the end of `theme/assets/cft-content.js`. Play-test panel: `?debug=1`.
+**Developer docs:** `docs/dev/README.md` (architecture, one page per engine module, testing, deploy, AI review
+checklist in `docs/dev/changing-code.md`). Change a module -> update its page in the same commit; `python -I tools/doc_check.py`
+(run by check.py) fails if the docs name code that no longer exists.
