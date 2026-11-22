@@ -54,7 +54,7 @@ function create(G, root) {
       <!-- the four corners (2026-11-18, the user: "all info in the 4 corners, nothing in the middle column or the middle row";
            the map back in the bottom left): top right = where/when, mayhem, boss + foe bars, the feed -->
       <div class="cft-tr">
-        <div class="cft-tc"><div class="cft-where"><div class="cft-clock" data-clock></div><div class="cft-boro" data-boro hidden title="The borough you're in: each one has its own colours, banners and road lines"><i></i><b></b></div></div><div class="cft-street" data-street></div></div>
+        <div class="cft-tc"><div class="cft-where"><div class="cft-clock" data-clock></div><div class="cft-boro" data-boro hidden title="The borough you're in: each one has its own colours, banners and road lines"><i></i><b></b></div></div><div class="cft-street" data-street></div><button type="button" class="cft-colour" data-colour hidden aria-label="Colour in this block"><span data-colourtext></span><span class="cft-cbars" aria-hidden="true"><i><b data-cbar></b></i><i><b data-cbar></b></i><i><b data-cbar></b></i></span></button></div>
         <div class="cft-boss" data-boss hidden><b data-bossname></b><div class="cft-bar boss"><i data-bossbar></i></div><small data-bosshint></small></div>
         <div class="cft-foe" data-foe hidden><b data-foename></b><div class="cft-bar foe"><i data-foebar></i></div></div>
         <div class="cft-feed" data-feed></div>
@@ -857,6 +857,7 @@ function create(G, root) {
     if (k === 'foam' || k === 'gun') for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { if (G.aim) G.aim.tap(k, false); else if (G.camp && k === 'foam') G.camp.power('foam', false); });
   }
   $('[data-quest]').addEventListener('click', () => U.phone('quests'));
+  $('[data-colour]').addEventListener('click', () => U.phone('colour'));
   $('[data-jump]').addEventListener('touchstart', e => { if (G.W) { G.W.input.jump = true; G.W.input.hold = true; } e.preventDefault(); }, { passive: false });
   for (const ev of ['touchend', 'touchcancel']) $('[data-jump]').addEventListener(ev, () => { if (G.W) G.W.input.hold = false; });  // held: jetpack thrust, gliding
   document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && G.W && G.state() === 'play' && !stack.length && U.wasLocked) U.phone(); U.wasLocked = !!document.pointerLockElement; });
@@ -864,7 +865,7 @@ function create(G, root) {
   // ------------------------------------------------------------------ the phone
   const APPS = [
     ['quests', '📜', 'Quests'], ['map', '🗺️', 'Map'], ['me', '🧑', 'Me'], ['wardrobe', '👕', 'Wardrobe'], ['hero', '🧙', 'Character'], ['rep', '🤝', 'Reputation'], ['ach', '🏆', 'Achievements'], ['bag', '🎒', 'Bag'], ['people', '💞', 'People'], ['homes', '🏠', 'Homes'],
-    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['chaos', '🤪', 'Chaos'], ['stunt', '🏁', 'Stunts'], ['dex', '📸', 'Dex'], ['camp', '🌀', 'Campaign'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
+    ['business', '💼', 'Business'], ['turf', '🎨', 'Turf'], ['street', '👑', 'Street life'], ['chaos', '🤪', 'Chaos'], ['stunt', '🏁', 'Stunts'], ['dex', '📸', 'Dex'], ['colour', '🎨', 'Colour'], ['camp', '🌀', 'Campaign'], ['album', '🎴', 'Album'], ['diary', '📔', 'Diary'], ['settings', '⚙️', 'Settings'],
   ];
   let phoneOv = null, phoneApp = null;
   U.phone = function (app) {
@@ -1079,6 +1080,23 @@ function create(G, root) {
       '<div class="cft-sec"><h4>🛩️ Flying</h4><p class="muted small">' + fly + '</p></div>' +
       '<div class="cft-sec"><h4>Chaos so far</h4><div class="cft-grid2">' + v.stats.map(x => '<div class="cft-mini"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('') + '</div></div>';
   };
+  // ---- colour blocks (cft-color.js, 2026-11-21): 2 km squares that start grey and get their colour back layer by layer
+  VIEWS.colour = function () {
+    if (!G.color) return '<div class="cft-empty">🎨<p>The colours are still loading.</p></div>';
+    const v = G.color.summary(), h = v.here, T = v.T;
+    const bar = (lv, col) => '<div class="cft-bar"><i style="width:' + Math.round(lv * 100) + '%;background:' + col + '"></i></div>';
+    const COLS = ['#ff8a3d', '#6b4eff', '#20c997'];
+    const how = [
+      'Free places: outposts (Tom Hearton\'s, groceries) ' + T.wOutpost + ' pts, metro stations ' + T.wMetro + ' pts, walking into a shop (E) ' + T.wShop + ' pt (made-up shops ' + T.wMadeUp + '). ' + Math.round(h.lib * 10) / 10 + ' / ' + h.libT + ' pts.',
+      'Find secret stashes in the tight gaps between buildings: ' + h.found + ' / ' + T.secretTarget + '.',
+      'Bonk figments inside this block: ' + h.kills + ' / ' + T.killTarget + ' (champions count 2, rares 3, guardians 5).'];
+    const rows = v.LAYERS.map((L, i) => '<div class="cft-li"><span>' + L[1] + '</span><div><b>' + L[2] + ' · ' + Math.round(h.lv[i] * 100) + '%</b>' + bar(h.lv[i], COLS[i]) + '<small>' + how[i] + '</small></div></div>').join('');
+    const list = v.list.slice(0, 14).map(q => '<div class="cft-row"><span>' + (q.here ? '📍 ' : '') + (q.done ? '🌈 ' : '') + 'Block ' + q.bx + ', ' + q.bz + (q.here ? ' (you are here)' : ' · ' + q.dist + ' km') + '</span><b>' + Math.round(q.avg * 100) + '%</b></div>').join('');
+    return '<div class="cft-pcard cft-aura"><b>🎨 ' + (h.done ? 'This block is restored 🌈' : Math.round(h.avg * 100) + '% colour in this block') + '</b><span>' + v.restored + ' block' + (v.restored === 1 ? '' : 's') + ' restored</span>' +
+      '<small>The Static drained the colour out of the city. The map is cut into 2 km squares (your home sits in the middle of the first one). Each square gets its colour back in three layers, and when all three are full it is restored: cash, XP and a rainbow.' + (v.on ? '' : ' (Colour blocks are off in Settings: you see full colour everywhere.)') + '</small></div>' +
+      '<div class="cft-sec"><h4>This block</h4>' + rows + '</div>' +
+      '<div class="cft-sec"><h4>Blocks you have been to</h4>' + list + '</div>';
+  };
   // ---- the stunt update (cft-stunt.js, 2026-11-19): ramps and rings of fire that pop up when you drive
   VIEWS.stunt = function () {
     if (!G.stunt) return '<div class="cft-empty">🏁<p>The stunts are still loading.</p></div>';
@@ -1168,6 +1186,7 @@ function create(G, root) {
       '<label class="cft-check"><input type="checkbox" data-set="voice" ' + (st.voice !== false ? 'checked' : '') + '> Voiced missions</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="cine" ' + (st.cine !== false ? 'checked' : '') + '> Cinematic mission scenes</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="reach" ' + (st.reach !== false ? 'checked' : '') + '> Show how far my bonk reaches (gold arc on the ground)</label>' +
+      '<label class="cft-check"><input type="checkbox" data-set="colour" ' + (st.colour !== false ? 'checked' : '') + '> Colour comes back block by block (off = full colour everywhere)</label>' +
       '<div class="cft-row"><span>Compliments and hype</span><div class="cft-chips">' + [['max', 'Max'], ['some', 'Some'], ['off', 'Off']].map(q => '<button type="button" class="cft-chipb ' + ((st.hype || 'max') === q[0] ? 'on' : '') + '" data-act="hype" data-id="' + q[0] + '">' + q[1] + '</button>').join('') + '</div></div>' +
       '<div class="cft-row"><span>Graphics</span><div class="cft-chips">' + ['auto', 'high', 'low'].map(q => '<button type="button" class="cft-chipb ' + (st.quality === q ? 'on' : '') + '" data-act="quality" data-id="' + q + '">' + q + '</button>').join('') + '</div></div>' +
       '<div class="cft-row"><span>Map size (N)</span><div class="cft-chips">' + MAP_SIZES.map(q => '<button type="button" class="cft-chipb ' + ((st.mapSize || 'm') === q ? 'on' : '') + '" data-act="mapsize" data-id="' + q + '">' + MAP_NAMES[q] + '</button>').join('') + '</div></div>' +
@@ -1185,6 +1204,7 @@ function create(G, root) {
     if (set) {
       save().settings[set.dataset.set] = set.checked; G.dirty();
       if (set.dataset.set === 'music' && window.ArkMusic) window.ArkMusic.enabled(set.checked);
+      if (set.dataset.set === 'colour' && G.color) G.color.apply('snap');
       return;
     }
     const b = e.target.closest('[data-act]');

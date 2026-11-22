@@ -295,7 +295,7 @@ function attach(G, api) {
     const ck = pick(kinds), base = D.MONSTERS[ck];
     const def = Object.assign({}, base, { n: (D.OUTPOST_CAPTAIN[pl.kind] || 'Captain') + ' (' + F.localName(ck) + ')', night: false, steal: [0, 0], xp: base.xp * 4 });
     const cap = F.spawnMonster(ck, home.x, home.z, { def, hp: base.hp * TO.captainHp, size: 1.6, atkMul: TO.captainAtk, outpost: pl.id, home, leash: TO.leash, aggro: 21, event: 1e9, lvl: F.monsterLevel(home.x, home.z) + 1 });
-    if (cap) { cap.champ = true; cap.xpv *= 2; mons.push(cap); const tag = W.label('😈 ' + def.n, { size: 32, height: 0.46, bg: 'rgba(200,16,46,.94)', fg: '#ffffff', border: '#5a0714' }); tag.position.y = 2.5; cap.obj.add(tag); }
+    if (cap) { cap.champ = true; cap.captain = true; cap.xpv *= 2; mons.push(cap); }   // its red name plate comes from cft-fun (rank 'captain')
     packs.set(pl.id, { pl, mons, started: G.rt.t });
     W.refreshSign(pl.id);
     U.banner(o.e + ' Figments hold ' + (pl.name || o.n) + '!', 'Clear them all out: +' + o.bonus + ' max ' + o.what + ' for good, and ' + o.free.replace(/^\S+\s/, '').replace(/\s*\(.*\)/, '') + ' every day.', 'fail');
@@ -312,6 +312,7 @@ function attach(G, api) {
     const h = st(), o = OUT[pl.kind], s = save();
     packs.delete(pl.id);
     h.out[pl.id] = s.day;
+    if (G.color) G.color.freed(pl, 'outpost');   // colour blocks
     if (!h.outKind) h.outKind = {};
     h.outKind[pl.id] = pl.kind;
     bump('liberated'); bump('lib_' + pl.kind);

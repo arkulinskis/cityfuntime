@@ -156,8 +156,8 @@ function attach(G, api) {
     }
     return false;
   };
-  F.blockPower = () => clamp(CB.block + (G.rpg ? G.rpg.bonus('block') : 0), 0.4, 0.92);
-  F.parryWindow = () => CB.parry + (G.rpg ? G.rpg.bonus('block') : 0) * 0.6;
+  F.blockPower = () => clamp(CB.block + (G.rpg ? G.rpg.bonus('block') : 0) + (weapon().block || 0), 0.4, 0.92);   // + the weapon in hand (2026-11-21)
+  F.parryWindow = () => CB.parry + ((G.rpg ? G.rpg.bonus('block') : 0) + (weapon().block || 0)) * 0.6;
   F.attack = function () {
     if (!alive || quiet() || cool > 0) return false;
     if (!onFoot()) { U.toast('Hop off your ride to bonk things (V), or just drive into them.'); cool = 0.6; return false; }
@@ -304,7 +304,7 @@ function attach(G, api) {
   // number of hits to win or lose stays about the same at every level. Further from home = stronger (monsterLevel).
   F.scaleFor = function (lvl) {
     const L = G.level(), w = weapon();
-    const gear = clamp(w.dmg * (1 + (G.rpg ? G.rpg.bonus('dmg') : 0)) / D.SLAP.dmg, 1, 40);
+    const gear = clamp((w.dmg + (w.add || 0)) * (1 + (G.rpg ? G.rpg.bonus('dmg') : 0)) / (D.SLAP.dmg + (D.SLAP.add || 0)), 1, 40);
     return D.calc.scale(L, lvl || L, gear, F.maxHp(), F.armor());   // the formula lives in cft-content.js (the Balance wiki shows it)
   };
   function spawnMonster(kind, x, z, o) {
@@ -324,16 +324,28 @@ function attach(G, api) {
       { def, hp, mhp: hp, atk, atkK: sc.atk, lvl, xpv: D.calc.xpFor(def, lvl, o.champ) });
     place(obj, x, z, Math.random() * 6.28);
     W.scene.add(obj);
-    if (def.boss) { const tag = nameTag(def.e + ' ' + def.n, 3.7); obj.add(tag); }
-    if (o.champ) { const tag = W.label('🔵 ' + def.n, { size: 32, height: 0.46, bg: 'rgba(28,80,190,.92)', fg: '#ffffff', border: '#0c2a6b' }); tag.position.y = (def.size ? 2.2 : 2.0) / size + 0.4; obj.add(tag); }
+    // the name plate (name, level, health bar) floats over its head; champions, guardians, rares, captains and King Blob get its colour
     if (def.ranged && !o.aggro) m.aggro = def.ranged.r + 4;   // shooters notice you from further away
+    m.plate = W.foePlate(); placePlate(m); obj.add(m.plate); plateTick(m, 0);
     F.monsters.push(m);
     W.burst(x, obj.position.y + 0.8, z, '💨', 4, { spread: 1.5, up: 1.5, size: 0.5, life: 0.5 });
     return m;
   }
   F.spawnMonster = spawnMonster;
   F.streetSpot = (x, z, a, b) => streetSpot(x, z, a, b);
+  const rankOf = m => m.guard ? 'guard' : m.def.boss ? 'boss' : m.def.rare ? 'rare' : m.captain ? 'captain' : m.champ ? 'champ' : '';
+  function placePlate(m) {
+    const sz = m.obj.userData.size || 1, h = (m.obj.userData.h || 1.4) * sz;
+    m.plate.position.y = (h + 0.55) / sz;
+    m.plate.scale.set(m.plate.userData.h * 400 / 116 / sz, m.plate.userData.h / sz, 1);
+  }
+  function plateTick(m, dt) {
+    if (!m.plate) return;
+    m.plate.userData.plate.set({ name: (m.def.e ? m.def.e + ' ' : '') + m.def.n, lvl: m.lvl || 1, pct: Math.max(0, m.hp / (m.mhp || m.hp || 1)), rank: rankOf(m) }, dt);
+  }
+  F.plateTick = plateTick;
   function removeMonster(m, poof) {
+    if (m.plate) { m.plate.userData.plate.dispose(); m.plate = null; }
     removeTele(m);
     const i = F.monsters.indexOf(m);
     if (i >= 0) F.monsters.splice(i, 1);
@@ -380,6 +392,7 @@ function attach(G, api) {
     const total = save().counters.bonks || 0, title = D.MONSTER_TITLES.find(t => t[0] === total);
     if (title && total > 1) U.banner('👾 ' + title[1], total + ' monsters bonked.', 'level');
     if (G.rpg) G.rpg.onKill(m);  // loot
+    if (G.color) G.color.onKill(m);   // colour blocks: figments bonked in a block bring its trees and parks back
     hype('kill', { m });
     if (m.outpost && G.hero) G.hero.outpostKill(m);
     removeMonster(m, true);
@@ -561,7 +574,7 @@ function attach(G, api) {
   F.maxHp = () => D.calc.maxHp(G.level(), G.stat('fit'), (G.rpg ? G.rpg.bonus('life') : 0) + (G.hero ? G.hero.hpBonus() : 0));   // D.TUNE.player.hp*
   function hp() { const f = fun(); if (typeof f.hp !== 'number' || f.hp !== f.hp) f.hp = F.maxHp(); return f.hp; }
   F.hp = hp;
-  F.armor = () => Math.round(G.rpg ? G.rpg.bonus('armor') : 0);
+  F.armor = () => Math.round((G.rpg ? G.rpg.bonus('armor') : 0) + (onFoot() ? weapon().def || 0 : 0));   // + the weapon in hand's defence (2026-11-21)
   F.hurt = function (n, src) {
     if (F.dying || !alive || G.debugGod) return 0;  // G.debugGod: the play-test panel's god mode
     if (G.camp && G.camp.immortal()) { G.camp.shrug(n); return 0; }  // the campaign's opening: you can't be hurt
@@ -659,8 +672,6 @@ function attach(G, api) {
     const TB = D.TUNE.bosses, def = Object.assign({}, base, { n: name, e: '🚇', guard: true, night: false, xp: base.xp * TB.guardXp, steal: [0, 0], coins: base.coins });
     const g = spawnMonster(kind, pl.pin.x, pl.pin.z, { def, hp: base.hp * TB.guardHp + TB.guardHpAdd, atkMul: TB.guardAtk, size: TB.guardSize, event: 1e9, aggro: 24, leash: 30, home: { x: pl.pin.x, z: pl.pin.z }, guard: pl.id, station: pl, lvl: monsterLevel(pl.pin.x, pl.pin.z) + 1 });
     if (!g) return;
-    const tag = W.label('🚇 ' + name, { size: 34, height: 0.55, bg: 'rgba(255,194,31,.95)', fg: '#1f1a3d', border: '#1f1a3d' });
-    tag.position.y = 2.6; g.obj.add(tag);
     F.guards.set(pl.id, g);
     U.banner('🚇 A guardian blocks ' + where, 'Beat the ' + D.GUARDIANS[kind] + ' and this station joins your metro network.', 'fail');
     G.sfx.fail();
@@ -668,6 +679,7 @@ function attach(G, api) {
   function freeStation(m) {
     const f = fun(), pl = m.station;
     f.cleared[m.guard] = save().day;
+    if (G.color && pl) G.color.freed(pl, 'metro');
     F.guards.delete(m.guard);
     api.bump('guardians');
     if (pl && G.visitMetro) G.visitMetro(pl);
@@ -680,13 +692,18 @@ function attach(G, api) {
   // the bar at the top of the screen: what you're fighting
   function foeTick(dt) {
     foeT -= dt;
-    if (foeT > 0 || !U.foe) return;
-    foeT = 0.12;
+    if (foeT > 0) return;
+    const step = 0.12 - foeT; foeT = 0.12;
+    if (U.foe && !F._foeHidden) { U.foe(null); F._foeHidden = true; }   // the HUD bar is gone: plates over their heads (2026-11-21)
     const p = P();
-    let m = F.lastFoe && F.monsters.includes(F.lastFoe) && !F.lastFoe.dead && Math.hypot(F.lastFoe.x - p.x, F.lastFoe.z - p.z) < 30 ? F.lastFoe : null;
-    if (!m) { let bd = 14; for (const q of F.monsters) { const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < bd && !q.dead) { bd = d; m = q; } } }
-    U.foe(m ? { name: m.def.n, lvl: m.lvl || 1, pct: Math.max(0, m.hp / (m.mhp || m.hp || 1)), rank: m.guard ? 'guard' : m.def.boss ? 'boss' : m.def.rare ? 'rare' : m.champ ? 'champ' : '' } : null);
+    for (const m of F.monsters) {
+      if (!m.plate) continue;
+      const near = !m.dead && Math.hypot(m.x - p.x, m.z - p.z) < 55;
+      m.plate.visible = near;
+      if (near) { if (m.obj.userData.size !== m.plateSz || m.obj.userData.h !== m.plateH) { m.plateSz = m.obj.userData.size; m.plateH = m.obj.userData.h; placePlate(m); } plateTick(m, step); }
+    }
   }
+
   const onStory = () => G.storyOn ? G.storyOn() : !!(save().m['c1-couch'] && save().m['c1-couch'].s === 'done');  // also true in the campaign's opening chaos
 
   // ------------------------------------------------------------------ strangers: hi, jokes, flirting

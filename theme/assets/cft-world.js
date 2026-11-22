@@ -636,6 +636,89 @@ varying float vGL; varying vec2 vGUV;
   MAT.decor = GFX ? GFX.pbr() : new THREE.MeshLambertMaterial({ vertexColors: true });   // decor's own colours, instanced, never tinted
   MAT.dglow = new THREE.MeshBasicMaterial({ vertexColors: true });
 
+  // ---------------------------------------------------------------- colour blocks (2026-11-21, the user: "separate any map into
+  // squares of 2 by 2 km. Inside each block everything starts off grayscale; as you unlock grocery stores, metros and shops the
+  // world becomes colourful... if all secret packages are found, the road and trees get colour"). Design: docs/colour-blocks.md.
+  // Every world material gets a few lines of shader (greyify): it looks up its block in a small texture (one texel per 2 km
+  // block, home in the middle of block 0,0) and mixes its colour with its own grey by that block's level for its LAYER:
+  //   R = buildings (walls, roofs), G = streets (roads, pavements, plazas, street furniture, parked cars, decor),
+  //   B = nature (trees, bushes, grass, parks, water, sand), A = the sky (set per frame from the block you stand in).
+  // People, figments, you, cars that drive, pickups, signs and lights are never greyed. cft-color.js decides the levels
+  // (W.setBlockColor) and sends colour waves when something is freed (W.colorWave). W.colorOff(true) = full colour (setting).
+  const CGW = {};   // the colour-block API, copied onto W once W exists (below)
+  const CG_N = 48;   // texels across: 48 blocks = 96 km around home
+  const cgData = new Uint8Array(CG_N * CG_N * 4);
+  const cgTex = new THREE.DataTexture(cgData, CG_N, CG_N, THREE.RGBAFormat);
+  cgTex.magFilter = cgTex.minFilter = THREE.NearestFilter; cgTex.needsUpdate = true;
+  const CGU = { cftSat: { value: cgTex }, cftGrid: { value: new THREE.Vector4(2000, CG_N, 0, 0) }, cftWave: { value: new THREE.Vector4(0, 0, 0, 0) }, cftOff: { value: 0 } };
+  const CG_FRAG = `uniform sampler2D cftSat; uniform vec4 cftGrid; uniform vec4 cftWave; uniform float cftOff; varying vec2 vCftW;
+`;
+  function cgPatch(sh, ch) {
+    if (!sh.vertexShader.includes('#include <project_vertex>') || !sh.fragmentShader.includes('#include <fog_fragment>')) return;
+    Object.assign(sh.uniforms, CGU);
+    sh.vertexShader = 'varying vec2 vCftW;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+	{ vec4 cw = vec4(transformed, 1.0);
+	#ifdef USE_INSTANCING
+	cw = instanceMatrix * cw;
+	#endif
+	vCftW = (modelMatrix * cw).xz; }`);
+    const pick = ch === 'ground'   // roads, pavements, plazas, paths = streets; grass, woods, sand, water = nature (groundify's vGL)
+      ? 'float cs = (vGL < -0.5 || (vGL > 1.5 && vGL < 3.5) || (vGL > 4.5 && vGL < 5.5)) ? lv.b : lv.g;'
+      : 'float cs = lv.' + ch + ';';
+    sh.fragmentShader = CG_FRAG + sh.fragmentShader.replace('#include <fog_fragment>', `{
+	vec2 bi = floor((vCftW - cftGrid.zw + cftGrid.x * 0.5) / cftGrid.x) + floor(cftGrid.y * 0.5);
+	vec4 lv = (bi.x < 0.0 || bi.y < 0.0 || bi.x >= cftGrid.y || bi.y >= cftGrid.y) ? vec4(0.0) : texture2D(cftSat, (bi + 0.5) / cftGrid.y);
+	${pick}
+	float wd = length(vCftW - cftWave.xy);
+	cs = max(cs, cftWave.w * smoothstep(cftWave.z - 26.0, cftWave.z - 3.0, wd) * (1.0 - smoothstep(cftWave.z, cftWave.z + 3.0, wd)));
+	cs = clamp(max(cs, cftOff), 0.0, 1.0);
+	float cl = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));
+	gl_FragColor.rgb = mix(vec3(cl), gl_FragColor.rgb, cs);
+}
+#include <fog_fragment>`);
+  }
+  function greyify(mat, ch) {
+    if (!mat || mat.userData.cftGrey) return mat;
+    const prev = mat.onBeforeCompile, key0 = mat.customProgramCacheKey ? mat.customProgramCacheKey() : '';
+    mat.onBeforeCompile = function (sh, r) { if (prev) prev.call(this, sh, r); cgPatch(sh, ch); };
+    mat.customProgramCacheKey = () => key0 + '|cftgrey:' + ch;   // three caches programs by this key: every layer keeps its own
+    mat.userData.cftGrey = ch; mat.needsUpdate = true;
+    return mat;
+  }
+  CGW.greyify = greyify;
+  for (const [k, ch] of [['walls', 'r'], ['plain', 'r'], ['terrain', 'ground'], ['drape', 'ground'], ['trunk', 'b'], ['crown', 'b'], ['prop', 'g'], ['tint', 'g'], ['wreck', 'g'], ['decor', 'g'], ['dglow', 'g']]) greyify(MAT[k], ch);
+  greyify(ground.material, 'b');
+  // the grid's centre: where the save first started (cft-color keeps it in save.color.origin), so moving house never shifts it
+  let cgOx = 0, cgOz = 0;
+  const cgBlock = (x, z) => [Math.floor((x - cgOx + 1000) / 2000), Math.floor((z - cgOz + 1000) / 2000)];
+  CGW.setBlockOrigin = function (x, z) { cgOx = x; cgOz = z; CGU.cftGrid.value.z = x; CGU.cftGrid.value.w = z; };
+  CGW.blockCentre = (bx, bz) => ({ x: cgOx + bx * 2000, z: cgOz + bz * 2000 });
+  CGW.blockOf = (x, z) => { const b = cgBlock(x, z); return { bx: b[0], bz: b[1], key: b[0] + '_' + b[1] }; };
+  CGW.BLOCK = 2000;
+  // levels 0..1 for [buildings, streets, nature, sky] of block (bx, bz)
+  CGW.setBlockColor = function (bx, bz, lv) {
+    const i = bx + (CG_N >> 1), j = bz + (CG_N >> 1);
+    if (i < 0 || j < 0 || i >= CG_N || j >= CG_N) return;
+    const o = (j * CG_N + i) * 4;
+    for (let c = 0; c < 4; c++) cgData[o + c] = Math.max(0, Math.min(255, Math.round((lv[c] || 0) * 255)));
+    cgTex.needsUpdate = true;
+  };
+  CGW.blockColor = function (bx, bz) { const i = bx + (CG_N >> 1), j = bz + (CG_N >> 1); if (i < 0 || j < 0 || i >= CG_N || j >= CG_N) return [0, 0, 0, 0]; const o = (j * CG_N + i) * 4; return [cgData[o] / 255, cgData[o + 1] / 255, cgData[o + 2] / 255, cgData[o + 3] / 255]; };
+  CGW.colorOff = function (off) { CGU.cftOff.value = off ? 1 : 0; };
+  CGW.colorIsOff = () => CGU.cftOff.value > 0.5;
+  // a ring of full colour running out from (x, z): something was freed here
+  const cgWaves = [];
+  CGW.colorWave = function (x, z, o) { o = o || {}; cgWaves.push({ x, z, t: 0, life: o.life || 2.6, max: o.max || 140 }); };
+  function updateColorWaves(dt) {
+    let best = null;
+    for (let i = cgWaves.length - 1; i >= 0; i--) { const w = cgWaves[i]; w.t += dt; if (w.t >= w.life) { cgWaves.splice(i, 1); continue; } if (!best || w.t < best.t) best = w; }
+    if (!best) { CGU.cftWave.value.w = 0; return; }
+    const k = best.t / best.life;
+    CGU.cftWave.value.set(best.x, best.z, 6 + best.max * (1 - Math.pow(1 - k, 2)), 1 - k * k);
+  }
+  CGW.skySat = 1;   // the sky's colour (the block you stand in), read by setClock
+  const greyCol = c => { const l = c.r * 0.299 + c.g * 0.587 + c.b * 0.114; return c.lerp(_c.setRGB(l, l, l), 1 - (CGU.cftOff.value > 0.5 ? 1 : W.skySat)); };
+
   // ---- cars (realism pass, 2026-11-17): a real side profile (bonnet, windscreen rake, roof, boot or hatch, wheel arches)
   // extruded with rounded edges, then narrowed towards the roof (tumblehome) and rounded at the corners in plan; a glass
   // greenhouse with pillars, tyres with rims and spokes, wheel wells, lights, grille, plates, mirrors and door handles.
@@ -880,6 +963,7 @@ varying float vGL; varying vec2 vGUV;
 
   // ---------------------------------------------------------------- state
   const W = { THREE, scene, camera, renderer, places: [], placeIds: new Set(), onPlace: null };
+  Object.assign(W, CGW);   // colour blocks (defined with the materials, above)
   let origin = null, gen = 0;
   const tiles = new Map();
   let allSubs = [], inflight = 0;
@@ -3697,6 +3781,54 @@ varying float vGL; varying vec2 vGUV;
     if (o.depthTest === false) sp.renderOrder = 20;
     return sp;
   };
+  // A figment's name plate (2026-11-21, the user: "each enemy has their health bar and name above their head, not in the HUD"):
+  // its own little canvas (name + level on a pill coloured by rank, a health bar with a fading "just lost" part, an optional
+  // hint line), redrawn only when something changed. plate.set({name, lvl, pct, rank, sub}); rank '', champ, guard, rare,
+  // boss, captain, mega. World height = o.height (default 0.82 m for the two-line plate).
+  const PLATE_RANK = { '': ['rgba(31,26,61,.9)', '#ffffff'], champ: ['rgba(28,80,190,.95)', '#ffffff'], guard: ['rgba(255,194,31,.97)', '#1f1a3d'],
+    rare: ['rgba(214,219,227,.97)', '#1f1a3d'], boss: ['rgba(255,194,31,.97)', '#1f1a3d'], captain: ['rgba(200,16,46,.95)', '#ffffff'], mega: ['rgba(160,20,50,.95)', '#ffffff'] };
+  W.foePlate = function (o) {
+    o = o || {};
+    const big = !!o.big, c = document.createElement('canvas'), g = c.getContext('2d');
+    c.width = big ? 640 : 400; c.height = big ? 200 : 116;
+    const tex = new THREE.CanvasTexture(c);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: !big, fog: false }));
+    const hgt = o.height || (big ? 2.6 : 0.82);
+    sp.scale.set(hgt * c.width / c.height, hgt, 1);
+    sp.userData.h = hgt; sp.renderOrder = big ? 21 : 6;
+    let key = '', shown = 1, lostT = 0;
+    const draw = (s) => {
+      const W0 = c.width, H0 = c.height, pad = big ? 10 : 6, fs = big ? 44 : 30;
+      g.clearRect(0, 0, W0, H0);
+      const [bg, fg] = PLATE_RANK[s.rank || ''] || PLATE_RANK[''];
+      g.font = '800 ' + fs + 'px Nunito, system-ui, ' + EMOJI_FONT;
+      const text = (s.name || '') + (s.lvl ? '  Lv ' + s.lvl : '');
+      const tw = Math.min(W0 - 8, g.measureText(text).width + fs * 0.9), th = fs * 1.3, tx = (W0 - tw) / 2;
+      g.fillStyle = bg; g.beginPath(); if (g.roundRect) g.roundRect(tx, 2, tw, th, th * 0.35); else g.rect(tx, 2, tw, th); g.fill();
+      g.lineWidth = 3; g.strokeStyle = '#1f1a3d'; g.stroke();
+      g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, W0 / 2, 2 + th / 2 + fs * 0.04, W0 - 16);
+      // the bar: dark track, a pale "just lost" part, then the health colour (green > yellow > red)
+      const by = th + pad + 2, bh = big ? 34 : 22, bw = W0 - pad * 4, bx = pad * 2, p = Math.max(0, Math.min(1, s.pct)), q = Math.max(p, Math.min(1, s.ghost == null ? p : s.ghost));
+      g.fillStyle = '#1f1a3d'; g.beginPath(); if (g.roundRect) g.roundRect(bx - 3, by - 3, bw + 6, bh + 6, (bh + 6) / 2); else g.rect(bx - 3, by - 3, bw + 6, bh + 6); g.fill();
+      if (q > p) { g.fillStyle = '#ffe9a8'; g.fillRect(bx, by, bw * q, bh); }
+      g.fillStyle = p > 0.5 ? '#35d07f' : p > 0.25 ? '#ffc21f' : '#ff3b5c'; g.fillRect(bx, by, bw * p, bh);
+      g.fillStyle = 'rgba(255,255,255,.28)'; g.fillRect(bx, by, bw * p, bh * 0.4);
+      if (s.sub) { g.font = '800 ' + Math.round(fs * 0.62) + 'px Nunito, system-ui, ' + EMOJI_FONT; g.lineWidth = 6; g.strokeStyle = '#1f1a3d'; g.strokeText(s.sub, W0 / 2, by + bh + fs * 0.62, W0 - 12); g.fillStyle = '#ffe36b'; g.fillText(s.sub, W0 / 2, by + bh + fs * 0.62, W0 - 12); }
+      tex.needsUpdate = true;
+    };
+    sp.userData.plate = {
+      // dt-driven: the "just lost" part catches up after a short pause
+      set(s, dt) {
+        const p = Math.max(0, Math.min(1, s.pct));
+        if (p < shown - 0.001) { lostT += dt || 0; if (lostT > 0.45) shown = Math.max(p, shown - (dt || 0) * 0.9); } else { shown = p; lostT = 0; }
+        const k = (s.name || '') + '|' + (s.lvl || '') + '|' + (s.rank || '') + '|' + Math.round(p * 200) + '|' + Math.round(shown * 100) + '|' + (s.sub || '');
+        if (k === key) return;
+        key = k; draw(Object.assign({}, s, { ghost: shown }));
+      },
+      dispose() { tex.dispose(); sp.material.dispose(); },
+    };
+    return sp;
+  };
   W.emojiSprite = function (emoji, size, bg, ring) {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: W.emojiTex(emoji, bg, ring), transparent: true, depthWrite: false, fog: false }));
     sp.scale.set(size || 1, size || 1, 1);
@@ -3779,6 +3911,7 @@ varying float vGL; varying vec2 vGUV;
   W.reachMarker = function (info) { reachInfo = info; };
   W.reachShown = () => reachEdge.visible;
   W.reachRadius = () => (reachInfo ? reachInfo.r : 0);
+  W.reachHeight = () => reachEdge.position.y - player.pos.y;   // tests: how far above your feet the arc floats
   function updateReach() {
     const i = reachInfo;
     const show = !!i && !i.ranged && ride.mode === 'foot' && !W.aiming && !W.cine && !W.showOff && avatar.visible && !player.climb && !W.tether;
@@ -3786,7 +3919,8 @@ varying float vGL; varying vec2 vGUV;
     if (!show) return;
     const key = i.r.toFixed(2) + ':' + Math.round(i.arc);
     if (key !== reachKey) { reachKey = key; reachFill.geometry = reachGeo(i.r, i.arc, null); reachEdge.geometry = reachGeo(i.r, i.arc, 'e'); reachLine.geometry = reachGeo(i.r, i.arc, 'o'); }
-    const y = player.pos.y + 0.05, rot = player.face + Math.PI / 2;
+    const fx = -Math.sin(player.face), fz = -Math.cos(player.face), px = player.pos.x, pz = player.pos.z;   // higher than the road and whatever rises ahead (2026-11-21)
+    const y = Math.max(player.pos.y, standAt(px + fx * i.r * 0.5, pz + fz * i.r * 0.5), standAt(px + fx * i.r, pz + fz * i.r)) + 0.3, rot = player.face + Math.PI / 2;
     reachFill.position.set(player.pos.x, y, player.pos.z); reachLine.position.set(player.pos.x, y + 0.004, player.pos.z); reachEdge.position.set(player.pos.x, y + 0.008, player.pos.z);
     reachFill.rotation.y = reachEdge.rotation.y = reachLine.rotation.y = rot;
     const pulse = i.hot ? 0.75 + 0.25 * Math.sin(performance.now() / 90) : 1;
@@ -3816,6 +3950,7 @@ varying float vGL; varying vec2 vGUV;
   W.guides = () => guides.length;
   function updateArcs(dt) {
     updateReach();
+    updateColorWaves(dt);
     for (let i = arcs.length - 1; i >= 0; i--) {
       const a = arcs[i]; a.t += dt; const k = a.t / a.life;
       if (k >= 1) { scene.remove(a.m); a.m.material.dispose(); arcs.splice(i, 1); continue; }
@@ -4143,7 +4278,7 @@ varying float vGL; varying vec2 vGUV;
       // aiming (hold the right mouse button, 2026-11-19): the arm points along the sight
       const ak = body.userData.aimK = (body.userData.aimK || 0) + ((W.aiming && !ride.kind && !player.climb ? 1 : 0) - (body.userData.aimK || 0)) * Math.min(1, dt * 16);
       if (ak > 0.02 && swingT <= 0) {
-        const u = body.userData, pr = Math.max(-0.5, Math.min(0.9, cam.pitch - 0.3));
+        const u = body.userData, pr = Math.max(-1.35, Math.min(0.9, cam.pitch - 0.3));
         u.armR.rotation.x += (1.55 - pr - u.armR.rotation.x) * ak; u.armR.rotation.z += (-0.12 - u.armR.rotation.z) * ak; u.elbowR.rotation.x += (0.08 - u.elbowR.rotation.x) * ak;
         u.armL.rotation.x += (0.9 - u.armL.rotation.x) * ak; u.elbowL.rotation.x += (1.2 - u.elbowL.rotation.x) * ak;
       }
@@ -4330,8 +4465,9 @@ varying float vGL; varying vec2 vGUV;
     const ak = cam.aimK;
     if (ak > 0.001) { target.x += Math.cos(cam.yaw) * 0.85 * ak; target.z -= Math.sin(cam.yaw) * 0.85 * ak; target.y += 0.15 * ak; }
     const dist = W.showOff ? 3.4 : cam.dist * (ride.mode === 'drive' ? 1.35 : 1) * (1 - ak) + Math.min(cam.dist, 3.6) * ak;
-    const cp = Math.cos(cam.pitch);
-    const dx = Math.sin(cam.yaw) * cp, dy = Math.sin(cam.pitch), dz = Math.cos(cam.yaw) * cp;
+    const pitch = Math.max(cam.pitch, -0.2), tilt = Math.max(0, -0.2 - cam.pitch);   // looking up: the camera stops sinking and tilts instead
+    const cp = Math.cos(pitch);
+    const dx = Math.sin(cam.yaw) * cp, dy = Math.sin(pitch), dz = Math.cos(cam.yaw) * cp;
     let maxD = dist;
     for (let i = 1; i <= 18; i++) { // pull the camera in when a wall or a hill is in the way
       const t = i / 18 * dist, x = target.x + dx * t, z = target.z + dz * t, y = target.y + dy * t, g = groundAt(x, z), hb = heightAt(x, z);
@@ -4345,6 +4481,11 @@ varying float vGL; varying vec2 vGUV;
       cam.shake *= Math.exp(-9 * dt);
     }
     camera.lookAt(target);
+    if (tilt > 0.001) { // up to the sky: the same direction, raised by the extra pitch (flying figments, balloons, the whale)
+      const ddx = target.x - camera.position.x, ddz = target.z - camera.position.z, hd = Math.hypot(ddx, ddz) || 1e-6;
+      const el = Math.min(1.45, Math.atan2(target.y - camera.position.y, hd) + tilt * 1.15);
+      camera.lookAt(camera.position.x + ddx / hd * Math.cos(el) * 10, camera.position.y + Math.sin(el) * 10, camera.position.z + ddz / hd * Math.cos(el) * 10);
+    }
     // the view widens a little when you go fast
     const sp = Math.abs(ride.mode === 'drive' ? player.speed : Math.hypot(player.vel.x, player.vel.z));
     const fov = (62 + Math.max(0, Math.min(13, (sp - 7) * 0.85))) * (1 - ak) + 50 * ak;
@@ -4419,6 +4560,7 @@ varying float vGL; varying vec2 vGUV;
     const t = (h - SKY[i][0]) / (SKY[i + 1][0] - SKY[i][0]);
     ca.setHex(SKY[i][1]); cb.setHex(SKY[i + 1][1]);
     skyCol.copy(ca).lerp(cb, t);
+    greyCol(skyCol);   // colour blocks: the sky is as grey as the block you stand in
     scene.background.copy(skyCol);
     scene.fog.color.copy(skyCol);
     const day = smooth(5.5, 8, h) * (1 - smooth(18.3, 21, h));
@@ -4447,6 +4589,7 @@ varying float vGL; varying vec2 vGUV;
     const tt = (h - SKY_TOP[i][0]) / (SKY_TOP[i + 1][0] - SKY_TOP[i][0]);
     ca.setHex(SKY_TOP[i][1]); cb.setHex(SKY_TOP[i + 1][1]);
     skyTop.copy(ca).lerp(cb, tt);
+    greyCol(skyTop);
     sunPos.set(Math.cos(a) * 0.75, Math.sin(a), 0.42).normalize();
     sunSprite.visible = sunPos.y > -0.12;
     sunSprite.material.color.setHex(h < 8 || h > 17.2 ? 0xffb37a : 0xffffff);
@@ -4854,7 +4997,7 @@ varying float vGL; varying vec2 vGUV;
     if (e.code === 'Space') input.hold = false;
   });
   on(window, 'blur', () => { input.f = input.b = input.l = input.r = 0; input.sprint = false; input.hold = false; });
-  function look(dx, dy, s) { cam.yaw -= dx * s; cam.pitch = Math.max(-0.15, Math.min(1.35, cam.pitch + dy * s)); cam.lookT = performance.now(); }
+  function look(dx, dy, s) { cam.yaw -= dx * s; cam.pitch = Math.max(-1.25, Math.min(1.35, cam.pitch + dy * s)); cam.lookT = performance.now(); }   // below -0.2 the camera stays low and tilts up to the sky (updateCamera)
   let drag = null;
   const lockSupported = 'requestPointerLock' in canvas && !W.TOUCH;
   W.lock = function () { if (!lockSupported) return; try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ } };

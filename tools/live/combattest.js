@@ -78,8 +78,7 @@ window.__cmbOut = []; window.__cmbDone = false;
     for (let i = 0; i < 150 && F.hp() >= hb; i++) sim(2);
     ok(F.hp() < hb, 'a ' + br.def.n + ' walked up and hit you (' + Math.round(hb) + ' -> ' + Math.round(F.hp()) + ')');
     W.teleport(br.x + 1.5, br.z); face(br.x, br.z); G.attack(); sim(6);
-    const foe = document.querySelector('[data-foe]');
-    ok(foe && !foe.hidden && foe.textContent.includes(br.def.n), 'the foe bar shows what you are fighting: "' + (foe && foe.textContent) + '"');
+    ok(br.plate && br.plate.visible && br.plate.parent === br.obj, 'the figment you fight wears its name plate and health bar over its head (2026-11-21: no HUD bar)');
     br.t = 1e9; br.event = 1; s.fun.hp = F.maxHp(); sim(10);
 
     // ---------- day monsters (not close to home)

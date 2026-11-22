@@ -22,7 +22,7 @@ const r0 = v => Math.round(v).toLocaleString('en-US');
 const r2 = v => (Math.round(v * 100) / 100).toString();
 const LEVELS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100];
 const SECTIONS = [['how', '📖', 'How it works'], ['you', '🧑', 'You, level by level'], ['figments', '👾', 'Figments'], ['bosses', '👑', 'Bosses'],
-  ['weapons', '🏏', 'Weapons'], ['powers', '⚡', 'Powers'], ['knobs', '🎛️', 'All knobs']];
+  ['weapons', '🏏', 'Weapons'], ['powers', '⚡', 'Powers'], ['colour', '🎨', 'Colour blocks'], ['knobs', '🎛️', 'All knobs']];
 
 function mount(root, opts) {
   const D = window.CFT_DATA, C = D.calc, api = opts.api;
@@ -74,15 +74,15 @@ function mount(root, opts) {
   const knobRow = (path, label, note, unit) => '<div class="wk-knob"><div><b>' + esc(label) + '</b>' + (note ? '<small>' + note + '</small>' : '') + '</div>' + num(path, { label, unit }) + '</div>';
 
   // ------------------------------------------------------------------ helpers built on the game's formulas
-  const meleeIds = () => Object.keys(D.ITEMS).filter(id => D.ITEMS[id].weapon && !D.ITEMS[id].weapon.ranged).sort((a, b) => D.ITEMS[a].p - D.ITEMS[b].p);
+  const meleeIds = () => Object.keys(D.ITEMS).filter(id => D.ITEMS[id].weapon && (!D.ITEMS[id].weapon.ranged || D.ITEMS[id].weapon.ranged === 'cone')).sort((a, b) => D.ITEMS[a].p - D.ITEMS[b].p);
   const shooterIds = () => Object.keys(D.ITEMS).filter(id => { const w = D.ITEMS[id].weapon; return w && (w.ranged === 'proj' || w.ranged === 'shot'); }).sort((a, b) => D.ITEMS[a].p - D.ITEMS[b].p);
   const weaponOf = id => (id && D.ITEMS[id] && D.ITEMS[id].weapon) || D.SLAP;
   const weaponName = id => id && D.ITEMS[id] ? D.ITEMS[id].e + ' ' + D.ITEMS[id].n : '🖐️ Bare hands';
-  function hitDmg(L, w) { return w.dmg * C.dmgMul(L) * (1 + ctx.gear / 100); }   // one ordinary hit of yours (before combos, counters, crits)
-  function gearRatio(w) { return Math.max(1, Math.min(40, w.dmg * (1 + ctx.gear / 100) / D.SLAP.dmg)); }
+  function hitDmg(L, w) { return (w.dmg + (w.add || 0)) * C.dmgMul(L) * (1 + ctx.gear / 100); }   // + the weapon's strength adder   // one ordinary hit of yours (before combos, counters, crits)
+  function gearRatio(w) { return Math.max(1, Math.min(40, (w.dmg + (w.add || 0)) * (1 + ctx.gear / 100) / (D.SLAP.dmg + (D.SLAP.add || 0)))); }
   function foe(kind, L, lvl, w) { // a figment of `kind` at level lvl when you are level L holding w
-    const m = D.MONSTERS[kind], hp = C.maxHp(L, ctx.fit), sc = C.scale(L, lvl, gearRatio(w), hp, ctx.armor);
-    const mhp = m.hp * sc.hp, atk = (m.atk || 6) * sc.atk, cut = C.armorCut(atk, ctx.armor);
+    const m = D.MONSTERS[kind], ar = ctx.armor + (w.def || 0), hp = C.maxHp(L, ctx.fit), sc = C.scale(L, lvl, gearRatio(w), hp, ar);   // the weapon's defence counts as armour
+    const mhp = m.hp * sc.hp, atk = (m.atk || 6) * sc.atk, cut = C.armorCut(atk, ar);
     const hits = Math.ceil(mhp / Math.max(1e-6, hitDmg(L, w) * (m.weak && m.weak.bonk || 1)));
     return { m, mhp, atk: cut, hits, survive: Math.ceil(hp / Math.max(1e-6, cut)), secs: hits * (w.cd || 0.42), xp: C.xpFor(m, lvl) };
   }
@@ -200,27 +200,28 @@ function mount(root, opts) {
 
   VIEW.weapons = function () {
     const L = ctx.L;
+    const B = id => id ? 'ITEMS.' + id + '.weapon.' : 'SLAP.';
+    const who = (id, it) => '<td class="wk-who"><span class="wk-e">' + (it ? it.e : '🖐️') + '</span><b>' + esc(it ? it.n : 'Bare hands') + '</b><small>' + (it ? '$' + it.p + (it.req && it.req.lvl ? ' · level ' + it.req.lvl : '') : 'always') + '</small></td>';
     const mrow = id => {
-      const it = id ? D.ITEMS[id] : null, w = weaponOf(id), base = id ? 'ITEMS.' + id + '.weapon.' : 'SLAP.', arc = w.arc || (w.ranged === 'cone' ? 66 : 160), cd = w.cd || 0.42;
-      return '<tr><td class="wk-who"><span class="wk-e">' + (it ? it.e : '🖐️') + '</span><b>' + esc(it ? it.n : 'Bare hands') + '</b><small>' + (it ? '$' + it.p + (it.req && it.req.lvl ? ' · level ' + it.req.lvl : '') : 'always') + '</small></td>' +
-        '<td>' + num(base + 'dmg') + '</td><td>' + num(base + 'reach', { unit: 'm' }) + '</td><td class="wk-calc">' + r1(w.reach + 0.6) + ' m</td><td>' + (id ? (w.arc != null ? num(base + 'arc', { unit: '°' }) : arc + '°') : '160°') + '</td><td>' + (id && w.cd != null ? num(base + 'cd', { unit: 's' }) : cd + ' s') + '</td><td>' + (id && w.hits != null ? num(base + 'hits') : (arc >= 300 ? 'all' : 3)) + '</td><td>' + num(base + 'knock') + '</td><td>' + (w.stun != null ? num(base + 'stun', { unit: 's' }) : '–') + '</td>' +
-        '<td class="wk-calc"><b>' + r1(hitDmg(L, w) * 10) + '</b></td><td class="wk-calc">' + r1(hitDmg(L, w) * 10 / cd) + '/s</td></tr>';
+      const it = id ? D.ITEMS[id] : null, w = weaponOf(id), b = B(id), cd = w.cd || 0.42, hit = hitDmg(L, w) * 10, crit = 1 + (w.crit || 0);
+      return '<tr>' + who(id, it) + ['dmg', 'add', 'reach', 'arc', 'cd', 'hits', 'knock', 'stun', 'crit', 'def', 'block'].map(k => '<td>' + num(b + k, { unit: k === 'reach' ? 'm' : k === 'arc' ? '°' : k === 'cd' || k === 'stun' ? 's' : '' }) + '</td>').join('') +
+        '<td class="wk-calc">' + r1(w.reach + 0.6) + ' m</td><td class="wk-calc"><b>' + r1(hit) + '</b></td><td class="wk-calc">' + r1(hit * crit / cd) + '/s</td></tr>';
     };
     const srow = id => {
-      const it = D.ITEMS[id], w = it.weapon, b = 'ITEMS.' + id + '.weapon.', rate = w.ranged === 'shot' ? 0.32 : (w.rate || 0.5), per = hitDmg(L, w) * 10 * (w.pellets || 1);
-      return '<tr><td class="wk-who"><span class="wk-e">' + it.e + '</span><b>' + esc(it.n) + '</b><small>$' + it.p + (it.req && it.req.lvl ? ' · level ' + it.req.lvl : '') + '</small></td>' +
-        '<td>' + num(b + 'dmg') + '</td><td>' + num(b + 'reach', { unit: 'm' }) + '</td><td>' + (w.rate != null ? num(b + 'rate', { unit: 's' }) : rate + ' s') + '</td><td>' + (w.ammo != null ? num(b + 'ammo') : '1') + '</td><td>' + (w.pellets != null ? num(b + 'pellets') : '1') + '</td><td>' + (w.splash != null ? num(b + 'splash', { unit: 'm' }) : '–') + '</td><td>' + (w.speed != null ? num(b + 'speed', { unit: 'm/s' }) : '–') + '</td><td>' + num(b + 'knock') + '</td>' +
-        '<td class="wk-calc"><b>' + r1(per) + '</b></td><td class="wk-calc">' + r1(per / rate) + '/s</td><td class="wk-calc">' + r1(per / (w.ammo || 1)) + '</td></tr>';
+      const it = D.ITEMS[id], w = it.weapon, b = B(id), rate = w.rate || 0.5, per = hitDmg(L, w) * 10 * (w.pellets || 1), crit = 1 + (w.crit || 0);
+      const keys = w.ranged === 'shot' ? ['dmg', 'add', 'reach', 'rate', 'ammo', 'knock', 'stun', 'crit'] : ['dmg', 'add', 'reach', 'rate', 'ammo', 'pellets', 'splash', 'speed', 'knock', 'stun', 'crit'];
+      return '<tr>' + who(id, it) + ['dmg', 'add', 'reach', 'rate', 'ammo', 'pellets', 'splash', 'speed', 'knock', 'stun', 'crit'].map(k => '<td>' + (keys.includes(k) ? num(b + k, { unit: k === 'reach' || k === 'splash' ? 'm' : k === 'rate' || k === 'stun' ? 's' : k === 'speed' ? 'm/s' : '' }) : '<span class="muted">–</span>') + '</td>').join('') +
+        '<td class="wk-calc"><b>' + r1(per) + '</b></td><td class="wk-calc">' + r1(per * crit / rate) + '/s</td><td class="wk-calc">' + r1(per / (w.ammo || 1)) + '</td></tr>';
     };
     return h2('🏏', 'Weapons', 'Bonk weapons (in your hand) and shooters (slot 5). "Real reach" is where the gold arc on the ground sits: an ordinary figment whose body touches it gets hit.') +
       '<div class="wk-ctx"><label>Your level <input type="text" inputmode="numeric" data-ctx="L" value="' + ctx.L + '"></label><label>Damage bonus % <input type="text" inputmode="numeric" data-ctx="gear" value="' + ctx.gear + '"></label></div>' +
-      '<h3 class="wk-h3">Bonk weapons</h3><div class="wk-scroll"><table class="wk-table"><thead><tr><th>Weapon</th><th>Damage</th><th>Reach</th><th class="wk-calc">Real reach</th><th>Arc</th><th>Cooldown</th><th>Hits at once</th><th>Knock</th><th>Stun</th><th class="wk-calc">Hit at your level</th><th class="wk-calc">Per second</th></tr></thead><tbody>' +
+      '<h3 class="wk-h3">Bonk weapons</h3><div class="wk-scroll"><table class="wk-table"><thead><tr><th>Weapon</th><th>Damage</th><th>Strength +</th><th>Reach (ring size)</th><th>Arc (ring width)</th><th>Cooldown</th><th>Hits at once</th><th>Knock</th><th>Stun</th><th>Crit chance</th><th>Defence (armour)</th><th>Block +</th><th class="wk-calc">Real reach</th><th class="wk-calc">Hit at your level</th><th class="wk-calc">Per second</th></tr></thead><tbody>' +
       mrow('') + meleeIds().map(mrow).join('') + '</tbody></table></div>' +
-      '<h3 class="wk-h3">Shooters (slot 5)</h3><div class="wk-scroll"><table class="wk-table"><thead><tr><th>Shooter</th><th>Damage</th><th>Range</th><th>Seconds a shot</th><th>Ammo a shot</th><th>Pellets</th><th>Splash</th><th>Speed</th><th>Knock</th><th class="wk-calc">Shot at your level</th><th class="wk-calc">Per second</th><th class="wk-calc">Per ammo</th></tr></thead><tbody>' +
+      '<h3 class="wk-h3">Shooters (slot 5)</h3><div class="wk-scroll"><table class="wk-table"><thead><tr><th>Shooter</th><th>Damage</th><th>Strength +</th><th>Range</th><th>Seconds a shot</th><th>Ammo a shot</th><th>Pellets</th><th>Splash</th><th>Speed</th><th>Knock</th><th>Stun</th><th>Crit chance</th><th class="wk-calc">Shot at your level</th><th class="wk-calc">Per second</th><th class="wk-calc">Per ammo</th></tr></thead><tbody>' +
       shooterIds().map(srow).join('') + '</tbody></table></div>' +
       '<div class="wk-knobs">' + knobRow('TUNE.camp.ammoStart', 'Ammo at the start') + knobRow('TUNE.camp.ammoMax', 'Most ammo you can carry') + knobRow('TUNE.camp.ammoCrate', 'Ammo in a crate', '+ half your level') + knobRow('TUNE.camp.ammoCrates', 'Ammo crates around you') +
       knobRow('TUNE.aim.gunDrops', 'Shooters lying around town') + knobRow('TUNE.aim.gunAmmo', 'Ammo in a found shooter') + knobRow('TUNE.smash.weaponMul', 'Smashing things', '× weapon damage') + '</div>' +
-      tip('Per second = one hit at your level divided by the cooldown (before combos, counters and crits). Shooters: per ammo = how much damage one ammo buys.');
+      tip('Every white box is that weapon\'s own number. Reach is how far the gold ring on the ground reaches (plus a figment\'s body, 0.6 m) and Arc is how wide it is; Strength + is added to every hit before level growth; Crit chance doubles a hit; Defence is armour while it is in your hand; Block + is extra share a block stops while it is in your hand. Per second counts crits on average (not combos or counters). Shooters: per ammo = how much damage one ammo buys.');
   };
 
   VIEW.powers = () => h2('⚡', 'Powers', 'Slots 1-4: water, lightning, the extinguisher and the web. Damage grows with your level like your hits.') +
@@ -229,6 +230,16 @@ function mount(root, opts) {
     '<h3 class="wk-h3">🧯 Fire and the extinguisher (3)</h3><div class="wk-knobs">' + knobRow('TUNE.camp.foamMax', 'Extinguisher (seconds × 10)') + knobRow('TUNE.camp.fireHurt', 'Fire damage to you a second') + knobRow('TUNE.camp.fireMax', 'Fires at once') + knobRow('TUNE.camp.fireSpread.0', 'Seconds between spreads: least', '', 's') + knobRow('TUNE.camp.fireSpread.1', 'Seconds between spreads: most', '', 's') + '</div>' +
     '<h3 class="wk-h3">🕸️ The web (4)</h3><div class="wk-knobs">' + knobRow('TUNE.aim.webRange', 'Sticks up to', '', 'm') + knobRow('TUNE.aim.webCd', 'Seconds between webs', '', 's') + knobRow('TUNE.aim.webMax', 'Top pull speed', '', 'm/s') + knobRow('TUNE.aim.webAcc', 'Pull acceleration') + knobRow('TUNE.aim.webStun', 'A webbed figment is stuck for', '', 's') + '</div>' +
     '<h3 class="wk-h3">🏃 Moving</h3><div class="wk-knobs">' + knobRow('WALK.walk', 'Walking speed', '', 'm/s') + knobRow('WALK.run', 'Sprinting speed', '', 'm/s') + knobRow('TUNE.wild.stamMax', 'Stamina') + knobRow('TUNE.wild.climb', 'Stamina a second climbing') + knobRow('TUNE.wild.dodgeWindow', 'Perfect dodge window', '', 's') + knobRow('TUNE.wild.flurryHits', 'Free hits after a perfect dodge') + knobRow('TUNE.hype.mainDmg', 'Main character mode: damage ×') + knobRow('TUNE.hype.mainSecs', 'Main character mode lasts', '', 's') + '</div>';
+
+  VIEW.colour = () => h2('🎨', 'Colour blocks', 'The map is cut into 2 km squares that start grey. Each square has three layers that come back on their own; all three full = BLOCK RESTORED.') +
+    '<div class="wk-cards"><div class="wk-card"><h3>🏠 Buildings</h3><p>Free places: liberate outposts (Tom Hearton\'s, groceries), beat metro guardians, walk into shops (E). Each counts points; full colour at the target (a block with fewer places needs all of them).</p></div>' +
+    '<div class="wk-card"><h3>🛣️ Streets</h3><p>Roads, pavements, plazas, street furniture, parked cars and decor come back as you find the secret stashes in the block\'s tight gaps.</p></div>' +
+    '<div class="wk-card"><h3>🌳 Nature</h3><p>Trees, bushes, grass, parks, water and sand come back as you bonk figments inside the block (champions count 2, rares and King Blob 3, guardians 5).</p></div>' +
+    '<div class="wk-card"><h3>Always in colour</h3><p>You, people, figments, moving cars, shop signs, pickups and lights. The sky follows the block you stand in (the average of the three layers).</p></div></div>' +
+    '<div class="wk-knobs">' + knobRow('TUNE.color.libTarget', '🏠 Points for full building colour') + knobRow('TUNE.color.wOutpost', 'Points: an outpost') + knobRow('TUNE.color.wMetro', 'Points: a metro entrance') +
+    knobRow('TUNE.color.wShop', 'Points: a real shop walked into') + knobRow('TUNE.color.wMadeUp', 'Points: a made-up shop') + knobRow('TUNE.color.secretTarget', '🛣️ Secrets for full street colour') +
+    knobRow('TUNE.color.killTarget', '🌳 Figments for full nature colour') + knobRow('TUNE.color.minSat', 'Colour at the very start', '0 = pure grey, 1 = full colour') +
+    knobRow('TUNE.color.rewardCash', 'BLOCK RESTORED: cash', '+15% per level') + knobRow('TUNE.color.rewardXp', 'BLOCK RESTORED: XP', '+10% per level') + '</div>';
 
   // every number in D.TUNE, grouped: the escape hatch for anything the other tabs don't show
   VIEW.knobs = function () {

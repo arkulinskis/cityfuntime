@@ -435,8 +435,7 @@ function attach(G, api) {
     const m = G.fun.spawnMonster(rr.kind, c.x, c.z, { def, hp: def.hp, event: 240, aggro: 22 });
     if (!m) return null;
     m.obj.userData.size = (base.size || 1) * TB.rareSize; m.r *= TB.rareSize;
-    const tag = W.label('💀 ' + rr.n, { size: 34, height: 0.52, bg: 'rgba(214,219,227,.95)', fg: '#1f1a3d', border: '#5b6270' });
-    tag.position.y = 2.6; m.obj.add(tag);
+    // its silver name plate comes from cft-fun (rank 'rare')
     U.banner('💀 A rare monster: ' + rr.n, 'Silver name tag, deep pockets. It always drops something Rare or better.', 'fail');
     G.sfx.fail();
     return m;
@@ -452,9 +451,9 @@ function attach(G, api) {
     else drop('monster');
   }
   // weapons: talents, charms and the Night Watch make bonks hit harder; critical bonks
-  function modWeapon(w) {
-    w.dmg = w.dmg * (1 + bonus('dmg'));
-    if (Math.random() < bonus('crit')) { w.dmg *= 2; w.word = 'CRIT! ' + w.word; }
+  function modWeapon(w) {   // + the weapon's own strength adder and crit chance (D.WEAPON_DEFAULTS, 2026-11-21)
+    w.dmg = (w.dmg + (w.add || 0)) * (1 + bonus('dmg'));
+    if (Math.random() < bonus('crit') + (w.crit || 0)) { w.dmg *= 2; w.word = 'CRIT! ' + w.word; }
     return w;
   }
 

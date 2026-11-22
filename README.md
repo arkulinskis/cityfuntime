@@ -337,6 +337,20 @@ extinguishers, water and lightning powers".
 - **Light through the day**: a pink-orange sunrise with long shadows, crisp morning, bright white noon, warm afternoon, an
   orange golden hour, a red sunset, a purple dusk, the blue hour and blue moonlight; the colour grade follows the hour.
 
+**Colour blocks, name plates and looking up (2026-11-21):**
+- **The city starts grey.** The Static drained the colour: the map is cut into 2 km squares (home in the middle of the
+  first one) and each square gets its colour back in three layers. 🏠 **Buildings** come back as you free places (liberate
+  Tom Hearton's and groceries, beat metro guardians, walk into shops), 🛣️ **streets** (roads, pavements, furniture, decor)
+  as you find the secret stashes, 🌳 **nature** (trees, parks, grass, water) as you bonk figments in the block; the sky
+  follows the block you stand in. A ring of colour runs out from everything you free. All three full = **BLOCK RESTORED**
+  (cash, XP, a rainbow). People, figments, cars, signs and pickups always keep their colour. The 🎨 chip (top right) and the
+  phone app 🎨 Colour show what is left. Settings can switch it off. How it works: `docs/colour-blocks.md`.
+- **Name plates**: every figment shows its name, level and a health bar over its head (champions blue, guardians gold, rares
+  silver, outpost captains red, MEGA figments with what to do); the HUD bars are gone.
+- **Look at the sky**: the camera tilts all the way up, so you can aim at seagulls, Wi-Fi wraiths, balloons and the sky whale.
+- **Every weapon's numbers** (reach, arc, cooldown, hits, knock-back, stun, strength +, crit chance, defence, block +) are
+  real game values, editable in Admin > Balance; the reach arc floats higher so the road doesn't hide it.
+
 **For members:** the same game saved to the server (and still in the browser), the **Life** page (`#life`, home after sign-in):
 level, money, net worth, stats, home, love & family, friends, businesses, blocks, stickers, the current mission and the diary.
 A game played as a guest is kept when you sign up.
@@ -427,6 +441,7 @@ python -I tools/live/game_test.py --people DIR   # close-ups of the characters: 
 python -I tools/live/game_test.py --models DIR   # the 3D models up close: faces, silly extras, vehicles, trees, bushes, animals
 python -I tools/live/game_test.py --long DIR     # the Character / Reputation / Achievements apps, a Legendary drop, a rare monster
 python -I tools/live/game_test.py --monsters DIR # the 15 monster types, a metro guardian, a fight, loot gear on you
+python -I tools/live/game_test.py --color        # colour blocks, name plates, looking up, weapon numbers
 python -I tools/live/game_test.py --balance      # slot 5 shooters + wheel, shooters in town, the reach arc, weaknesses, balance values, feet, light
 git push origin master                           # the deploy: Anvil pulls master
 ```
@@ -445,6 +460,7 @@ theme/assets/cft-world.js     the 3D city: tile streaming, buildings, roads, tre
                               shop signs, people, traffic, pigeons, monsters' and props' shapes, rides, day/night, minimap
 theme/assets/cft-tiles.js     vector-tile decoder (protobuf/MVT) incl. named places (poi layer)
 theme/assets/cft-kit.js       window.CFT: loads the engine on demand, save sync, plain JSON views for the Forms pages
+theme/assets/cft-color.js     colour blocks: 2 km squares that start grey and come back as you free them
 theme/assets/cft-wiki.js      Admin > Balance: the wiki of characters and numbers, editable, live test + publish
 theme/assets/three.min.js     three.js r149
 client_code/    Layouts/Shell, Pages (Landing, Play, Life, Quests, Album, Ranks, Auth, Profile, Admin), Items, Dialogs, Components (Game, Bar),

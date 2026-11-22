@@ -11,6 +11,7 @@
     python -I tools/live/game_test.py --aim [OUTDIR]      only aimtest.js (right-mouse sight, slots 1-4, the web, weapon reach + arcs, gabled roofs, scaling figments, no level cap, rainbow guides, the Dex gallery)
     python -I tools/live/game_test.py --aimshots [OUTDIR] no tests: the sight on a wall, the web pulling, a 360° swing, a rainbow guide, the Dex gallery
     python -I tools/live/game_test.py --balance [OUTDIR] only balancetest.js (slot 5 shooter belt + scroll wheel + shooters in town, the bonk reach on the ground, weaknesses, balance overrides + live draft, feet on roads, light through the day)
+    python -I tools/live/game_test.py --color [OUTDIR]   only colortest.js (2 km colour blocks that start grey + their three layers, name plates over figments, looking up, every weapon's numbers, the raised reach arc)
     python -I tools/live/game_test.py --stunt [OUTDIR]    only stunttest.js (courses pop up in a car, boost, ramp launch, ring of fire, flips, rolls, wipeout, hop, fire alley, phone app)
     python -I tools/live/game_test.py --stuntshots [OUTDIR] no tests: a stunt course popping up, the car through a ring of fire, a flip, a MEGA ramp, a fire alley, the phone app
     python -I tools/live/game_test.py --cine [OUTDIR]     only cinetest.js (every mission line voiced, a mission intro as a scene, title + chapter cards, subtitles, skip, phone calls, MISSION COMPLETE, settings)
@@ -385,6 +386,8 @@ else:
         steps += script("cinetest.js", "__cineDone", "__cineOut", 300000)
     elif "--balance" in flags:
         steps += script("balancetest.js", "__balDone", "__balOut", 600000)
+    elif "--color" in flags:
+        steps += script("colortest.js", "__colDone", "__colOut", 600000)
     else:
         if "--fun" not in flags:
             steps += script("gametest.js", "__cftDone", "__cftOut", 500000)
@@ -401,6 +404,7 @@ else:
             steps += script("stunttest.js", "__stuntDone", "__stuntOut", 600000)
             steps += script("cinetest.js", "__cineDone", "__cineOut", 300000)
             steps += script("balancetest.js", "__balDone", "__balOut", 600000)
+            steps += script("colortest.js", "__colDone", "__colOut", 600000)
     steps += [{"wait": 1500}, {"shot": "after"}]
 
 sf = out / "steps.json"

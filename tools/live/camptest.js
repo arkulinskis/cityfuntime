@@ -185,7 +185,7 @@ window.__campOut = []; window.__campDone = false;
     ok(mega.heart.visible && Math.abs(mega.hy - (W.groundAt(mega.hx, mega.hz) + 1.5)) < 0.1, 'when it\'s dizzy its glowing heart pops out at arm\'s height');
     const h1 = mega.hp; K.meleeHit(pp, { x: 1, z: 0 }, w, false); const heartHit = h1 - mega.hp;
     ok(heartHit > bodyHit * 10, 'the weak spot takes far more than its body (' + heartHit.toFixed(2) + ' vs ' + bodyHit.toFixed(2) + ')');
-    ok(!document.querySelector('[data-boss]').hidden || (sim(6), !document.querySelector('[data-boss]').hidden), 'the boss bar shows its health');
+    sim(6); ok(mega.label && mega.label.userData.plate && mega.label.visible && document.querySelector('[data-boss]').hidden, 'the MEGA shows its health on a plate over its head (no HUD boss bar)');
     // a stomp: on the ground = hurt, in the air = JUMPED IT
     mega.expose = 0; mega.state = 'walk'; sim(2);
     F.heal(9999); let hpS = F.hp();

@@ -1603,3 +1603,12 @@ anvil-dropzone { display: contents; }
 .ui .wk .wk-weak .wk-num input[type=text] { width: 52px; }
 .ui .wk .wk-ctx input[type=text] { width: 76px; }
 .ui .wk .wk-ctx select { max-width: 220px; }
+
+/* ===== colour blocks: the HUD chip under the street name (cft-color.js, 2026-11-21) ===== */
+.cft-colour { display: flex; align-items: center; gap: 8px; margin: 4px 0 0 auto; min-height: 30px; padding: 3px 10px; border: 2px solid #1f1a3d; border-radius: 999px; background: #fff; color: #1f1a3d; font: 800 .78rem/1 var(--font-body); cursor: pointer; pointer-events: auto; box-shadow: 2px 2px 0 #1f1a3d; transition: transform var(--dur-press) var(--ease-out); }
+.cft-colour:hover { transform: translateY(-1px); } .cft-colour:active { transform: translate(1px, 1px); }
+.cft-colour:focus-visible { outline: 3px solid #6b4eff; outline-offset: 2px; }
+.cft-cbars { display: grid; gap: 2px; width: 46px; }
+.cft-cbars i { display: block; height: 4px; border-radius: 9px; background: #e6e1f3; overflow: hidden; }
+.cft-cbars b { display: block; height: 100%; width: 0; transition: width var(--dur-slow) var(--ease-out); }
+.cft-cbars i:nth-child(1) b { background: #ff8a3d; } .cft-cbars i:nth-child(2) b { background: #6b4eff; } .cft-cbars i:nth-child(3) b { background: #20c997; }

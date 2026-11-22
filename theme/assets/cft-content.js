@@ -1891,6 +1891,15 @@ D.TUNE = {
     ptsPerCoin: 30, cashCap: 450, ptsPerXp: 14,   // rewards
     streakT: 6,                   // seconds after a landing to launch again and keep the streak (x1.25, x1.5 ... x2)
   },
+  color: {                        // cft-color.js (2026-11-21): colour blocks, 2 x 2 km squares that start grey (docs/colour-blocks.md)
+    libTarget: 40,                // 🏠 buildings: points of freed places for full colour (a block with fewer places needs all of them)
+    wOutpost: 4, wMetro: 4,       // points for a liberated outpost (Tom Hearton's, grocery) and a freed metro entrance
+    wShop: 1, wMadeUp: 0.5,       // points for walking into a real shop / a made-up one (E)
+    secretTarget: 8,              // 🛣️ streets: secret stashes found in the block for full colour
+    killTarget: 25,               // 🌳 nature: figments bonked in the block for full colour (champions 2, rares and King Blob 3, guardians 5)
+    minSat: 0,                    // colour a block keeps at the very start (0 = pure grey)
+    rewardCash: 300, rewardXp: 400,   // BLOCK RESTORED (all three layers full): money and XP (+15% / +10% per level)
+  },
   camp: {                         // cft-camp.js (2026-11-18): the campaign, secrets, ammo, powers, fire, storms, mega figments
     introFoes: 14, introFoesLow: 8,   // figments chasing you at once in the opening five minutes
     ammoStart: 20, ammoMax: 60, ammoCrate: 12,   // shots for ranged weapons (heavy ones cost more: weapon.ammo)
@@ -1922,6 +1931,27 @@ D.DMG_TYPES = [['bonk', '🏏', 'Bonk'], ['shot', '🎯', 'Shots'], ['water', '�
   };
   for (const k in D.MONSTERS) { const w = Object.assign({}, WEAK[k] || {}, D.MONSTERS[k].weak || {}); D.MONSTERS[k].weak = {}; for (const t of D.DMG_TYPES) D.MONSTERS[k].weak[t[0]] = w[t[0]] || 1; }
 }
+
+// ======================================================== every weapon's numbers, written out (2026-11-21, the user: "control the
+// stats of all the weapons including their attack arch, strength adder, defence and so on" from Admin > Balance)
+// Bonk weapons: dmg, reach, arc (degrees: how wide a swing reaches; also the arc on the ground), cd (seconds between swings),
+// hits (most figments one swing hits), knock, stun (seconds), add (flat damage added to every hit, before level growth),
+// crit (chance of a double hit), def (armour while it is in your hand), block (extra share a block stops while it is in hand).
+// Shooters: dmg, reach, rate (seconds a shot), ammo, pellets, splash (metres, 0 = none), speed (m/s), knock, stun, add, crit.
+// Missing numbers get the game's old defaults here, so every one of them is a real, editable path in the wiki.
+D.WEAPON_DEFAULTS = {
+  melee: { arc: 160, cd: 0.42, hits: 3, knock: 3, stun: 0, add: 0, crit: 0, def: 0, block: 0 },
+  cone: { arc: 66, cd: 0.42, hits: 3, knock: 3, stun: 0, add: 0, crit: 0, def: 0, block: 0 },
+  shot: { rate: 0.32, ammo: 1, knock: 3, stun: 0, add: 0, crit: 0 },
+  proj: { rate: 0.5, ammo: 1, pellets: 1, splash: 0, speed: 22, knock: 3, stun: 0, add: 0, crit: 0 },
+};
+for (const id in D.ITEMS) {
+  const w = D.ITEMS[id].weapon;
+  if (!w) continue;
+  const d = D.WEAPON_DEFAULTS[w.ranged || 'melee'] || D.WEAPON_DEFAULTS.melee;
+  for (const k in d) if (typeof w[k] !== 'number') w[k] = d[k];
+}
+for (const k in D.WEAPON_DEFAULTS.melee) if (typeof D.SLAP[k] !== 'number') D.SLAP[k] = D.WEAPON_DEFAULTS.melee[k];
 
 // ======================================================== the formulas (one copy: the game and the Admin > Balance wiki both use them)
 D.calc = {

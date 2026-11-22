@@ -2034,7 +2034,7 @@ function mount(root, opts) {
       const k = D.KINDS[pl.kind];
       if (pl.kind === 'metro') return metroOpen(pl) ? { t: '🚇 Ride the metro', fn: () => U.metroPanel(pl) } : { t: '🚇 ' + (G.fun ? G.fun.stationName(pl) : pl.name || 'Metro') + ': a guardian blocks the stairs', fn: () => U.toast('Beat the guardian here and this station joins your metro network.') };
       if (pl.kind === 'bank') return { t: '🏦 ' + (pl.name || 'Bank'), fn: () => U.bankPanel(pl) };
-      if (k && k.sells.length) return { t: k.e + ' ' + (pl.name || k.n), fn: () => U.shopPanel(pl) };
+      if (k && k.sells.length) return { t: k.e + ' ' + (pl.name || k.n), fn: () => { if (G.color) G.color.visit(pl); U.shopPanel(pl); } };   // walking in counts for the colour blocks
     }
     const pcar2 = G.hero && onFootNow && !save.equip.ride && W.borrowable(p.x, p.z, 2.4);
     if (pcar2) return { t: '🚗 Borrow this car', fn: () => G.hero.borrow(pcar2) };
@@ -2178,6 +2178,7 @@ function mount(root, opts) {
     if (G.camp) G.camp.tick(dt, paused || rt.busy);
     if (G.wild) G.wild.tick(dt, paused || rt.busy);
     if (G.aim) G.aim.tick(dt, paused || rt.busy);
+    if (G.color) G.color.tick(dt, paused || rt.busy);
     if (G.stunt) G.stunt.tick(dt, paused || rt.busy);
     rt.promptTimer -= dt;
     if (rt.promptTimer <= 0) { rt.promptTimer = 0.15; rt.interact = (paused || rt.busy) ? null : findInteraction(); U.prompt(rt.interact ? rt.interact.t : null); }
@@ -2267,7 +2268,8 @@ function mount(root, opts) {
     if (window.CFTChaos && G.fun) G.chaos = window.CFTChaos.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the chaos update (cft-chaos.js)
     if (window.CFTCamp && G.fun) G.camp = window.CFTCamp.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; }, travel, setState: v => { state = v; } });  // the campaign update (cft-camp.js)
     if (window.CFTWild && G.fun) G.wild = window.CFTWild.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; }, spawnPickup, setBusy: v => { rt.busy = !!v; } });  // the open-air update (cft-wild.js)
-    if (window.CFTAim && G.fun) G.aim = window.CFTAim.attach(G, { bump });  // the aim update (cft-aim.js): right-mouse sight, slots 1-4, the web, rainbow guides
+    if (window.CFTAim && G.fun) G.aim = window.CFTAim.attach(G, { bump });
+    if (window.CFTColor && G.fun) G.color = window.CFTColor.attach(G, { bump });  // colour blocks (cft-color.js): 2 km squares that start grey  // the aim update (cft-aim.js): right-mouse sight, slots 1-4, the web, rainbow guides
     if (window.CFTStunt && G.fun) G.stunt = window.CFTStunt.attach(G, { bump, bumpTo: (k, n) => { save.counters[k] = n; } });  // the stunt update (cft-stunt.js): ramps + rings of fire pop up when you drive
     if (window.CFTCine) G.cine = window.CFTCine.attach(G);  // voiced cinematic mission scenes (cft-cine.js + the clip list cft-vo.js)
     if (window.CFTDebug) G.debug = window.CFTDebug.attach(G);  // the play-test panel: only with ?debug=1
@@ -2327,6 +2329,7 @@ function mount(root, opts) {
       if (G.camp) G.camp.destroy();
       if (G.wild) G.wild.destroy();
       if (G.aim) G.aim.destroy();
+      if (G.color) G.color.destroy();
       if (G.stunt) G.stunt.destroy();
       if (G.cine) G.cine.destroy();
       if (G.debug) G.debug.destroy();

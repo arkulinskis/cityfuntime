@@ -130,11 +130,13 @@ function attach(G, api) {
     const cap = CP.CAP[Math.min(tier, CP.CAP.length - 1)];
     setT('[data-mcount]', inf ? '🌀 The opening: survive' : '📍 ' + Math.min(shown, cap) + '/' + cap + ' on the map  ·  🌀 ' + Math.min(tier, CP.WILD.length) + '/' + CP.WILD.length + ' weird');
     // the boss bar: the nearest MEGA figment
+    // MEGA plates over their heads (the old HUD boss bar stays hidden since 2026-11-21)
+    for (const q of K.megas) if (!q.dead && q.label.userData.plate) q.label.userData.plate.set({ name: q.def.e + ' ' + q.def.n + ' · MEGA', lvl: q.lvl, pct: Math.max(0, q.hp / q.mhp), rank: 'mega',
+      sub: q.expose > 0 ? '💥 WEAK SPOT OPEN! Hit the glowing heart!' : q.state === 'stomp' ? '⚠️ STOMP INCOMING: JUMP!' : q.wave ? '⚠️ Shockwave: jump when it reaches you' : 'Jump its stomp, then hit the glowing heart' }, 0.25);
     const bb = $('[data-boss]');
     if (bb) {
-      const p = P(); let m = null, bd = 220;
-      for (const q of K.megas) { if (q.dead) continue; const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < bd) { bd = d; m = q; } }
-      bb.hidden = !m;
+      const m = null;
+      bb.hidden = true;
       if (m) {
         setT('[data-bossname]', m.def.e + ' ' + m.def.n + ' · MEGA · level ' + m.lvl);
         $('[data-bossbar]').style.width = Math.max(0, Math.round(m.hp / m.mhp * 100)) + '%';
@@ -634,7 +636,7 @@ function attach(G, api) {
     glow.scale.setScalar(1.6); heart.add(glow);
     heart.visible = false;
     W.scene.add(heart);
-    const label = W.label(def.e + ' ' + def.n, { bg: 'rgba(160,20,50,.92)', fg: '#ffffff', size: 44, height: 2.4, border: '#1f1a3d', depthTest: false });
+    const label = W.foePlate({ big: true });   // name, level, health and what to do, over its head (2026-11-21: no HUD bar)
     W.scene.add(label);
     const tag = W.label('💥 WEAK SPOT!', { bg: '#ffc21f', fg: '#1f1a3d', size: 44, height: 0.9, border: '#1f1a3d', depthTest: false });
     tag.visible = false; W.scene.add(tag);
@@ -652,7 +654,7 @@ function attach(G, api) {
   function removeMega(m) {
     m.dead = true;
     const i = K.megas.indexOf(m); if (i >= 0) K.megas.splice(i, 1);
-    W.removeObj(m.obj); W.scene.remove(m.heart); W.scene.remove(m.label); W.scene.remove(m.tag);
+    W.removeObj(m.obj); W.scene.remove(m.heart); W.scene.remove(m.label); W.scene.remove(m.tag); if (m.label.userData.plate) m.label.userData.plate.dispose();
     for (const r of m.rings) W.scene.remove(r.mesh);
     if (m.rock) W.scene.remove(m.rock.obj);
   }
@@ -998,6 +1000,7 @@ function attach(G, api) {
   function openSecret(o) {
     const c = st(), s = save(), p = P(), L = lvl();
     c.secrets[o.sp.id] = s.day;
+    if (G.color) G.color.secret(o.sp);   // colour blocks: stashes bring the streets back
     W.scene.remove(o.obj); K.stash.delete(o.sp.id);
     api.bump('secrets');
     let tot = 0; for (const r of CP.SECRET_LOOT) tot += r[1];
