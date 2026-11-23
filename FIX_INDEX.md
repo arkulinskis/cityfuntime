@@ -92,6 +92,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Chaos street events (Ohio, glitch, cats & dogs, cheese, 6-7, balloons) | "glitch too long" | cft-chaos `C.startEvent` `C.updateEvent` `C.endEvent` (via cft-fun startEvent) | `D.EVENTS` (chaos: true) | --chaos |
 | Sky (blimps, balloons, whale) | "blimp text" | cft-chaos `skyTick` `blimpModel` | `D.CHAOS.BLIMPS` | --chaosshots |
 | Hit-stop | "game freezes on hits" | cft-game `frame` (`rt.hitstop`), cft-chaos `hitstop` | `D.TUNE.chaos.hitstop` | --chaos |
+| Start over (new life) | "restart doesn't reset money/level" | cft-kit `CFT.reset` + `mountGame` onReset (`CFT.wiping`), cft-ui settings `case 'reset'`, server `reset_save` | none | node tools/testing/reset_test.js |
 | The opening (5 immortal minutes) | "too long", "too few figments", "lands too far from home" | cft-camp `K.startIntro` `introTick` `endIntro` `wakeUp` (fever dream: what is reset, `DREAM_KEYS`) `K.shrug`, cft-game `startWorld` (introPending) | `D.CAMPAIGN.INTRO_SECS`, `D.TUNE.camp.introFoes` | --camp |
 | Crazy list (one more per mission), mission cap | "storms too early", "show 4 missions" | cft-camp `K.allow` `tierTick` `K.capOpen`, cft-game `G.allow` `G.openMissions` | order of `D.CAMPAIGN.WILD`, `D.CAMPAIGN.CAP` | --camp |
 | Ammo, crates | "runs out too fast", "crates too far" | cft-camp `K.useAmmo` `manageCrates` `K.collect`, cft-fun `F.attack` (useAmmo) | `D.TUNE.camp.ammo*`, `crate*`, weapon `ammo` in `D.ITEMS` | --camp |

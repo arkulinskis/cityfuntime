@@ -958,6 +958,10 @@ at the sky." The write-up: **`docs/colour-blocks.md`**.
   answer, the world asks `tile_backup` (server_code/Tiles.py; cap 3,000 MB; Admin > Map backup).
 
 ## Gotchas
+- **"Start over" (Settings > reset)** goes through cft-kit.js `mountGame` onReset: it sets `CFT.wiping` (persist/push
+  do nothing), destroys the game, then `CFT.reset()` (removes this user's save, the guest save, photos and dex pictures
+  on this device + server `reset_save`), then reloads. Order matters: the game's destroy() makes a last "exit" save, which
+  before 2026-11-23 wrote the old life straight back. Test: `node tools/testing/reset_test.js` (in check.py).
 
 - **Tim Hortons is always "Tom Hearton's"** (the user's rule, for legal reasons): never show the real name. Outposts are
   liberations (figments occupy the place; staff thank you), never mockery of the business.

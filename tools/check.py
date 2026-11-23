@@ -85,6 +85,8 @@ def main():
     step("asset hashes", r.returncode == 0, r.stdout + r.stderr)
     if "updated" in r.stdout:
         print("     (anvil.yaml was updated with new asset hashes: commit it)")
+    r = run(["node", str(ROOT / "tools" / "testing" / "reset_test.js")], timeout=60)
+    step("start over wipes the life", r.returncode == 0, (r.stdout + r.stderr)[-2000:])
     r = run([sys.executable, str(ROOT / "tools" / "testing" / "test_server.py")], timeout=600)
     step("server tests: " + (r.stdout.strip().splitlines() or ["?"])[-1], r.returncode == 0 and "ALL OK" in r.stdout,
          (r.stdout + r.stderr)[-3000:])

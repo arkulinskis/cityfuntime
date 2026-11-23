@@ -108,6 +108,7 @@
     },
     // Called by the game whenever something changes (debounced there). Writes locally at once, to the server every 20 s.
     persist: function (save, reason) {
+      if (CFT.wiping) return;  // "Start over" in progress: the old life must not write itself back
       set(CFT.key(), save);
       if (!CFT.me) return;
       var now = Date.now();
@@ -115,14 +116,22 @@
       else { clearTimeout(CFT._t); CFT._t = setTimeout(function () { CFT.push(save); }, 20000 - (now - CFT._last)); }
     },
     push: function (save, quiet) {
-      if (!CFT.me) return Promise.resolve();
+      if (!CFT.me || CFT.wiping) return Promise.resolve();
       CFT._last = Date.now();
       clearTimeout(CFT._t);
       return CFT.api('put_save', [save], true).then(function (r) { CFT.lastSync = Date.now(); return r; },
         function (e) { if (!quiet) console.warn('save', e && e.message); });
     },
+    // "Start over": forget the life everywhere. Call it with saving already stopped (CFT.wiping) and the game torn
+    // down, or the game's last "exit" save writes the old life straight back (the 2026-11-23 bug). Also clears this
+    // device's guest life (or loadSave would offer it back as "a game played before signing in"), the photos and the
+    // creature snapshots.
     reset: function () {
-      set(CFT.key(), null);
+      clearTimeout(CFT._t);
+      var who = CFT.me ? CFT.me.id : 'guest';
+      [CFT.key(), 'save.guest', 'photos.' + who].forEach(function (k) { try { localStorage.removeItem(STORE + k); } catch (e) { /* blocked */ } });
+      try { localStorage.removeItem('cityfuntime.dexpics.' + who); } catch (e) { /* blocked */ }
+      CFT.save = null; CFT.adopt = null;
       return CFT.me ? CFT.api('reset_save', [], true) : Promise.resolve();
     },
     photos: function () { return get('photos.' + (CFT.me ? CFT.me.id : 'guest'), []); },
@@ -173,7 +182,15 @@
           onSave: function (s, reason) { CFT.persist(s, reason); },
           onPhoto: function (url, meta) { CFT.addPhoto(url, meta); },
           onExit: function () { hooks.exit(); },
-          onReset: function () { CFT.reset().then(function () { if (game) { game.destroy(); game = null; } hooks.reload(); }); }
+          onReset: function () {
+            CFT.wiping = true;  // no more saves from the old life, not even the one destroy() makes on the way out
+            if (game) { game.destroy(); game = null; window.CFT_GAME = null; }
+            CFT.reset().then(function () { CFT.wiping = false; hooks.reload(); }, function (e) {
+              CFT.wiping = false;
+              alert('Your life could not be wiped on the server (' + ((e && e.message) || 'no connection') + '). Please try again.');
+              hooks.reload();
+            });
+          }
         });
         window.CFT_GAME = game;
       }, function (e) {
