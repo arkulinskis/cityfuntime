@@ -343,18 +343,29 @@ function attach(G, api) {
   K.charges = () => { const c = st(); return { ammo: c.ammo, water: c.water, volt: c.volt, foam: c.foam }; };
 
   // ------------------------------------------------------------------ powers: water (1), lightning (2), the extinguisher (hold 3)
+  // {x, z} flat direction + up (rise per metre, 2026-11-23): the sight's point, else how far up you look (W.aimEl)
   function aimDir() {
+    const f = aimFlat(), p = P();
+    if (f.up == null) f.up = Math.tan(W.aimEl ? W.aimEl() : 0);
+    if (W.aiming && W.aimPoint) { const ap = W.aimPoint, d = Math.hypot(ap.x - p.x, ap.z - p.z); if (d > 0.5) f.up = (ap.y - p.y - 1.35) / d; }
+    f.up = Math.max(-1.2, Math.min(4, f.up));
+    return f;
+  }
+  // is a thing at height y, d metres away, inside the jet (aimed f.up from shoulder height)?
+  const inJet = (p, f, d, y, slack) => Math.abs(y - (p.y + 1.35 + f.up * d)) < slack + d * 0.12;
+  function aimFlat() {
     const p = P();
     if (W.aiming && W.aimPoint) { const dx = W.aimPoint.x - p.x, dz = W.aimPoint.z - p.z, d = Math.hypot(dx, dz); if (d > 0.5) return { x: dx / d, z: dz / d }; }  // the right-mouse sight (cft-aim.js)
     if (W.isLocked && W.isLocked()) return { x: -Math.sin(W.cam.yaw), z: -Math.cos(W.cam.yaw) };
     // nudge onto the best target in front: a mega's open weak spot, a figment, a fire
     const fx = -Math.sin(W.player.face), fz = -Math.cos(W.player.face);
     let best = null, bs = -9;
-    const consider = (x, z, range, bonus) => { const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); if (d < 0.5 || d > range) return; const cs = (dx * fx + dz * fz) / d; if (cs < 0.55) return; const sc = cs * 2 - d / range + (bonus || 0); if (sc > bs) { bs = sc; best = { x: dx / d, z: dz / d }; } };
-    for (const m of F.monsters) if (!m.dead) consider(m.x, m.z, T.voltRange, 0.2);
-    for (const m of K.megas) if (!m.dead && m.expose > 0) consider(m.hx, m.hz, T.voltRange + 6, 0.6);
-    for (const f of K.fires) consider(f.x, f.z, T.waterRange, 0.1);
-    if (best) { W.player.face = Math.atan2(-best.x, -best.z); return best; }
+    const el = W.aimEl ? W.aimEl() : 0;
+    const consider = (x, z, range, bonus, y) => { const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); if (d < 0.5 || d > range) return; const cs = (dx * fx + dz * fz) / d; if (cs < 0.55) return; if (el > 0.2 && Math.atan2(y - p.y - 1.35, d) < el - 0.5) return; const sc = cs * 2 - d / range + (bonus || 0); if (sc > bs) { bs = sc; best = { x: dx / d, z: dz / d, up: (y - p.y - 1.35) / d }; } };
+    for (const m of F.monsters) if (!m.dead) consider(m.x, m.z, T.voltRange, 0.2, m.obj.position.y + (m.obj.userData.h || 1.4) * (m.obj.userData.size || 1) * 0.55);
+    for (const m of K.megas) if (!m.dead && m.expose > 0) consider(m.hx, m.hz, T.voltRange + 6, 0.6, m.hy);
+    for (const f of K.fires) consider(f.x, f.z, T.waterRange, 0.1, gy(f.x, f.z) + 0.6);
+    if (best) { W.player.face = Math.atan2(-best.x, -best.z); return { x: best.x, z: best.z, up: best.up }; }
     return { x: fx, z: fz };
   }
   const inCone = (p, f, x, z, range, dot) => { const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); return d < range && (d < 1 || (dx * f.x + dz * f.z) / d > dot) ? d : -1; };
@@ -373,13 +384,15 @@ function attach(G, api) {
   };
   function waterBlast() {
     const p = P(), f = aimDir(), y = p.y + 1.35;
-    for (let d = 1.2; d < T.waterRange; d += 1.3) W.burst(p.x + f.x * d, y - d * 0.04, p.z + f.z * d, Math.random() < 0.6 ? '💧' : '💦', 1, { spread: 0.6 + d * 0.06, up: 1.2, size: 0.55, life: 0.45, grav: 6 });
+    for (let d = 1.2; d < T.waterRange; d += 1.3) W.burst(p.x + f.x * d, y + f.up * d - d * 0.04, p.z + f.z * d, Math.random() < 0.6 ? '💧' : '💦', 1, { spread: 0.6 + d * 0.06, up: 1.2, size: 0.55, life: 0.45, grav: 6 });
     sfx('splash');
     let hits = 0;
     for (const m of F.monsters.slice()) {
       if (m.dead) continue;
       const d = inCone(p, f, m.x, m.z, T.waterRange + m.r, 0.72);
       if (d < 0) continue;
+      const mh = (m.obj.userData.h || 1.4) * (m.obj.userData.size || 1);
+      if (!inJet(p, f, d, m.obj.position.y + mh * 0.5, mh * 0.6 + 1)) continue;   // the jet went over or under it
       m.wet = G.rt.t + 8;
       F.hitMonster(m, { dmg: 0.5 * lvlMul(), type: 'water', knock: T.waterKnock, stun: 1.1, word: pick(['SPLASH!', 'SPLOOSH!', 'SOAKED!']), puff: '💦' }, f);
       hits++;
@@ -427,8 +440,9 @@ function attach(G, api) {
     }
     let target = null, bs = -9;
     for (const m of F.monsters) { if (m.dead) continue; const d = inCone(p, f, m.x, m.z, T.voltRange + m.r, 0.5); if (d < 0) continue; const sc = -d + (m.wet > G.rt.t ? 6 : 0); if (sc > bs) { bs = sc; target = m; } }
-    if (!target) {
-      const tx = p.x + f.x * 11, tz = p.z + f.z * 11, ty = gy(tx, tz);
+    if (!target) {   // nothing to hit: the sight's point (a roof, a wall) when aiming, else the ground ahead
+      const ap = W.aiming && W.aimPoint && W.aimPoint.kind !== 'sky' && Math.hypot(W.aimPoint.x - p.x, W.aimPoint.z - p.z) < T.voltRange + 6 ? W.aimPoint : null;
+      const tx = ap ? ap.x : p.x + f.x * 11, tz = ap ? ap.z : p.z + f.z * 11, ty = ap ? ap.y : gy(tx, tz);
       bolt(tx, ty + 26, tz, tx, ty, tz, 0.35);
       strikeGround(tx, tz, 0.6);
       return;
@@ -459,6 +473,7 @@ function attach(G, api) {
     else if (Math.random() < fireChance * 0.4) K.spawnFire(x, z, 0.5);
     for (const m of F.monsters.slice()) if (!m.dead && Math.hypot(m.x - x, m.z - z) < 3.5) F.hitMonster(m, { dmg: T.voltDmg * lvlMul() * 0.8, type: 'volt', knock: 6, stun: 1.4, word: 'ZAP!', puff: '⚡' }, { x: (m.x - x) || 0.1, z: (m.z - z) || 0.1 });
   }
+  function inFoam(p, f, m) { const d = inCone(p, f, m.x, m.z, 5.5 + m.r, 0.6), mh = (m.obj.userData.h || 1.4) * (m.obj.userData.size || 1); return d >= 0 && inJet(p, f, d, m.obj.position.y + mh * 0.5, mh * 0.6 + 1); }
   function sprayTick(dt) {
     const c = st(), inf = K.inIntro();
     if (!spraying) return;
@@ -466,9 +481,9 @@ function attach(G, api) {
     if (!inf) c.foam = Math.max(0, c.foam - 12 * dt);
     const p = P(), f = aimDir(), y = p.y + 1.1;
     sprayFx -= dt;
-    if (sprayFx <= 0) { sprayFx = 0.07; for (let d = 1; d < 7; d += 1.4) W.burst(p.x + f.x * d, y, p.z + f.z * d, Math.random() < 0.5 ? '☁️' : '⚪', 1, { spread: 0.5 + d * 0.15, up: 0.8, size: 0.6, life: 0.5, grav: 1 }); }
+    if (sprayFx <= 0) { sprayFx = 0.07; for (let d = 1; d < 7; d += 1.4) W.burst(p.x + f.x * d, y + f.up * d, p.z + f.z * d, Math.random() < 0.5 ? '☁️' : '⚪', 1, { spread: 0.5 + d * 0.15, up: 0.8, size: 0.6, life: 0.5, grav: 1 }); }
     for (const fi of K.fires.slice()) if (inCone(p, f, fi.x, fi.z, 8, 0.55) >= 0) douse(fi, 160 * dt);
-    for (const m of F.monsters) if (!m.dead && inCone(p, f, m.x, m.z, 5.5 + m.r, 0.6) >= 0) { m.stun = Math.max(m.stun, 0.35); if (!(m.foamT > G.rt.t)) { m.foamT = G.rt.t + 1.5; W.pop(m.x, m.obj.position.y + 2, m.z, 'FOAMED!', '#ffffff', 0.7); } }
+    for (const m of F.monsters) if (!m.dead && inFoam(p, f, m)) { m.stun = Math.max(m.stun, 0.35); if (!(m.foamT > G.rt.t)) { m.foamT = G.rt.t + 1.5; W.pop(m.x, m.obj.position.y + 2, m.z, 'FOAMED!', '#ffffff', 0.7); } }
   }
 
   // ------------------------------------------------------------------ fire: it spreads, it hurts, it burns things down. Put it out.

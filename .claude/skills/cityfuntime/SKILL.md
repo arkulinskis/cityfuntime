@@ -310,6 +310,11 @@ Diablo 2 monsters + gear, GTA missions slowly disclosed + cars destroying things
   photo along a street (pavement slabs start at the kerb and run on across segments), null = world x/z. The shader divides
   each photo by its average colour, so the vertex colours still decide the palette; `TEX[i].real` mixes in the photo's own
   hue, `k` = detail strength, `m` = metres per photo (their real size). A second, 14x larger sample breaks up the repeat.
+  **Drawn, not photos:** roads (`cartoonRoad`, 2026-11-20) and pavements (`cartoonPavement`, 2026-11-23, user: the
+  sidewalk "looks uninviting, needs to be more friendly"): canvas tiles via `TEX[i].draw`. The pavement = 4 x 4 cream
+  slabs of 1.5 m (m = 6) with bevels, joint grass + flowers and five chalk doodles; `real: 0.5` so the chalk colours
+  show; warm `paveCol` 0xd8ccb6 / `kerbCol` 0xeee6d6, borough `L.pc` = that lerped 0.3 to the borough wall colour.
+  ground-sidewalk.jpg is no longer loaded.
   Every mesh drawn with MAT.drape/terrain must carry `glayer` + `guv`. Both quality levels get them (low = 512 px).
   Pictures: `game_test.py --ground DIR` (`W.findArea(kinds, minArea)` finds a park/plaza to stand in).
 - **Outposts never spawn within 90 m of home** (home is calm). The older suites set `CFT_TEST.outposts = false` (with ~70
@@ -659,6 +664,11 @@ am I collecting? Spiderwebs: in the right-left click combo it shoots out and pul
     DOM `.cft-sight[data-sight]` (centre of the screen, only while aiming: the one thing allowed in the middle) red on a
     figment, green on a web-able wall, dashed grey "no wall"; label = slot + distance. cft-camp `aimDir` and cft-chaos
     `aimShot` use `W.aimPoint` first (exact, no nudge).
+  - **Height without the sight (2026-11-23, user: shots "never go up"):** cft-world `W.aimEl()` = how far up the camera
+    looks (+ `AIM_BIAS` 0.28, so the default chase view shoots level). Used by `aimShot` (no-target shots, up to 22 m
+    high; looking up skips targets far below), `F.shoot` bubble shots (now 3D: y/vy, hit figments only at their height),
+    cft-camp `aimDir().up` + `inJet` (water and foam spray tilt and only hit at the jet's height). Lightning with no
+    target strikes the sight's point. Test: `game_test.py --eval tools/live/upaimtest.js`.
   - **The web:** `shootWeb` -> a strand (`strandGeo` box stretched from `handPos()`, flies at `webSpeed`) -> on a wall
     `W.tether = {x, y, z, v0, acc, max, life}`; cft-world updatePlayer (foot only) pulls toward it, no gravity, A/D steer,
     Space = let go (`W.onTetherEnd('jump')`); releasing the right button = `cutWeb()` (setAim(false): pull stops, speed kept, strand gone); arrival (within 1.6 m, or a wall hit within 5.5 m, or `life` s) = mantle onto the

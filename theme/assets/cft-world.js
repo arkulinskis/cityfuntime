@@ -236,7 +236,7 @@ function create(opts) {
   // Without WebGL2, or until the photos load, the ground looks as it did before (plain colours).
   const TEX = [
     { f: 'asphalt', m: 7.0, k: 1.0, real: 0, draw: cartoonRoad },  // 0 car roads, service lanes, cycleways, road paint (drawn, not a photo)
-    { f: 'sidewalk', m: 1.8, k: 1.0, real: 0.25 },  // 1 pavements + kerbs (slabs laid along the street)
+    { f: 'sidewalk', m: 6.0, k: 1.0, real: 0.5, draw: cartoonPavement },  // 1 pavements + kerbs: drawn cartoon slabs laid along the street (4 x 4 of 1.5 m)
     { f: 'grass', m: 2.4, k: 0.95, real: 0.4 },     // 2 grass, parks, pitches, cemeteries
     { f: 'forest', m: 3.0, k: 0.9, real: 0.45 },    // 3 woods
     { f: 'bricks', m: 2.4, k: 0.9, real: 0.5 },     // 4 plazas, pedestrian streets, steps
@@ -340,6 +340,69 @@ varying float vGL; varying vec2 vGUV;
         if (lt) { g.beginPath(); g.arc(x - r * 0.35, y - r * 0.35, r * 0.35, 0, Math.PI * 2); g.fillStyle = 'rgba(255,255,255,0.45)'; g.fill(); }
       });
     }
+    return c;
+  }
+  // The pavement as a cartoon (2026-11-23, the user: the photo "looks uninviting, needs to be more friendly"): warm cream
+  // slabs with soft bevels and rounded corners, little grass tufts and flowers in the joints, and the odd chalk doodle
+  // (heart, star, smiley, sun, hopscotch squares). 4 x 4 slabs per tile (TEX m = 6 m), seamless: the joints sit on the
+  // tile edges and anything crossing an edge is drawn again one tile over. real = 0.5 lets the chalk colours show.
+  function cartoonPavement(S) {
+    const c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d'), u = S / 512, N = 4, cell = S / N, j = 5 * u;   // j = half a joint
+    let seed = 11;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const wrap = fn => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { g.save(); g.translate(ox, oy); fn(); g.restore(); } };
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    g.lineJoin = g.lineCap = 'round';
+    g.fillStyle = '#b3a58f'; g.fillRect(0, 0, S, S);   // the joints
+    const tones = ['#e9dfcc', '#e4d8c2', '#ede4d3', '#e6d6c4', '#e2dccb', '#eadbc8'];
+    for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) {
+      const x = a * cell + j, y = b * cell + j, w = cell - 2 * j, r = 14 * u;
+      rr(x, y, w, w, r); g.fillStyle = tones[Math.floor(rnd() * tones.length)]; g.fill();
+      // soft bevel: light from the top-left, a shade along the bottom-right
+      g.save(); rr(x, y, w, w, r); g.clip();
+      g.lineWidth = 7 * u; g.strokeStyle = 'rgba(255,255,255,0.55)'; rr(x + 2 * u, y + 2 * u, w + 6 * u, w + 6 * u, r); g.stroke();
+      g.strokeStyle = 'rgba(120,98,70,0.22)'; rr(x - 6 * u, y - 6 * u, w + 4 * u, w + 4 * u, r); g.stroke();
+      for (let k = 0; k < 26; k++) {   // speckles, like terrazzo
+        g.beginPath(); g.arc(x + rnd() * w, y + rnd() * w, (1 + rnd() * 1.8) * u, 0, Math.PI * 2);
+        g.fillStyle = rnd() < 0.5 ? 'rgba(150,128,100,0.35)' : 'rgba(255,255,255,0.6)'; g.fill();
+      }
+      g.restore();
+      g.lineWidth = 2 * u; g.strokeStyle = 'rgba(110,92,70,0.45)'; rr(x, y, w, w, r); g.stroke();   // a friendly outline
+    }
+    // grass tufts and tiny flowers in the joints
+    const FLOWER = ['#ffffff', '#ffd23f', '#ff8fb8', '#b48cff'];
+    for (let i = 0; i < 18; i++) {
+      const along = rnd() < 0.5, line = Math.floor(rnd() * N) * cell, t = rnd() * S;
+      const x = along ? t : line, y = along ? line : t;
+      wrap(() => {
+        g.strokeStyle = '#5fa24a'; g.lineWidth = 2.4 * u;
+        for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(x + k * 2 * u, y); g.quadraticCurveTo(x + k * 3 * u, y - 6 * u, x + k * 5 * u, y - (9 + rnd() * 5) * u); g.stroke(); }
+        if (rnd() < 0.55) {
+          const fx = x + (rnd() - 0.5) * 6 * u, fy = y - 9 * u, col = FLOWER[Math.floor(rnd() * FLOWER.length)];
+          for (let k = 0; k < 5; k++) { const an = k / 5 * Math.PI * 2; g.beginPath(); g.arc(fx + Math.cos(an) * 3.2 * u, fy + Math.sin(an) * 3.2 * u, 2.6 * u, 0, Math.PI * 2); g.fillStyle = col; g.fill(); }
+          g.beginPath(); g.arc(fx, fy, 2 * u, 0, Math.PI * 2); g.fillStyle = col === '#ffd23f' ? '#e8853c' : '#ffc21f'; g.fill();
+        }
+      });
+    }
+    // chalk doodles, each inside one slab (so they never cross a tile edge)
+    const chalk = (col, w) => { g.strokeStyle = col; g.lineWidth = (w || 4) * u; g.globalAlpha = 0.8; };
+    const slab = (a, b) => [a * cell + cell / 2, b * cell + cell / 2];
+    const doodles = [
+      (x, y) => { chalk('#ff6fa8'); g.beginPath(); g.moveTo(x, y + 22 * u); g.bezierCurveTo(x - 34 * u, y - 4 * u, x - 18 * u, y - 30 * u, x, y - 12 * u); g.bezierCurveTo(x + 18 * u, y - 30 * u, x + 34 * u, y - 4 * u, x, y + 22 * u); g.stroke(); },
+      (x, y) => { chalk('#f2b500'); g.beginPath(); for (let k = 0; k <= 10; k++) { const an = -Math.PI / 2 + k * Math.PI / 5, r = (k % 2 ? 11 : 26) * u; g.lineTo(x + Math.cos(an) * r, y + Math.sin(an) * r); } g.stroke(); },
+      (x, y) => { chalk('#4f9fe8'); g.beginPath(); g.arc(x, y, 24 * u, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(x, y + 2 * u, 13 * u, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke(); g.beginPath(); g.arc(x - 8 * u, y - 7 * u, 2 * u, 0, Math.PI * 2); g.arc(x + 8 * u, y - 7 * u, 2 * u, 0, Math.PI * 2); g.stroke(); },
+      (x, y) => { chalk('#ff9a3c'); g.beginPath(); g.arc(x, y, 13 * u, 0, Math.PI * 2); g.stroke(); for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4; g.beginPath(); g.moveTo(x + Math.cos(an) * 19 * u, y + Math.sin(an) * 19 * u); g.lineTo(x + Math.cos(an) * 28 * u, y + Math.sin(an) * 28 * u); g.stroke(); } },
+      (x, y) => { chalk('#ffffff', 3.5); const q = 22 * u; [[0, -1.5], [0, -0.5], [-0.5, 0.5], [0.5, 0.5], [0, 1.5]].forEach(([dx, dy], k) => { g.strokeRect(x + dx * q - q / 2, y + dy * q - q / 2, q, q); g.font = 'bold ' + Math.round(13 * u) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffffff'; g.fillText(String(k + 1), x + dx * q, y + dy * q); }); },
+    ];
+    const used = new Set();
+    doodles.forEach(fn => {
+      let a, b; do { a = Math.floor(rnd() * N); b = Math.floor(rnd() * N); } while (used.has(a * N + b));
+      used.add(a * N + b);
+      const [x, y] = slab(a, b);
+      g.save(); g.translate(x, y); g.rotate((rnd() - 0.5) * 0.8); fn(0, 0); g.restore();
+    });
+    g.globalAlpha = 1;
     return c;
   }
   const CAR = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'service', 'track']);
@@ -1080,7 +1143,7 @@ varying float vGL; varying vec2 vGUV;
     { id: 'cherry', n: 'Cherry', a: 0xd62839, b: 0xffe0e3, wall: 0xdc9f9f, roof: [0x5a2a2a, 0x6e3030], line: 0xffffff, dash: 'dots', tree: [0.01, 0.6, 0.45] },
     { id: 'slate', n: 'Slate', a: 0x3f4b5e, b: 0xf4f6fa, wall: 0xc4ccd6, roof: [0x2f3640, 0x3a4048], line: 0xffc21f, dash: 'long', tree: [0.36, 0.25, 0.42] },
   ];
-  for (const L of LOOKS) { L.ac = new THREE.Color(L.a); L.bc = new THREE.Color(L.b); L.wc = new THREE.Color(L.wall); L.lc = new THREE.Color(L.line); L.rc = L.roof.map(c => new THREE.Color(c)); L.pc = new THREE.Color(0xb9b4aa).lerp(L.wc, 0.35); L.css = '#' + L.ac.getHexString(); L.ink = (0.2126 * L.ac.r + 0.7152 * L.ac.g + 0.0722 * L.ac.b) > 0.42 ? '#1f1a3d' : '#ffffff'; L.map = '#' + new THREE.Color(0xcbc3b4).lerp(L.ac, 0.35).getHexString(); L.mapLine = '#' + new THREE.Color(0xb3a998).lerp(L.ac, 0.45).getHexString(); }
+  for (const L of LOOKS) { L.ac = new THREE.Color(L.a); L.bc = new THREE.Color(L.b); L.wc = new THREE.Color(L.wall); L.lc = new THREE.Color(L.line); L.rc = L.roof.map(c => new THREE.Color(c)); L.pc = new THREE.Color(0xd8ccb6).lerp(L.wc, 0.3); L.css = '#' + L.ac.getHexString(); L.ink = (0.2126 * L.ac.r + 0.7152 * L.ac.g + 0.0722 * L.ac.b) > 0.42 ? '#1f1a3d' : '#ffffff'; L.map = '#' + new THREE.Color(0xcbc3b4).lerp(L.ac, 0.35).getHexString(); L.mapLine = '#' + new THREE.Color(0xb3a998).lerp(L.ac, 0.45).getHexString(); }
   W.LOOKS = LOOKS;
   const BORO_Z = 11, BORO_R = 6000, CITY_R = 25000, BORO_MIX = 0.5;
   const boro = { tiles: new Map(), pts: [], stale: new Set() };
@@ -2551,7 +2614,7 @@ varying float vGL; varying vec2 vGUV;
   const dashCol = new THREE.Color(0xe9e2c4);
   // 2026-11-17 graphics pass: road edge lines, pavements and their kerb strip (KERB_Y = height above the ground: just above
   // the road surface, so people's feet don't sink into it)
-  const edgeCol = new THREE.Color(0xeeeee6), paveCol = new THREE.Color(0xb9b4aa), kerbCol = new THREE.Color(0xdcd7cd), KERB_Y = 0.13;
+  const edgeCol = new THREE.Color(0xeeeee6), paveCol = new THREE.Color(0xd8ccb6), kerbCol = new THREE.Color(0xeee6d6), KERB_Y = 0.13;
   // Centre lines. The borough's look picks the colour and pattern (dash 3 m every 9 m, long 6 every 9, dots 0.6 every 2.4,
   // double = two solid lines), so each borough's streets read differently at a glance.
   const DASH = { dash: [3, 9, 0.09], long: [6, 9, 0.11], dots: [0.6, 2.4, 0.16], double: [0, 0, 0.07] };
@@ -4495,6 +4558,15 @@ varying float vGL; varying vec2 vGUV;
     if (W.showOff) { avatar.rotation.y = cam.yaw + Math.PI + Math.sin(performance.now() / 1400) * 0.5; avatar.rotation.x = 0; if (body && !ride.kind) W.animate(body, 0, dt); }
     followLight();
   }
+  // How far up or down you are looking, in radians (+ = up), for ranged weapons without the sight (2026-11-23, the user:
+  // "projectiles need to respect the height of where the target is pointing... never up"). The chase camera looks down
+  // at your head (default pitch 0.32), so AIM_BIAS makes the default view shoot about level; tilting up to the sky lifts it.
+  const AIM_BIAS = 0.28;
+  W.aimEl = function () {
+    const r = W.aimRay;
+    if (!r) return 0;
+    return Math.max(-1.1, Math.min(1.35, Math.atan2(r.dy, Math.hypot(r.dx, r.dz)) + AIM_BIAS));
+  };
   // Mission cut-scenes (cft-cine.js, 2026-11-20): W.cine = {pos, look, fov, face, pose} places the camera exactly; you are
   // always drawn, turned to `face` (yaw) and posed (`pose`: 'phone' on a call). Set to null and the normal camera returns.
   function cineCamera(dt) {

@@ -248,12 +248,13 @@ function attach(G, api) {
   }
   // Where a shot goes: the camera's direction with the mouse captured, else where you face; then nudged onto the best
   // target within ~37° and range (figments, piñatas, balloons). Lobbed shots get the arc that lands on the target.
+  // Height (2026-11-23): the sight's point, else how far up you look (W.aimEl); looking up skips targets far below.
   function aimShot(w, speed, lob, g) {
-    const p = P(), from = { x: p.x, y: p.y + 1.45, z: p.z };
+    const p = P(), from = { x: p.x, y: p.y + 1.45, z: p.z }, el = W.aimEl ? W.aimEl() : 0;
     let fx, fz;
     if (W.isLocked && W.isLocked()) { fx = -Math.sin(W.cam.yaw); fz = -Math.cos(W.cam.yaw); } else { fx = -Math.sin(W.player.face); fz = -Math.cos(W.player.face); }
     let best = null, bs = -9;
-    const consider = (x, y, z, bonus) => { const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); if (d < 0.6 || d > w.reach + 3) return; const c = (dx * fx + dz * fz) / d; if (c < 0.8) return; const sc = c * 2 - d / (w.reach + 3) + (bonus || 0); if (sc > bs) { bs = sc; best = { x, y, z, d }; } };
+    const consider = (x, y, z, bonus) => { const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); if (d < 0.6 || d > w.reach + 3) return; const c = (dx * fx + dz * fz) / d; if (c < 0.8) return; if (el > 0.2 && Math.atan2(y - from.y, d) < el - 0.5) return; const sc = c * 2 - d / (w.reach + 3) + (bonus || 0); if (sc > bs) { bs = sc; best = { x, y, z, d }; } };
     for (const m of F.monsters) if (!m.dead) consider(m.x, monY(m), m.z, m.def.fly ? 0.1 : 0.2);
     for (const q of C.pinatas) consider(q.x, q.y, q.z, 0);
     if (C.ev && C.ev.balloons) for (const b of C.ev.balloons) if (!b.dead) consider(b.x, b.y, b.z, -0.1);
@@ -264,7 +265,7 @@ function attach(G, api) {
     }
     if (tx != null) { /* aimed */ }
     else if (best) { tx = best.x; ty = best.y; tz = best.z; d = best.d; fx = (tx - p.x) / d; fz = (tz - p.z) / d; W.player.face = Math.atan2(-fx, -fz); }
-    else { d = Math.min(w.reach * 0.75, 18); tx = p.x + fx * d; tz = p.z + fz * d; ty = (W.isLocked && W.isLocked()) ? from.y + Math.tan(-(W.cam.pitch - 0.16)) * d : gy(tx, tz) + 0.6; }
+    else { d = Math.min(w.reach * 0.75, 18); tx = p.x + fx * d; tz = p.z + fz * d; ty = Math.max(gy(tx, tz) + 0.4, from.y + Math.min(22, Math.tan(el) * d)); }   // at most 22 m up: lobs stay on screen
     if (lob) {
       const vh = speed * 0.82, t = Math.max(0.25, d / vh), vy = ((ty - from.y) + 0.5 * g * t * t) / t;
       return { from, vx: fx * vh, vy, vz: fz * vh };

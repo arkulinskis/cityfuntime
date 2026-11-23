@@ -147,10 +147,15 @@ function attach(G, api) {
     if (G.camp && !G.camp.useAmmo(w)) return false;   // out of ammo: *click*
     if (w.ranged === 'proj' && G.chaos) return G.chaos.fire(w);
     if (w.ranged === 'shot') {
-      const p = P(), f = facing(), sp = W.emojiSprite(w.puff || '🫧', 0.7);
-      sp.position.set(p.x + f.x * 0.8, p.y + 1.3, p.z + f.z * 0.8);
+      // flat direction + climb (2026-11-23): toward the sight's point, else where you face, tilted by how far up you look
+      const p = P(), sp = W.emojiSprite(w.puff || '🫧', 0.7), y0 = p.y + 1.3;
+      let f = facing(), up = Math.tan(W.aimEl ? W.aimEl() : 0);
+      if (W.aiming && W.aimPoint) { const ap = W.aimPoint, dd = Math.hypot(ap.x - p.x, ap.z - p.z); if (dd > 0.6) { f = { x: (ap.x - p.x) / dd, z: (ap.z - p.z) / dd }; up = (ap.y - y0) / dd; } }
+      up = Math.max(-1.2, Math.min(4, up));
+      const k = 26 / Math.hypot(1, up);
+      sp.position.set(p.x + f.x * 0.8, y0, p.z + f.z * 0.8);
       W.scene.add(sp);
-      F.shots.push({ sp, x: sp.position.x, z: sp.position.z, vx: f.x * 26, vz: f.z * 26, left: w.reach, w });
+      F.shots.push({ sp, x: sp.position.x, y: y0, z: sp.position.z, vx: f.x * k, vy: up * k, vz: f.z * k, left: w.reach, w });
       W.swing(); G.sfx.swing();
       return true;
     }
@@ -272,11 +277,18 @@ function attach(G, api) {
   }
   function updateShots(dt) {
     for (let i = F.shots.length - 1; i >= 0; i--) {
-      const s = F.shots[i], stepLen = Math.hypot(s.vx, s.vz) * dt;
-      s.x += s.vx * dt; s.z += s.vz * dt; s.left -= stepLen;
-      s.sp.position.x = s.x; s.sp.position.z = s.z; s.sp.position.y += Math.sin(G.rt.t * 20) * 0.01;
-      let hit = W.heightAt(s.x, s.z) > 2;
-      for (const m of F.monsters) if (!hit && Math.hypot(m.x - s.x, m.z - s.z) < m.r + 0.7) { hitMonster(m, s.w, { x: s.vx / 26, z: s.vz / 26 }); hit = true; }
+      const s = F.shots[i], stepLen = Math.hypot(s.vx, s.vy || 0, s.vz) * dt;
+      s.x += s.vx * dt; s.z += s.vz * dt; s.y += (s.vy || 0) * dt; s.left -= stepLen;
+      s.sp.position.set(s.x, s.y + Math.sin(G.rt.t * 20) * 0.05, s.z);
+      const g = W.groundAt(s.x, s.z), hb = W.heightAt(s.x, s.z);
+      let hit = (hb > 2 && s.y < g + hb) || s.y < g + 0.1;   // a wall at the bubble's height, or the ground
+      for (const m of F.monsters) {
+        if (hit || Math.hypot(m.x - s.x, m.z - s.z) >= m.r + 0.7) continue;
+        const mh = (m.obj.userData.h || 1) * (m.obj.userData.size || 1), my = m.obj.position.y + mh * 0.55;
+        if (Math.abs(my - s.y) > mh * 0.6 + 0.7) continue;   // flew over or under it
+        const sp2 = Math.hypot(s.vx, s.vz) || 1;
+        hitMonster(m, s.w, { x: s.vx / sp2, z: s.vz / sp2 }); hit = true;
+      }
       if (hit || s.left <= 0) { W.burst(s.x, s.sp.position.y, s.z, s.w.puff || '🫧', 4, { spread: 1.5, up: 1, size: 0.4, life: 0.5 }); W.scene.remove(s.sp); s.sp.material.dispose(); F.shots.splice(i, 1); }
     }
   }
