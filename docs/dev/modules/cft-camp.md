@@ -17,7 +17,7 @@
 
 ## Responsibilities
 
-- **The opening** ("fever dream"): 5 immortal minutes of everything chasing you, then waking at home with level 1 and $0.
+- **The opening** ("fever dream"): 3 immortal minutes of everything chasing you, then waking at home with level 1 and $0.
 - **The crazy list:** `K.allow(id)` = which of `D.CAMPAIGN.WILD` is switched on, one more per finished mission (`tier`).
 - **The mission cap:** `K.capOpen(ids)` limits story/side missions on the map to `D.CAMPAIGN.CAP[min(tier, 2)]` (1, 3, 5).
 - **Ammo** for shooters (crates, drops, secrets), **powers** water (1), lightning (2), extinguisher (hold 3).

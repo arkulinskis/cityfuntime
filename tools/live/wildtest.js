@@ -67,7 +67,7 @@ window.__wildOut = []; window.__wildDone = false;
     if (pv) {
       W.teleport(pv.x, pv.z); sim(10);
       const lift = pp.y - W.groundAt(pp.x, pp.z);
-      ok(W.paveAt(pp.x, pp.z) ? Math.abs(lift - 0.13) < 0.03 : true, 'standing on a pavement puts your feet on it (' + lift.toFixed(2) + ' m above the ground, pavement 0.13 m)');
+      ok(W.paveAt(pp.x, pp.z) ? Math.abs(lift - 0.2) < 0.03 : true, 'standing on a pavement puts your feet on it (' + lift.toFixed(2) + ' m above the ground, pavement 0.2 m)');
       const ped = W.life.peds.find(q => !q.ctl && W.paveAt(q.obj.position.x, q.obj.position.z));
       if (ped) ok(Math.abs(ped.obj.position.y - W.standAt(ped.obj.position.x, ped.obj.position.z)) < 0.05, 'passers-by on pavements stand on them too');
       else info('no passer-by on a pavement right now');

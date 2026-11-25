@@ -84,6 +84,14 @@ window.__cineOut = []; window.__cineDone = false;
       ok(card && !card.hidden && /Chapter/.test(card.textContent), 'chapter 1 opens with the narrator card: ' + (card && card.textContent.slice(0, 60)));
       ok(!!W.cine && W.cine.pos && W.cine.look, 'the camera is taken over (W.cine)');
       ok(max.obj.userData.cine === true, 'the giver is in the scene (actor userData.cine)');
+      { // 2026-11-24: givers stand outside, at a set spot; you step to a set spot in front of them
+        const gp = max.obj.position, pp = W.player.pos, gap = Math.hypot(gp.x - pp.x, gp.z - pp.z);
+        ok(W.clearAt(gp.x, gp.z, 0.4) && !W.roofAt(gp.x, gp.z), 'the giver stands outside, not inside a building');
+        ok(Math.abs(gap - 1.6) < 0.25 && W.clearAt(pp.x, pp.z, 0.3), 'you stand 1.6 m in front of the giver for the talk (' + gap.toFixed(2) + ' m)');
+        ok(Math.abs(gp.y - W.standAt(gp.x, gp.z)) < 0.05, 'the giver\'s feet are on the ground / pavement');
+        const all = [...G.rt.actors.values()].filter(a => a.who !== 'boss');
+        ok(all.every(a => W.clearAt(a.x, a.z, 0.3)), 'no mission giver is inside a wall (' + all.length + ' givers)');
+      }
       ok(Cn.chapterFor(G.D.MISSIONS[0]) === null, 'each chapter card plays only once');
       // skip the chapter card, then the title card
       $('.cft-cine-wrap').click();

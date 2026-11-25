@@ -209,6 +209,8 @@ GROUND = (
     + scene("g1-pavement", "s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 11; s.settings.colour = false; if (G.color) G.color.apply('snap');"
             "const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 10) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw + 0.9); W.cam.pitch = 0.42; W.cam.dist = W.cam.cur = 6;", 200)
     + scene("g1b-pavement-close", "const sd = W.nearestWalk(p.x, p.z, 40); if (sd) W.teleport(sd.x, sd.z, sd.yaw); W.cam.pitch = 0.75; W.cam.dist = W.cam.cur = 4.5;", 40)
+    + scene("g1c-kerb-low", "const w = W.nearestWalk(p.x, p.z, 60, true); if (w) { const ux = -Math.sin(w.yaw), uz = -Math.cos(w.yaw), nx = -uz, nz = ux, o = w.w / 2 - 1.6, f = Math.atan2(-nx, -nz);"
+            " W.teleport(w.x + nx * o, w.z + nz * o, f); } W.cam.pitch = 0.06; W.cam.dist = W.cam.cur = 3.2;", 30)   # the raised kerb (2026-11-24): stone face + brick top
     + scene("g2-road-above", "W.cam.pitch = 1.05; W.cam.dist = W.cam.cur = 16;", 20)
     + scene("g3-lawn", AREA_SHOT % ("['park', 'grass', 'pitch', 'cemetery']", 1500, "0.34", 8), 60)
     + scene("g4-plaza", AREA_SHOT % ("['plaza']", 150, "0.4", 8), 60)

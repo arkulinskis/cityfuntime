@@ -74,7 +74,7 @@ window.__campOut = []; window.__campDone = false;
 
     // ---------- the opening: immortal, everything chases, then home
     const home = G.homeSpot();
-    s.camp.intro = 'todo'; s.camp.left = 300;
+    s.camp.intro = 'todo'; s.camp.left = 180;
     const p0 = K.startIntro();
     for (let i = 0; i < 400 && s.camp.intro !== 'run'; i++) await sleep(150);
     for (let i = 0; i < 400 && G.state() !== 'play'; i++) await sleep(150);

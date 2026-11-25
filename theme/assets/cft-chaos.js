@@ -56,7 +56,7 @@ function attach(G, api) {
   }
   const build = fn => { const m = new W.Merge(); fn(m); return m.mesh(); };
   const eye = (m, x, y, z, r) => { m.add(SPH, 0xffffff, x, y, z, 0, 0, 0, r, r, r); m.add(SPH, 0x111111, x, y, z - r * 0.36, 0, 0, 0, r * 0.5, r * 0.5, r * 0.4); };
-  const gy = (x, z) => W.groundAt(x, z);
+  const gy = (x, z) => W.standAt(x, z);
   const free = (x, z) => !W.heightAt(x, z) && !W.heightAt(x + 1, z) && !W.heightAt(x - 1, z) && !W.heightAt(x, z + 1) && !W.heightAt(x, z - 1);
   function drop(o) { if (!o) return; if (o.isSprite) { W.scene.remove(o); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } } else W.removeObj(o); }
   const monY = m => m.obj.position.y + (m.obj.userData.h || 1) * (m.obj.userData.size || 1) * 0.55;

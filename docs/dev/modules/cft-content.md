@@ -416,7 +416,7 @@ Example talent and achievement:
 `KINDS: { kicker|ramp|mega|alley: { n, e, L, H, w (m), vy (m/s), rings: [share of time to apex], R (ring radius), weight, alley?, gap? } }`, `PTS` (trick -> points), `WIPEOUT`, `AIR` (string[]). Course counts and physics: `D.TUNE.stunt`.
 
 ## The campaign update: `D.CAMPAIGN` (L1707)
-`INTRO_SECS` (300), `CAP: [1, 3, 5]` (missions on the map after 0 / 1 / 2+ done), `WILD: [{ id, e, n, d }]` (the "crazy list": the n-th finished mission switches on `WILD[n]`; the `id` is what `G.allow(id)` checks in code — a new id needs a check in code), `MEGA: [{ id, kind (monster kind), size, n, e, breath ('honk'|'slime'|'fire'), line }]`, `SECRET_LOOT: [[kind, weight]]`, `NOTES`, `PANIC` (string[]).
+`INTRO_SECS` (180), `CAP: [1, 3, 5]` (missions on the map after 0 / 1 / 2+ done), `WILD: [{ id, e, n, d }]` (the "crazy list": the n-th finished mission switches on `WILD[n]`; the `id` is what `G.allow(id)` checks in code — a new id needs a check in code), `MEGA: [{ id, kind (monster kind), size, n, e, breath ('honk'|'slime'|'fire'), line }]`, `SECRET_LOOT: [[kind, weight]]`, `NOTES`, `PANIC` (string[]).
 
 ## Knobs, weaknesses, weapon numbers, formulas
 - `D.TUNE` (L1790-1916) — every balance knob, grouped by module; documented knob by knob in [../balance.md](../balance.md). `D.COMBAT = D.TUNE.combat` (same object).

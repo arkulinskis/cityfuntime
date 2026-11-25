@@ -208,7 +208,7 @@ function attach(G, api) {
       const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz);
       if (d > 2.1) {
         const sp = Math.min(d, 7 * dt);
-        o.x += dx / d * sp; o.z += dz / d * sp; o.y = W.groundAt(o.x, o.z);
+        o.x += dx / d * sp; o.z += dz / d * sp; o.y = W.standAt(o.x, o.z);
         ped.obj.rotation.y = Math.atan2(-dx, -dz);
         W.animate(ped.fig, 7, dt);
         if (f.t > 0.4 && !f.called) { f.called = true; W.say(ped.obj, f.gift ? 'Wait! I have something for you!' : fill(pick(HY.selfie)), 2.4); }

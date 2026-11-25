@@ -64,7 +64,7 @@ function attach(G, api) {
       const m = Math.min(d, sp * dt);
       e.x += dx / d * m; e.z += dz / d * m;
       W.collide(e, R || 0.4);
-      e.obj.position.set(e.x, W.groundAt(e.x, e.z), e.z);
+      e.obj.position.set(e.x, W.standAt(e.x, e.z), e.z);
       const want = Math.atan2(-dx, -dz), da = Math.atan2(Math.sin(want - e.obj.rotation.y), Math.cos(want - e.obj.rotation.y));
       e.obj.rotation.y += da * Math.min(1, dt * 9);
     }
@@ -452,7 +452,7 @@ function attach(G, api) {
       if (Math.abs(m.kx) + Math.abs(m.kz) > 0.2) { // flying back from a bonk
         const e = { x: m.x, z: m.z }; e.x += m.kx * dt; e.z += m.kz * dt; W.collide(e, m.r); m.x = e.x; m.z = e.z;
         m.kx *= Math.exp(-6 * dt); m.kz *= Math.exp(-6 * dt);
-        m.obj.position.set(m.x, W.groundAt(m.x, m.z), m.z);
+        m.obj.position.set(m.x, W.standAt(m.x, m.z), m.z);
       }
       if (!onFoot() && Math.abs(W.player.speed) > CB.runOver && d < m.r + 1.6 && !(m.runT > G.rt.t)) { // driving into one
         m.runT = G.rt.t + 0.8;
@@ -510,7 +510,7 @@ function attach(G, api) {
     const k = 1 - Math.max(0, m.wind) / (m.windT || 1), reach = m.r + CB.reach, late = m.wind <= F.parryWindow();
     if (m.ring) {
       const R = reach * (2.1 - 1.1 * k);
-      m.ring.scale.set(R, 1, R); m.ring.position.set(m.x, W.groundAt(m.x, m.z) + 0.14, m.z);
+      m.ring.scale.set(R, 1, R); m.ring.position.set(m.x, W.standAt(m.x, m.z) + 0.14, m.z);
       m.ring.material.opacity = 0.25 + 0.6 * k; m.ring.material.color.setHex(late ? 0xffd23f : 0xff3b30);  // turns gold: block NOW
     }
     if (m.tele) { const sc = 0.75 * (1 + 0.35 * Math.abs(Math.sin(G.rt.t * (late ? 30 : 14)))); m.tele.scale.set(sc * m.tele.material.map.userData.aspect, sc, 1); }

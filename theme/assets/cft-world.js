@@ -236,7 +236,7 @@ function create(opts) {
   // Without WebGL2, or until the photos load, the ground looks as it did before (plain colours).
   const TEX = [
     { f: 'asphalt', m: 7.0, k: 1.0, real: 0, draw: cartoonRoad },  // 0 car roads, service lanes, cycleways, road paint (drawn, not a photo)
-    { f: 'sidewalk', m: 6.0, k: 1.0, real: 0.5, draw: cartoonPavement },  // 1 pavements + kerbs: drawn cartoon slabs laid along the street (4 x 4 of 1.5 m)
+    { f: 'sidewalk', m: 6.0, k: 1.0, real: 0.65, draw: cartoonPavement },  // 1 pavements: drawn herringbone brick laid along the street (bricks 0.5 x 0.25 m)
     { f: 'grass', m: 2.4, k: 0.95, real: 0.4 },     // 2 grass, parks, pitches, cemeteries
     { f: 'forest', m: 3.0, k: 0.9, real: 0.45 },    // 3 woods
     { f: 'bricks', m: 2.4, k: 0.9, real: 0.5 },     // 4 plazas, pedestrian streets, steps
@@ -342,67 +342,47 @@ varying float vGL; varying vec2 vGUV;
     }
     return c;
   }
-  // The pavement as a cartoon (2026-11-23, the user: the photo "looks uninviting, needs to be more friendly"): warm cream
-  // slabs with soft bevels and rounded corners, little grass tufts and flowers in the joints, and the odd chalk doodle
-  // (heart, star, smiley, sun, hopscotch squares). 4 x 4 slabs per tile (TEX m = 6 m), seamless: the joints sit on the
-  // tile edges and anything crossing an edge is drawn again one tile over. real = 0.5 lets the chalk colours show.
+  // The pavement: warm herringbone brick paving (2026-11-24, the user: "make them beautiful brick texture or rock";
+  // before: cream cartoon slabs with chalk doodles, 2026-11-23). Bricks 0.5 x 0.25 m (TEX m = 6 m = 24 brick units),
+  // each with rounded corners, a soft bevel and a little speckle, in six terracotta tones with the odd dark-fired one;
+  // sand joints with a few moss tufts. Seamless: the 90-degree herringbone repeats every 4 units, and every brick's tone
+  // comes from its position modulo the tile, so a brick cut by the edge continues on the other side.
   function cartoonPavement(S) {
     const c = document.createElement('canvas'); c.width = c.height = S;
-    const g = c.getContext('2d'), u = S / 512, N = 4, cell = S / N, j = 5 * u;   // j = half a joint
-    let seed = 11;
-    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-    const wrap = fn => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { g.save(); g.translate(ox, oy); fn(); g.restore(); } };
-    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
-    g.lineJoin = g.lineCap = 'round';
-    g.fillStyle = '#b3a58f'; g.fillRect(0, 0, S, S);   // the joints
-    const tones = ['#e9dfcc', '#e4d8c2', '#ede4d3', '#e6d6c4', '#e2dccb', '#eadbc8'];
-    for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) {
-      const x = a * cell + j, y = b * cell + j, w = cell - 2 * j, r = 14 * u;
-      rr(x, y, w, w, r); g.fillStyle = tones[Math.floor(rnd() * tones.length)]; g.fill();
-      // soft bevel: light from the top-left, a shade along the bottom-right
-      g.save(); rr(x, y, w, w, r); g.clip();
-      g.lineWidth = 7 * u; g.strokeStyle = 'rgba(255,255,255,0.55)'; rr(x + 2 * u, y + 2 * u, w + 6 * u, w + 6 * u, r); g.stroke();
-      g.strokeStyle = 'rgba(120,98,70,0.22)'; rr(x - 6 * u, y - 6 * u, w + 4 * u, w + 4 * u, r); g.stroke();
-      for (let k = 0; k < 26; k++) {   // speckles, like terrazzo
-        g.beginPath(); g.arc(x + rnd() * w, y + rnd() * w, (1 + rnd() * 1.8) * u, 0, Math.PI * 2);
-        g.fillStyle = rnd() < 0.5 ? 'rgba(150,128,100,0.35)' : 'rgba(255,255,255,0.6)'; g.fill();
+    const g = c.getContext('2d'), N = 24, q = S / N, j = Math.max(1, q * 0.08), r = q * 0.16;
+    const rr = (x, y, w, h, rad) => { g.beginPath(); g.moveTo(x + rad, y); g.arcTo(x + w, y, x + w, y + h, rad); g.arcTo(x + w, y + h, x, y + h, rad); g.arcTo(x, y + h, x, y, rad); g.arcTo(x, y, x + w, y, rad); g.closePath(); };
+    const h2 = (a, b) => { let h = Math.imul(a + 1013, 2654435761) ^ Math.imul(b + 7, 2246822519); h ^= h >>> 13; h = Math.imul(h, 3266489917); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const mod = v => ((v % N) + N) % N;
+    g.fillStyle = '#cdb994'; g.fillRect(0, 0, S, S);   // the sand joints
+    const tones = ['#b85c42', '#c4684b', '#a9503a', '#cf7652', '#b4614a', '#c25f3f'], dark = '#7f3b2b', pale = '#d98d68';
+    const brick = (bx, by, w, h, vert) => {   // (bx, by, w, h) in brick units
+      const t = h2(mod(bx) * 2 + (vert ? 1 : 0), mod(by)), x = bx * q + j, y = by * q + j, W = w * q - 2 * j, H = h * q - 2 * j;
+      if (x > S || y > S || x + W < 0 || y + H < 0) return;
+      rr(x, y, W, H, r); g.fillStyle = t < 0.06 ? dark : t > 0.94 ? pale : tones[Math.floor(t * 997) % tones.length]; g.fill();
+      g.save(); rr(x, y, W, H, r); g.clip();
+      g.lineWidth = q * 0.22; g.strokeStyle = 'rgba(255,225,200,0.32)'; rr(x + q * 0.06, y + q * 0.06, W + q * 0.3, H + q * 0.3, r); g.stroke();   // light from the top-left
+      g.strokeStyle = 'rgba(70,25,15,0.28)'; rr(x - q * 0.3, y - q * 0.3, W + q * 0.24, H + q * 0.24, r); g.stroke();                            // shade bottom-right
+      for (let k = 0; k < 5; k++) {   // speckle (seeded per brick, so it repeats with the tile)
+        const u = h2(t * 1e6 + k, 3), v = h2(t * 1e6 + k, 9);
+        g.beginPath(); g.arc(x + u * W, y + v * H, q * (0.03 + 0.03 * h2(k, t * 1e5)), 0, Math.PI * 2);
+        g.fillStyle = k % 2 ? 'rgba(60,20,10,0.25)' : 'rgba(255,230,210,0.3)'; g.fill();
       }
       g.restore();
-      g.lineWidth = 2 * u; g.strokeStyle = 'rgba(110,92,70,0.45)'; rr(x, y, w, w, r); g.stroke();   // a friendly outline
+      g.lineWidth = Math.max(1, q * 0.04); g.strokeStyle = 'rgba(80,35,22,0.45)'; rr(x, y, W, H, r); g.stroke();
+    };
+    // lattice (1, 1) and (-2, 2): a lying brick [0,2]x[0,1] and a standing one [0,1]x[1,3] at each point
+    for (let k = -8; k < N + 8; k++) for (let m = -10; m < 10; m++) {
+      const tx = k - 2 * m, ty = k + 2 * m;
+      if (tx < -4 || tx > N + 1 || ty < -4 || ty > N + 1) continue;
+      brick(tx, ty, 2, 1, false); brick(tx, ty + 1, 1, 2, true);
     }
-    // grass tufts and tiny flowers in the joints
-    const FLOWER = ['#ffffff', '#ffd23f', '#ff8fb8', '#b48cff'];
-    for (let i = 0; i < 18; i++) {
-      const along = rnd() < 0.5, line = Math.floor(rnd() * N) * cell, t = rnd() * S;
-      const x = along ? t : line, y = along ? line : t;
-      wrap(() => {
-        g.strokeStyle = '#5fa24a'; g.lineWidth = 2.4 * u;
-        for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(x + k * 2 * u, y); g.quadraticCurveTo(x + k * 3 * u, y - 6 * u, x + k * 5 * u, y - (9 + rnd() * 5) * u); g.stroke(); }
-        if (rnd() < 0.55) {
-          const fx = x + (rnd() - 0.5) * 6 * u, fy = y - 9 * u, col = FLOWER[Math.floor(rnd() * FLOWER.length)];
-          for (let k = 0; k < 5; k++) { const an = k / 5 * Math.PI * 2; g.beginPath(); g.arc(fx + Math.cos(an) * 3.2 * u, fy + Math.sin(an) * 3.2 * u, 2.6 * u, 0, Math.PI * 2); g.fillStyle = col; g.fill(); }
-          g.beginPath(); g.arc(fx, fy, 2 * u, 0, Math.PI * 2); g.fillStyle = col === '#ffd23f' ? '#e8853c' : '#ffc21f'; g.fill();
-        }
-      });
+    // a few moss tufts in the joints (positions inside the tile, drawn again across its edges)
+    const wrap = fn => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { g.save(); g.translate(ox, oy); fn(); g.restore(); } };
+    g.lineCap = 'round';
+    for (let i = 0; i < 14; i++) {
+      const k = Math.floor(h2(i, 77) * 6) * 4, m = Math.floor(h2(i, 78) * 6) * 4, x = (k + 2) * q, y = (m + 1) * q;
+      wrap(() => { g.strokeStyle = '#6f9a45'; g.lineWidth = q * 0.07; for (let a = -2; a <= 2; a++) { g.beginPath(); g.moveTo(x + a * q * 0.05, y); g.lineTo(x + a * q * 0.11, y - q * (0.16 + 0.08 * h2(i, a + 5))); g.stroke(); } });
     }
-    // chalk doodles, each inside one slab (so they never cross a tile edge)
-    const chalk = (col, w) => { g.strokeStyle = col; g.lineWidth = (w || 4) * u; g.globalAlpha = 0.8; };
-    const slab = (a, b) => [a * cell + cell / 2, b * cell + cell / 2];
-    const doodles = [
-      (x, y) => { chalk('#ff6fa8'); g.beginPath(); g.moveTo(x, y + 22 * u); g.bezierCurveTo(x - 34 * u, y - 4 * u, x - 18 * u, y - 30 * u, x, y - 12 * u); g.bezierCurveTo(x + 18 * u, y - 30 * u, x + 34 * u, y - 4 * u, x, y + 22 * u); g.stroke(); },
-      (x, y) => { chalk('#f2b500'); g.beginPath(); for (let k = 0; k <= 10; k++) { const an = -Math.PI / 2 + k * Math.PI / 5, r = (k % 2 ? 11 : 26) * u; g.lineTo(x + Math.cos(an) * r, y + Math.sin(an) * r); } g.stroke(); },
-      (x, y) => { chalk('#4f9fe8'); g.beginPath(); g.arc(x, y, 24 * u, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(x, y + 2 * u, 13 * u, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke(); g.beginPath(); g.arc(x - 8 * u, y - 7 * u, 2 * u, 0, Math.PI * 2); g.arc(x + 8 * u, y - 7 * u, 2 * u, 0, Math.PI * 2); g.stroke(); },
-      (x, y) => { chalk('#ff9a3c'); g.beginPath(); g.arc(x, y, 13 * u, 0, Math.PI * 2); g.stroke(); for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4; g.beginPath(); g.moveTo(x + Math.cos(an) * 19 * u, y + Math.sin(an) * 19 * u); g.lineTo(x + Math.cos(an) * 28 * u, y + Math.sin(an) * 28 * u); g.stroke(); } },
-      (x, y) => { chalk('#ffffff', 3.5); const q = 22 * u; [[0, -1.5], [0, -0.5], [-0.5, 0.5], [0.5, 0.5], [0, 1.5]].forEach(([dx, dy], k) => { g.strokeRect(x + dx * q - q / 2, y + dy * q - q / 2, q, q); g.font = 'bold ' + Math.round(13 * u) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffffff'; g.fillText(String(k + 1), x + dx * q, y + dy * q); }); },
-    ];
-    const used = new Set();
-    doodles.forEach(fn => {
-      let a, b; do { a = Math.floor(rnd() * N); b = Math.floor(rnd() * N); } while (used.has(a * N + b));
-      used.add(a * N + b);
-      const [x, y] = slab(a, b);
-      g.save(); g.translate(x, y); g.rotate((rnd() - 0.5) * 0.8); fn(0, 0); g.restore();
-    });
-    g.globalAlpha = 1;
     return c;
   }
   const CAR = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'service', 'track']);
@@ -1143,7 +1123,7 @@ varying float vGL; varying vec2 vGUV;
     { id: 'cherry', n: 'Cherry', a: 0xd62839, b: 0xffe0e3, wall: 0xdc9f9f, roof: [0x5a2a2a, 0x6e3030], line: 0xffffff, dash: 'dots', tree: [0.01, 0.6, 0.45] },
     { id: 'slate', n: 'Slate', a: 0x3f4b5e, b: 0xf4f6fa, wall: 0xc4ccd6, roof: [0x2f3640, 0x3a4048], line: 0xffc21f, dash: 'long', tree: [0.36, 0.25, 0.42] },
   ];
-  for (const L of LOOKS) { L.ac = new THREE.Color(L.a); L.bc = new THREE.Color(L.b); L.wc = new THREE.Color(L.wall); L.lc = new THREE.Color(L.line); L.rc = L.roof.map(c => new THREE.Color(c)); L.pc = new THREE.Color(0xd8ccb6).lerp(L.wc, 0.3); L.css = '#' + L.ac.getHexString(); L.ink = (0.2126 * L.ac.r + 0.7152 * L.ac.g + 0.0722 * L.ac.b) > 0.42 ? '#1f1a3d' : '#ffffff'; L.map = '#' + new THREE.Color(0xcbc3b4).lerp(L.ac, 0.35).getHexString(); L.mapLine = '#' + new THREE.Color(0xb3a998).lerp(L.ac, 0.45).getHexString(); }
+  for (const L of LOOKS) { L.ac = new THREE.Color(L.a); L.bc = new THREE.Color(L.b); L.wc = new THREE.Color(L.wall); L.lc = new THREE.Color(L.line); L.rc = L.roof.map(c => new THREE.Color(c)); L.pc = new THREE.Color(0xb8644c).lerp(L.wc, 0.15); L.css = '#' + L.ac.getHexString(); L.ink = (0.2126 * L.ac.r + 0.7152 * L.ac.g + 0.0722 * L.ac.b) > 0.42 ? '#1f1a3d' : '#ffffff'; L.map = '#' + new THREE.Color(0xcbc3b4).lerp(L.ac, 0.35).getHexString(); L.mapLine = '#' + new THREE.Color(0xb3a998).lerp(L.ac, 0.45).getHexString(); }
   W.LOOKS = LOOKS;
   const BORO_Z = 11, BORO_R = 6000, CITY_R = 25000, BORO_MIX = 0.5;
   const boro = { tiles: new Map(), pts: [], stale: new Set() };
@@ -1547,7 +1527,10 @@ varying float vGL; varying vec2 vGUV;
   // pavements (the raised strips with a kerb along streets with cars, drawn KERB_Y above the ground in buildSub): people
   // standing on them stand on top, not 13 cm into them (2026-11-18, "legs in the ground")
   const paveAt = (x, z) => { if (LOW) return 0; const i = Math.floor(x / LCELL), j = Math.floor(z / LCELL), a = pchunks.get(ckey(i, j)); return a && a[(j - Math.floor(j / CH) * CH) * CH + (i - Math.floor(i / CH) * CH)] && !roadLift(x, z) ? 1 : 0; };   // fine grid (LCELL) like the road surface
-  const standAt = (x, z) => { const r = roadLift(x, z); return groundAt(x, z) + (r || (paveAt(x, z) ? 0.13 : 0)); };
+  // KERB_Y = how high the pavement sits above the ground (13 cm until 2026-11-24, then 20 cm: the user wanted higher
+  // sidewalks with a proper kerb). Everything standing on a pavement uses standAt, so feet stay on top of it.
+  const KERB_Y = 0.2;
+  const standAt = (x, z) => { const r = roadLift(x, z); return groundAt(x, z) + (r || (paveAt(x, z) ? KERB_Y : 0)); };
   W.standAt = standAt; W.paveAt = paveAt;
   function rasterize(rings, fn, cell) {
     const CELL_ = cell || CELL;
@@ -2361,14 +2344,25 @@ varying float vGL; varying vec2 vGUV;
           flat.layer = TL.sidewalk;
           for (const sd of [1, -1]) {
             const oi = hw * sd, oo = (hw + pw) * sd, ok = (hw + 0.22) * sd;
-            // slabs laid along the street, the first row starting at the kerb
-            flat.fr = [x1, z1, dx / L, dz / L, ex * sd, ez * sd, run0, -hw];
+            // bricks laid along the street, the first row starting at the kerb
+            const fr = [x1, z1, dx / L, dz / L, ex * sd, ez * sd, run0, -hw];
             for (let q = 0; q < k; q++) {
               const t0 = q / k, t1 = (q + 1) / k, mx = x1 + dx * (t0 + t1) / 2 + ex * (hw + pw / 2) * sd, mz = z1 + dz * (t0 + t1) / 2 + ez * (hw + pw / 2) * sd;
               if (roadAt(mx, mz)) continue;  // another street crosses here: no pavement over it
               const ax = x1 + dx * t0, az = z1 + dz * t0, bx = x1 + dx * t1, bz = z1 + dz * t1;
+              flat.layer = TL.sidewalk; flat.fr = fr;
               flat.dquad(ax + ex * ok, az + ez * ok, bx + ex * ok, bz + ez * ok, bx + ex * oo, bz + ez * oo, ax + ex * oo, az + ez * oo, groundAt, KERB_Y, lk ? lk.pc : paveCol);
+              // the kerb: a smooth stone strip (plain concrete texture), the borough's colour every other 2.5 m
+              flat.layer = TL.path; flat.fr = null;
               flat.dquad(ax + ex * oi, az + ez * oi, bx + ex * oi, bz + ez * oi, bx + ex * ok, bz + ez * ok, ax + ex * ok, az + ez * ok, groundAt, KERB_Y + 0.004, lk && Math.floor((run0 + L * (t0 + t1) / 2) / 2.5) % 2 ? lk.ac : kerbCol);
+              // its sides (2026-11-24, the raised pavement): the stone face down to the road, and the back edge down to the yard
+              flat.layer = -1;
+              const ix = ex * oi, iz = ez * oi, wx = ex * oo, wz = ez * oo, gA = groundFace(ax + ix, az + iz), gB = groundFace(bx + ix, bz + iz);
+              flat.tri([ax + ix, gA + lift - 0.01, az + iz], [bx + ix, gB + lift - 0.01, bz + iz], [bx + ix, gB + KERB_Y + 0.004, bz + iz], kerbSide, -ex * sd, 0, -ez * sd);
+              flat.tri([ax + ix, gA + lift - 0.01, az + iz], [bx + ix, gB + KERB_Y + 0.004, bz + iz], [ax + ix, gA + KERB_Y + 0.004, az + iz], kerbSide, -ex * sd, 0, -ez * sd);
+              const hA = groundFace(ax + wx, az + wz), hB = groundFace(bx + wx, bz + wz);
+              flat.tri([ax + wx, hA - 0.03, az + wz], [bx + wx, hB - 0.03, bz + wz], [bx + wx, hB + KERB_Y, bz + wz], kerbSide, ex * sd, 0, ez * sd);
+              flat.tri([ax + wx, hA - 0.03, az + wz], [bx + wx, hB + KERB_Y, bz + wz], [ax + wx, hA + KERB_Y, az + wz], kerbSide, ex * sd, 0, ez * sd);
             }
           }
           flat.layer = st.l; flat.fr = null;
@@ -2492,7 +2486,7 @@ varying float vGL; varying vec2 vGUV;
         let pitch = 0, roll = 0, sink = 0;
         if (stride === 4) { const fx = -Math.sin(yaw), fz = -Math.cos(yaw); pitch = Math.atan((groundAt(x + fx * 1.6, z + fz * 1.6) - groundAt(x - fx * 1.6, z - fz * 1.6)) / 3.2); c.setHex(st === 'wreck' ? WRECK_COL : list[i * stride + 3]); im.setColorAt(i, c); }
         if (st === 'wreck') { roll = 0.12; sink = -0.18; }
-        e.set(pitch, yaw, roll); q.setFromEuler(e); v.set(x - ccx, groundAt(x, z) - ccy + sink, z - ccz); m.compose(v, q, st && st !== 'wreck' ? ZERO3 : one);
+        e.set(pitch, yaw, roll); q.setFromEuler(e); v.set(x - ccx, standAt(x, z) - ccy + sink, z - ccz); m.compose(v, q, st && st !== 'wreck' ? ZERO3 : one);
         im.setMatrixAt(i, m);
       }
       im.castShadow = !!shadow && !LOW; im.receiveShadow = false;
@@ -2526,7 +2520,7 @@ varying float vGL; varying vec2 vGUV;
       for (let i = 0; i < cnt; i++) {
         const x = list[i * 5], z = list[i * 5 + 1], sc = list[i * 5 + 4], st = DECOR_HP[kind] && smashed.get(propKey(kind, x, z));
         de.set(0, list[i * 5 + 2], 0); dq.setFromEuler(de);
-        dv.set(x - ccx, groundAt(x, z) - ccy + (flag ? sc : water ? 0.1 : 0), z - ccz);
+        dv.set(x - ccx, (flag || water ? groundAt(x, z) : standAt(x, z)) - ccy + (flag ? sc : water ? 0.1 : 0), z - ccz);
         if (st) ds.set(0, 0, 0); else if (flag) ds.set(1, 1, 1); else ds.set(sc, sc, sc);
         dm.compose(dv, dq, ds); im.setMatrixAt(i, dm);
         if (tinted) im.setColorAt(i, dcol.setHex(list[i * 5 + 3]));
@@ -2761,7 +2755,7 @@ varying float vGL; varying vec2 vGUV;
   const dashCol = new THREE.Color(0xe9e2c4);
   // 2026-11-17 graphics pass: road edge lines, pavements and their kerb strip (KERB_Y = height above the ground: just above
   // the road surface, so people's feet don't sink into it)
-  const edgeCol = new THREE.Color(0xeeeee6), paveCol = new THREE.Color(0xd8ccb6), kerbCol = new THREE.Color(0xeee6d6), KERB_Y = 0.13;
+  const edgeCol = new THREE.Color(0xeeeee6), paveCol = new THREE.Color(0xb8644c), kerbCol = new THREE.Color(0xd9d6cf), kerbSide = new THREE.Color(0xb4b0a8);
   // Centre lines. The borough's look picks the colour and pattern (dash 3 m every 9 m, long 6 every 9, dots 0.6 every 2.4,
   // double = two solid lines), so each borough's streets read differently at a glance.
   const DASH = { dash: [3, 9, 0.09], long: [6, 9, 0.11], dots: [0.6, 2.4, 0.16], double: [0, 0, 0.07] };
@@ -2999,6 +2993,46 @@ varying float vGL; varying vec2 vGUV;
     }
     return best;
   }
+  // Open ground for someone of radius r at (x, z): no building footprint under them or r around them.
+  const clearAt = (x, z, r) => !heightAt(x, z) && !heightAt(x + r, z) && !heightAt(x - r, z) && !heightAt(x, z + r) && !heightAt(x, z - r);
+  W.clearAt = (x, z, r) => clearAt(x, z, r == null ? 0.5 : r);
+  // A fixed place to stand for someone tied to a spot (mission givers, turf bosses; 2026-11-24, the user: "people giving
+  // missions are inside the building ... they need to have a specific place"). On the pavement of the nearest street with
+  // cars, on the side of (x, z), facing the street; slot (an integer) spreads several people 1.6 m apart along the kerb.
+  // Returns {x, z, yaw, onStreet} (yaw = a figure facing the street; figures face their -z), never inside a wall: with no
+  // street loaded yet it pushes (x, z) out of any building and onStreet is false (the caller tries again later).
+  W.standSpot = function (x, z, slot) {
+    const w = nearestWalk(x, z, 60, true) || nearestWalk(x, z, 40);
+    if (w) {
+      const ux = -Math.sin(w.yaw), uz = -Math.cos(w.yaw), nx = -uz, nz = ux;   // along the street, and across it
+      const sd = (x - w.x) * nx + (z - w.z) * nz < 0 ? -1 : 1, hw = (w.w || 6) / 2;
+      const face = Math.atan2(-sd * nx, -sd * nz) + Math.PI;   // towards the street
+      const s0 = (slot || 0) * 1.6;
+      for (const along of [s0, s0 + 2, s0 - 2, s0 + 4, s0 - 4, s0 + 7, s0 - 7])
+        for (const off of [hw + 1.1, hw + 0.7, hw + 1.7]) {
+          const px = w.x + ux * along + nx * off * sd, pz = w.z + uz * along + nz * off * sd;
+          if (clearAt(px, pz, 0.55) && !roadAt(px, pz)) return { x: px, z: pz, yaw: face, onStreet: true };
+        }
+    }
+    const pos = { x, z };
+    collide(pos, 0.6);
+    return { x: pos.x, z: pos.z, yaw: w ? Math.atan2(pos.x - w.x, pos.z - w.z) : 0, onStreet: false };
+  };
+  // Puts you `d` metres in front of a figure for a talk (mission scenes): in front of where they stand facing (their
+  // userData.standYaw, else their rotation), or a little to either side when a wall is there. On foot only.
+  W.stageBefore = function (fig, d) {
+    if (!fig || ride.mode !== 'foot' || player.carAir) return false;
+    const fx = fig.position.x, fz = fig.position.z, base = fig.userData && fig.userData.standYaw != null ? fig.userData.standYaw : fig.rotation.y;
+    for (const turn of [0, 0.45, -0.45, 0.9, -0.9, 1.4, -1.4]) {
+      const a = base + turn, px = fx - Math.sin(a) * d, pz = fz - Math.cos(a) * d;
+      if (!clearAt(px, pz, 0.45)) continue;
+      player.pos.set(px, surfaceAt(px, pz), pz); player.vel.set(0, 0, 0); player.vy = 0; player.speed = 0; player.grounded = true;
+      player.face = player.heading = Math.atan2(fx - px, fz - pz) + Math.PI;
+      fig.rotation.y = Math.atan2(px - fx, pz - fz) + Math.PI;   // and they turn to you
+      return true;
+    }
+    return false;
+  };
   // A random point on a street between minD and maxD from (cx, cz); optional filter(x, z).
   function randomWalkSpot(cx, cz, minD, maxD, filter, rnd) {
     rnd = rnd || Math.random;
@@ -4326,7 +4360,7 @@ varying float vGL; varying vec2 vGUV;
   W.setFollowers = function (list) { // list of THREE groups (from W.person / W.animal) with userData.followSpeed optional
     for (const f of followers) scene.remove(f.obj);
     followers = list.map((obj, i) => ({ obj, i, speed: 0 }));
-    for (const f of followers) { const x = player.pos.x + 1 + f.i, z = player.pos.z + 1; f.obj.position.set(x, groundAt(x, z), z); scene.add(f.obj); }
+    for (const f of followers) { const x = player.pos.x + 1 + f.i, z = player.pos.z + 1; f.obj.position.set(x, standAt(x, z), z); scene.add(f.obj); }
   };
   W.followers = () => followers;
   function updateFollowers(dt) {
@@ -4770,7 +4804,7 @@ varying float vGL; varying vec2 vGUV;
     player.carAir = null; player.onRamp = null; player.boostT = 0;
     if (yaw != null) { player.face = player.heading = yaw; cam.yaw = yaw; }
     trail.length = 0;
-    for (const f of followers) f.obj.position.set(x + 1, groundAt(x + 1, z + 1), z + 1);
+    for (const f of followers) f.obj.position.set(x + 1, standAt(x + 1, z + 1), z + 1);
     cam.cur = cam.dist;
   };
 
@@ -5278,7 +5312,7 @@ varying float vGL; varying vec2 vGUV;
       W.animate(p.fig, p.speed, dt, p.type === 'skate' ? 'ride' : p.type === 'bike' ? 'pedal' : null);
       if (p.dog) {
         const dx = pt.x - pt.ux * 1.3 + pt.uz * 0.5, dz = pt.z - pt.uz * 1.3 - pt.ux * 0.5;
-        p.dog.position.set(dx, p.a.sg.br ? pt.y : groundAt(dx, dz), dz);
+        p.dog.position.set(dx, p.a.sg.br ? pt.y : standAt(dx, dz), dz);
         p.dog.rotation.y = p.obj.rotation.y;
         W.animate(p.dog, p.speed, dt);
       }

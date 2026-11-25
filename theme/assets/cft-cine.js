@@ -76,7 +76,7 @@ C.SHOUT = {
     crate: ['Look what was in the crate!', 1], generic: ['Nice work!', 1],
   },
   praise: ["You're amazing!", "You're incredible!", 'Absolute legend!', 'The city loves you!', "You're on fire!", 'Unstoppable!',
-    "Who's awesome? You're awesome!", 'Brilliant work!', 'Superstar!', 'Nobody does it like you!', 'Look at you go!',
+    "Who's awesome? You're awesome!", 'Brilliant work!', 'Superstar!', 'You make this city shine!', 'Look at you go!',
     'Hero of the block!', 'Outstanding!', 'Pure greatness!', "You're the best!", 'What a champion!'],
 };
 C.SHOUT.achRaw = n => 'Achievement unlocked: ' + n + '!';
@@ -312,6 +312,9 @@ C.attach = function (G) {
     // the people in the scene
     const main = { id: o.who, fig: o.actor || (G.actorOf ? G.actorOf(o.who) : null) };
     if (main.fig && Math.hypot(main.fig.position.x - W.player.pos.x, main.fig.position.z - W.player.pos.z) > 28) main.fig = null;
+    // face to face: you step to a set spot 1.6 m in front of them (2026-11-24, the user: the main character stood
+    // "weirdly placed", wherever E was pressed: beside them, too close or metres away)
+    if (main.fig && W.stageBefore && Math.hypot(main.fig.position.x - W.player.pos.x, main.fig.position.z - W.player.pos.z) < 12) W.stageBefore(main.fig, 1.6);
     sc.side = REDUCED ? 1 : pickSide(main);
     const figOf = id => (id === o.who ? main.fig : (G.actorOf ? G.actorOf(id, 28) : null));
     // input: next line / skip all

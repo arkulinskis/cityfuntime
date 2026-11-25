@@ -209,7 +209,7 @@ Goose Game, combo ranks like Tony Hawk and Devil May Cry):
 **The campaign update (2026-11-18):** "secrets in the tight gaps between buildings, a redesigned HUD with a map size, limited
 ranged attacks, mega monsters, a campaign that starts in chaos and then calms down, everything jumpable and bouncy, fire,
 extinguishers, water and lightning powers".
-- **The opening:** a new game starts with five minutes on a countdown, a few streets from home, where you **can't die** and
+- **The opening:** a new game starts with three minutes on a countdown, a few streets from home, where you **can't die** and
   every figment in town chases you: champions, King Blob, a MEGA figment, fires, a lightning storm, street events one after
   another. When the clock hits zero you wake up at the address you typed, drenched in sweat: cousin Max explains it
   was all a fever dream. Nothing from it is kept (no gear, loot, stickers, achievements or XP): you start at level 1 with $0

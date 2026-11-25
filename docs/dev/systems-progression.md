@@ -6,7 +6,7 @@ are approximate (`~L`) and checked by `python -I tools/doc_check.py --lines`.
 
 ```mermaid
 flowchart LR
-  A[New game: save.camp.intro = todo] --> B[Opening: 5 immortal min]
+  A[New game: save.camp.intro = todo] --> B[Opening: 3 immortal min]
   B --> C[Fever dream: level 1, $0]
   C --> D[Missions on the map: CAP 1 / 3 / 5]
   D --> E[completeMission: reward XP quest + 1-of-3 loot pick]

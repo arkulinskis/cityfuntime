@@ -29,7 +29,7 @@ function attach(G, api) {
   const save = () => G.save;
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const P = () => W.player.pos;
-  const gy = (x, z) => W.groundAt(x, z);
+  const gy = (x, z) => W.standAt(x, z);
   const X = { stam: T.stamMax, tired: false, views: [] };
   let alive = true, regenWait = 0, shownT = 0, dodgeT = -9, flurry = 0, gliding = false, soakT = 0, viewT = 0, giggled = new Set(), climbAcc = 0, glideAcc = 0, lastFall = 0, steamT = 0;
   const word = (t, tone, sub, big) => { if (G.hero) G.hero.word(t, tone, sub, big); };

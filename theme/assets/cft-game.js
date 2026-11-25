@@ -928,7 +928,7 @@ function mount(root, opts) {
       const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 60, 8, 1, true).translate(0, 30, 0), new THREE.MeshBasicMaterial({ color: 0x6b4eff, transparent: true, opacity: 0.25, depthWrite: false }));
       g.add(beam);
       const num = W.label(String(i + 1), { bg: '#6b4eff', size: 48, height: 1.1 }); num.position.y = 5.8; g.add(num);
-      g.position.set(c.x, W.groundAt(c.x, c.z), c.z);
+      g.position.set(c.x, W.standAt(c.x, c.z), c.z);
       W.scene.add(g);
       return g;
     });
@@ -966,7 +966,7 @@ function mount(root, opts) {
     const a = W.agentOn(s.x, s.z, false);
     if (!a) { U.toast('Nowhere to run here!'); return; }
     const obj = o.obj || makeCastObj(o.who);
-    obj.position.set(s.x, W.groundAt(s.x, s.z), s.z);
+    obj.position.set(s.x, W.standAt(s.x, s.z), s.z);
     W.scene.add(obj);
     const name = o.name || (D.CAST[o.who] ? D.CAST[o.who].n : 'them');
     W.say(obj, o.taunt || 'Catch me if you can!', 2.5);
@@ -1159,18 +1159,26 @@ function mount(root, opts) {
         let obj, name, e;
         if (s.who === 'boss') { const crew = CREW[turfCrew(s.turf)]; obj = W.person(Object.assign(W.randomLook(crew.id.length * 99), crew.look)); name = crew.boss; e = crew.e; }
         else { obj = makeCastObj(s.who); name = D.CAST[s.who].n; e = D.CAST[s.who].e; }
-        const off = (hash(s.key.length * 31 + s.key.charCodeAt(0) * 7 + (s.key.charCodeAt(2) || 0)) - 0.5) * 4;
-        s.x += off; s.z += off * 0.3;
+        // a fixed place on the pavement in front of their spot, facing the street (2026-11-24: the old random nudge put
+        // givers inside shops); people sharing a spot stand a slot apart along the kerb
+        const slot = Math.floor(hash(s.key.length * 31 + s.key.charCodeAt(0) * 7 + (s.key.charCodeAt(2) || 0)) * 5) - 2;
+        const st = W.standSpot ? W.standSpot(s.x, s.z, slot) : { x: s.x, z: s.z, yaw: 0, onStreet: true };
+        s.x = st.x; s.z = st.z;
         obj.position.set(s.x, W.surfaceAt(s.x, s.z), s.z);
+        obj.rotation.y = st.yaw; obj.userData.standYaw = st.yaw;
         const nm = W.label(e + ' ' + name, { size: 34, height: 0.5, bg: 'rgba(255,255,255,.92)', fg: '#1f1a3d', border: '#1f1a3d' });
         nm.position.y = 2.35 / (obj.scale.y || 1); obj.add(nm);
         const mark = W.label('!', { bg: '#ffc21f', fg: '#1f1a3d', size: 60, height: 0.9, border: '#1f1a3d', depthTest: false });
         mark.position.y = 3.2 / (obj.scale.y || 1); obj.add(mark);
         W.scene.add(obj);
-        rt.actors.set(key, { key, obj, x: s.x, z: s.z, who: s.who, turf: s.turf, nm, mark, phase: Math.random() * 6 });
+        rt.actors.set(key, { key, obj, x: s.x, z: s.z, who: s.who, turf: s.turf, nm, mark, phase: Math.random() * 6, slot, fixed: st.onStreet });
       }
       for (const [key, a] of rt.actors) {
         const s = spots.get(key);
+        if (!a.fixed && W.standSpot && !a.obj.userData.cine) {   // no street was loaded when they appeared: find their place now
+          const st = W.standSpot(s.x, s.z, a.slot);
+          if (st.onStreet) { a.x = st.x; a.z = st.z; a.fixed = true; a.obj.position.set(st.x, W.surfaceAt(st.x, st.z), st.z); a.obj.rotation.y = a.obj.userData.standYaw = st.yaw; }
+        }
         a.open = s.open; a.active = s.active; a.place = s.place;
         const show = s.open.length || s.active.length || s.who === 'boss';
         a.mark.visible = !!show && !W.cine; a.markShow = !!show;
@@ -1186,8 +1194,8 @@ function mount(root, opts) {
     }
     for (const a of rt.actors.values()) {
       const d = Math.hypot(a.x - p.x, a.z - p.z);
-      a.obj.rotation.y = d < 12 ? Math.atan2(p.x - a.x, p.z - a.z) + Math.PI : a.obj.rotation.y;
       const u = a.obj.userData;
+      a.obj.rotation.y = d < 12 ? Math.atan2(p.x - a.x, p.z - a.z) + Math.PI : u.standYaw != null ? u.standYaw : a.obj.rotation.y;   // idle: facing the street
       if (!u.cine) {   // in a cut-scene cft-cine.js animates them (talking, the mouth)
         if (u.cheerT > 0) u.cheerT -= dt;   // just accepted a mission: arms up!
         W.animate(a.obj, 0, dt, u.cheerT > 0 ? 'cheer' : d < 6 && (a.open && a.open.length) ? 'wave' : null);
@@ -1515,7 +1523,7 @@ function mount(root, opts) {
     const h = homeSpot(), dx = h.bx - h.x, dz = h.bz - h.z, d = Math.hypot(dx, dz);
     let fx = h.x + (d > 0.5 ? dx / d * Math.min(2.5, d) : 2.5), fz = h.z + (d > 0.5 ? dz / d * Math.min(2.5, d) : 0);
     if (W.heightAt(fx, fz)) { fx = h.x + (fx - h.x) * 0.4; fz = h.z + (fz - h.z) * 0.4; }
-    rt.flag.position.set(fx, W.groundAt(fx, fz), fz);
+    rt.flag.position.set(fx, W.standAt(fx, fz), fz);
   }
 
   // ------------------------------------------------------------------ businesses

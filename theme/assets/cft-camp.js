@@ -1,7 +1,7 @@
 /* City Fun Time: the campaign update (2026-11-18). The user: "leave little secrets around town: analyse the map and find
    where there are tight locations between buildings, so nosy people can get them. Redesign the HUD; add map size. Ranged
    attacks limited in quantity, run around town to get more. Mega monsters bigger than buildings, hard to kill, weak spots
-   temporarily exposed, scaled to your level (gear helps). A campaign: the first 5 minutes a countdown, immortal, every
+   temporarily exposed, scaled to your level (gear helps). A campaign: the first 3 minutes a countdown, immortal, every
    monster chases you, complete chaos, then you're next to your home and the world is peaceful. 1 mission, then 3 more,
    never more than 5 on the map. The world starts calm and every mission adds a crazy thing. Everything jumpable and
    bouncy. Fire and extinguishers. Water powers and lightning powers."
@@ -30,7 +30,7 @@ function attach(G, api) {
   const rnd = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const P = () => W.player.pos;
-  const gy = (x, z) => W.groundAt(x, z);
+  const gy = (x, z) => W.standAt(x, z);
   const K = { megas: [], fires: [], spots: [], stash: new Map(), storm: null };
   const WILD_IDX = {}; CP.WILD.forEach((w, i) => { WILD_IDX[w.id] = i; });
   let alive = true, tier = 0, tierT = 0, hudT = 0, cratesT = 0, fireT = rnd(T.fireEvery[0], T.fireEvery[1]), stormT = rnd(T.stormEvery[0], T.stormEvery[1]);
@@ -53,7 +53,7 @@ function attach(G, api) {
     if (!s.camp || typeof s.camp !== 'object') s.camp = { intro: 'done', veteran: true };   // a save from before the campaign: keeps the whole crazy world it had
     const c = s.camp;
     if (!c.intro) c.intro = 'done';
-    if (typeof c.left !== 'number') c.left = CP.INTRO_SECS;
+    if (typeof c.left !== 'number' || c.left > CP.INTRO_SECS) c.left = CP.INTRO_SECS;   // saves from the 5-minute days
     if (typeof c.ammo !== 'number') c.ammo = T.ammoStart;
     if (typeof c.water !== 'number') c.water = T.waterStart;
     if (typeof c.volt !== 'number') c.volt = T.voltStart;
@@ -146,7 +146,7 @@ function attach(G, api) {
     }
   }
 
-  // ------------------------------------------------------------------ the opening: five immortal minutes of everything chasing you
+  // ------------------------------------------------------------------ the opening: three immortal minutes of everything chasing you
   K.startIntro = async function () {
     const c = st();
     if (c.intro === 'done') return;
@@ -164,10 +164,10 @@ function attach(G, api) {
     if (!alive) return;
     shell.classList.add('cft-panic');
     introEl.hidden = false;
-    U.banner('🌀 WHAT IS HAPPENING', 'Everything is chasing you. Good news: you can\'t die. Survive five minutes of total chaos!', 'fail');
+    U.banner('🌀 WHAT IS HAPPENING', 'Everything is chasing you. Good news: you can\'t die. Survive three minutes of total chaos!', 'fail');
     word('YOU CAN\'T DIE!', 'red', 'Fight (F), splash (1), zap (2), jump on everything', true);
     G.sfx.fail();
-    introEv = 6; introFire = 2; introPanic = 3; introMega = Math.min(introMega, Math.max(10, c.left - 225)); introChamp = 30;
+    introEv = 6; introFire = 2; introPanic = 3; introMega = Math.min(introMega, Math.max(10, c.left - CP.INTRO_SECS * 0.75));   // the first MEGA a quarter of the way in introChamp = 30;
     startStorm(c.left + 5, true);
     G.dirty();
   };
@@ -211,7 +211,7 @@ function attach(G, api) {
     if (c.left <= 0) endIntro();
   }
   // The opening was a fever dream (the user, 2026-11-18): you wake at the address you typed, level 1 with $0, and nothing
-  // from those five minutes is kept: no gear, loot, stickers, achievements, counters, aura or Dex entries. DREAM_KEYS are the
+  // from those three minutes is kept: no gear, loot, stickers, achievements, counters, aura or Dex entries. DREAM_KEYS are the
   // parts of the save that are put back exactly as they were before it started (save.camp.snap, taken in startIntro).
   const DREAM_KEYS = ['bag', 'owned', 'equip', 'rpg', 'stickers', 'counters', 'hero', 'chaos', 'fun', 'm', 'track', 'jobs', 'dyn'];
   function dreamSnap() { const s = save(), o = {}; for (const k of DREAM_KEYS) o[k] = s[k] === undefined ? null : JSON.parse(JSON.stringify(s[k])); return o; }

@@ -1705,7 +1705,7 @@ S('s-mega', 'Send It', 'kai', 'park', { m: ['s-stunts'], lvl: 4 }, ['Kai: Okay, 
 // total chaos, then home to a peaceful world, 1 mission, then 3, never more than 5; the world starts calm and every mission
 // adds a crazy thing; everything jumpable and bouncy; fire and extinguishers; water and lightning powers."
 D.CAMPAIGN = {
-  INTRO_SECS: 300,                // the opening: five immortal minutes of everything chasing you
+  INTRO_SECS: 180,                // the opening: three immortal minutes (was 5 until 2026-11-24) of everything chasing you
   CAP: [1, 3, 5],                 // missions on the map after 0 / 1 / 2+ missions done (never more than the last)
   // the crazy list: every story or side mission you finish switches on the next one (the world starts calm)
   WILD: [
@@ -1901,7 +1901,7 @@ D.TUNE = {
     rewardCash: 300, rewardXp: 400,   // BLOCK RESTORED (all three layers full): money and XP (+15% / +10% per level)
   },
   camp: {                         // cft-camp.js (2026-11-18): the campaign, secrets, ammo, powers, fire, storms, mega figments
-    introFoes: 14, introFoesLow: 8,   // figments chasing you at once in the opening five minutes
+    introFoes: 14, introFoesLow: 8,   // figments chasing you at once in the opening three minutes
     ammoStart: 20, ammoMax: 60, ammoCrate: 12,   // shots for ranged weapons (heavy ones cost more: weapon.ammo)
     ammoCrates: 6, crateMin: 70, crateMax: 320,  // ammo crates kept around you, between these distances (so you run for them)
     waterMax: 30, voltMax: 20, foamMax: 100,     // power charges (foam = seconds x 10 of extinguisher spray)
