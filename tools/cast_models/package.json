@@ -1,0 +1,2 @@
+{ "name": "cft-cast-models", "private": true, "type": "module",
+  "dependencies": { "@gltf-transform/core": "4.1.1", "@gltf-transform/functions": "4.1.1", "@gltf-transform/extensions": "4.1.1", "meshoptimizer": "0.22.0" } }

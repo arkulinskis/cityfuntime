@@ -972,6 +972,16 @@ importantly the face. Put graffiti on 10% of buildings."
   the map; no camera-based flip any more, it flickered), runs cut at sharp corners and around crossings with other named streets, whole names only.
 - **House numbers:** `houseNumbers(s, group)` after streetNames in buildSub: nearest car street point -> the OSM address point -> the first
   wall on that line gets a plate (atlas canvas per sub-tile, `s.hnMat`, lod hi, not on LOW). `W.hnPlates` lists them.
+- **Actor Troop cast models (2026-11-24):** `D.CAST_MODELS` (generated block in cft-content.js by
+  `tools/cast_models/build.py`: Godot export `../actor-troop/tools/export_cft.sh` -> `slim_glb.mjs` (npm install there once)
+  -> `APP_MAKER/media/public/models/cft/<id>-<md5>.glb` -> portraits `theme/assets/cast-faces.jpg` (one 160 px strip, manifest
+  order)). Then `python -I ../APP_MAKER/media/r2_deploy.py --only=models/cft/` (the worker allows models/<app>/*.glb).
+  `W.person(look)` with `look.model` builds the usual figure, then `wearModel` loads the .glb and hides the built meshes;
+  `syncModels` (in `draw`, every frame) copies 10 joints (body->Hips, head, legs, knees, arms, elbows) as quaternions:
+  the Actor Troop Rig has the same conventions (faces -z, right +x, +x swings forward, elbows +x, knees -x), so every
+  pose and attack works unchanged. Skinned + quantized: `frustumCulled = false` (bounds are wrong). Givers: `GIVER` in
+  build.py; `castModelFor(id)` skips the one you are; `G.refreshCast()` after a change. Shop outfits/hats only change your
+  own built look (a model wears its own clothes). `?nomodels=1` turns them off. Shots: `game_test.py --castshots`.
 - **The opening is 3 minutes** (`D.CAMPAIGN.INTRO_SECS` 180); the first MEGA comes at `INTRO_SECS * 0.25`.
 
 ## Recipes

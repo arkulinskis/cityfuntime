@@ -1612,3 +1612,14 @@ anvil-dropzone { display: contents; }
 .cft-cbars i { display: block; height: 4px; border-radius: 9px; background: #e6e1f3; overflow: hidden; }
 .cft-cbars b { display: block; height: 100%; width: 0; transition: width var(--dur-slow) var(--ease-out); }
 .cft-cbars i:nth-child(1) b { background: #ff8a3d; } .cft-cbars i:nth-child(2) b { background: #6b4eff; } .cft-cbars i:nth-child(3) b { background: #20c997; }
+
+/* "Who are you?" in Your look: Actor Troop's characters (2026-11-24) */
+.cft-castpick > span { display: block; font-weight: 700; font-size: .85rem; margin: 4px 0 6px; }
+.cft-castgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; }
+.cft-castb { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px; min-height: 44px; border: 2px solid transparent; border-radius: 12px; background: transparent; color: inherit; cursor: pointer; font: inherit; transition: transform var(--dur-1, 150ms) var(--ease-out, ease-out), border-color var(--dur-1, 150ms) var(--ease-out, ease-out); }
+.cft-castb i { width: 54px; height: 54px; border-radius: 50%; border: 2.5px solid #1f1a3d; background-repeat: no-repeat; display: grid; place-items: center; font-style: normal; font-size: 1.6rem; background-color: #f3ead8; }
+.cft-castb b { font-size: .72rem; font-weight: 700; line-height: 1.1; }
+.cft-castb:hover { transform: translateY(-1px); }
+.cft-castb:active { transform: scale(.97); }
+.cft-castb:focus-visible { outline: 3px solid #6b4eff; outline-offset: 2px; }
+.cft-castb.on { border-color: #6b4eff; background: rgba(107, 78, 255, .1); }

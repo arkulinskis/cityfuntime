@@ -468,6 +468,7 @@ function create(G, root) {
           <form class="cft-start-form" data-f1>
             <h3>1 · Who are you?</h3>
             <label class="cft-field"><span>Your name</span><input name="name" maxlength="20" required value="${esc(me && me.name ? me.name.split(' ')[0] : '')}" placeholder="Alex"></label>
+            ${castPick(look)}
             ${sw('Skin', SKIN, 'skin')}${sw('Hair', HAIR, 'hair')}${sw('Shirt', SHIRT, 'shirt')}
             <div class="cft-sw cft-styles" data-styles><span>Style</span>${STYLES.map((n, k) => '<button type="button" class="cft-chipb ' + (k ? '' : 'on') + '" data-style="' + k + '">' + n + '</button>').join('')}</div>
             <div class="cft-row"><label class="cft-check"><input type="checkbox" name="glasses"> Glasses</label><label class="cft-check"><input type="checkbox" name="beard"> Beard</label></div>
@@ -485,6 +486,15 @@ function create(G, root) {
         row.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
         look[row.dataset.sw] = hexN(b.dataset.c);
       }));
+      const cp = ov.el.querySelector('[data-castpick]');   // be one of Actor Troop's characters (2026-11-24)
+      if (cp) cp.addEventListener('click', e => {
+        const mb = e.target.closest('[data-model]'); if (!mb) return;
+        const M = G.D.CAST_MODELS || {}, id = mb.dataset.model || null, who = id && M[id];
+        cp.querySelectorAll('[data-model]').forEach(x => x.classList.toggle('on', x === mb));
+        if (id) { look.model = id; if (G.W && G.W.preloadCast) G.W.preloadCast(id); } else delete look.model;
+        const note = cp.querySelector('[data-castnote]');
+        if (note) note.textContent = who ? who.n + ': ' + who.d + '. Wears their own clothes; the colours below change your own look.' : 'Your own look: pick colours and a style below.';
+      });
       ov.el.querySelector('[data-styles]').addEventListener('click', e => {
         const b = e.target.closest('[data-style]'); if (!b) return;
         ov.el.querySelectorAll('[data-style]').forEach(x => x.classList.toggle('on', x === b));
@@ -619,11 +629,25 @@ function create(G, root) {
     const sel = wear && wardOv && wardOv.el.querySelector('.cft-wslot.sel');
     if (sel) sel.classList.add('pop');
   }
+  // "Who are you?": your own built look, or one of Actor Troop's characters (D.CAST_MODELS, 2026-11-24). Portraits are
+  // one strip (cast-faces.jpg, 160 px each, manifest order). A character wears their own clothes; the colours below and
+  // shop outfits only change your own look.
+  function castPick(cur) {
+    const M = G.D.CAST_MODELS || {}, ids = Object.keys(M), F = 54;
+    if (!ids.length) return '';
+    const v = ids.map(k => M[k].file.slice(-12, -4)).join('').slice(0, 8);
+    const tile = (id, k) => '<button type="button" class="cft-castb' + ((cur.model || '') === id ? ' on' : '') + '" data-model="' + id + '" title="' + esc(id ? M[id].n + ': ' + M[id].d : 'Your own look') + '">' +
+      (id ? '<i style="background-image:url(_/theme/cast-faces.jpg?v=' + v + ');background-size:' + (F * ids.length) + 'px ' + F + 'px;background-position:-' + (k * F) + 'px 0"></i>' : '<i class="own">🎨</i>') +
+      '<b>' + esc(id ? M[id].n : 'Me') + '</b></button>';
+    const who = cur.model && M[cur.model];
+    return '<div class="cft-castpick" data-castpick><span>Who are you?</span><div class="cft-castgrid">' + tile('', -1) + ids.map((id, k) => tile(id, k)).join('') + '</div>' +
+      '<p class="muted small" data-castnote>' + (who ? esc(who.n + ': ' + who.d) + '. Wears their own clothes; the colours below change your own look.' : 'Your own look: pick colours and a style below.') + '</p></div>';
+  }
   U.lookEditor = function () {
     const s = save(), W = G.W;
     const cur = Object.assign({ skin: hexN(SKIN[2]), hair: hexN(HAIR[1]), shirt: hexN(SHIRT[0]), style: s.look && s.look.long ? 1 : 0, glasses: false, beard: false, pack: true }, s.look || {});
     const sw = (name, list, key) => '<div class="cft-sw" data-sw="' + key + '"><span>' + name + '</span>' + list.map((c, k) => '<button type="button" style="background:' + c + '" data-c="' + c + '" class="' + (c === toHex(cur[key]) ? 'on' : '') + '" aria-label="' + name + ' ' + (k + 1) + '"></button>').join('') + '</div>';
-    const ov = overlay('<div class="cft-card cft-look"><h3>🪞 Your look</h3>' + sw('Skin', SKIN, 'skin') + sw('Hair', HAIR, 'hair') + sw('Shirt', SHIRT, 'shirt') +
+    const ov = overlay('<div class="cft-card cft-look"><h3>🪞 Your look</h3>' + castPick(cur) + sw('Skin', SKIN, 'skin') + sw('Hair', HAIR, 'hair') + sw('Shirt', SHIRT, 'shirt') +
       '<div class="cft-sw cft-styles" data-styles><span>Style</span>' + STYLES.map((n, k) => '<button type="button" class="cft-chipb ' + (k === cur.style ? 'on' : '') + '" data-style="' + k + '">' + n + '</button>').join('') + '</div>' +
       '<div class="cft-row"><label class="cft-check"><input type="checkbox" data-flag="glasses" ' + (cur.glasses ? 'checked' : '') + '> Glasses</label><label class="cft-check"><input type="checkbox" data-flag="beard" ' + (cur.beard ? 'checked' : '') + '> Beard</label>' +
       '<label class="cft-check"><input type="checkbox" data-flag="pack" ' + (cur.pack !== false ? 'checked' : '') + '> Backpack</label></div>' +
@@ -632,7 +656,17 @@ function create(G, root) {
     const apply = () => { cur.long = [1, 2, 3, 6].includes(cur.style); s.look = cur; W.setLook(G.playerLook()); };
     W.showOff = true;
     ov.el.addEventListener('click', e => {
-      const c = e.target.closest('[data-c]'), st = e.target.closest('[data-style]');
+      const c = e.target.closest('[data-c]'), st = e.target.closest('[data-style]'), mb = e.target.closest('[data-model]');
+      if (mb) {
+        const M = G.D.CAST_MODELS || {}, id = mb.dataset.model || null;
+        ov.el.querySelectorAll('[data-model]').forEach(x => x.classList.toggle('on', x === mb));
+        if (id) cur.model = id; else delete cur.model;
+        const note = ov.el.querySelector('[data-castnote]'), who = id && M[id];
+        if (note) note.textContent = who ? who.n + ': ' + who.d + '. Wears their own clothes; the colours below change your own look.' : 'Your own look: pick colours and a style below.';
+        apply();
+        if (G.refreshCast) G.refreshCast();
+        return;
+      }
       if (c) { const row = c.closest('[data-sw]'); row.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === c)); cur[row.dataset.sw] = hexN(c.dataset.c); apply(); }
       else if (st) { ov.el.querySelectorAll('[data-style]').forEach(x => x.classList.toggle('on', x === st)); cur.style = +st.dataset.style; apply(); }
       else if (e.target.closest('[data-x]')) ov.close();

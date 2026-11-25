@@ -855,13 +855,26 @@ function mount(root, opts) {
   };
 
   // ------------------------------------------------------------------ escorts + followers
+  // Which Actor Troop character plays a mission giver (D.CAST_MODELS[..].giver; 2026-11-24). Nobody plays the giver
+  // whose character you chose to be (they keep their built look), and Sam as a boyfriend keeps his own look.
+  function castModelFor(id) {
+    const M = D.CAST_MODELS || {};
+    if (id === 'sam' && save.pref === 'bf') return null;
+    for (const k in M) if (M[k].giver === id) return save.look && save.look.model === k ? null : k;
+    return null;
+  }
+  G.castModelFor = castModelFor;
   function castLook(id) {
     const c = D.CAST[id];
     if (!c) return W.randomLook(id.length * 977);
     if (id === 'sam' && save.pref === 'bf' && c.lookB) return Object.assign(W.randomLook(5), c.lookB);
-    return Object.assign(W.randomLook(id.length * 131 + id.charCodeAt(0)), c.look || {});
+    const look = Object.assign(W.randomLook(id.length * 131 + id.charCodeAt(0)), c.look || {}), mid = castModelFor(id);
+    if (mid) { look.model = mid; look.h = 1; }   // the model has its own height
+    return look;
   }
   G.castLook = castLook;
+  // after you change who you are: the givers are made again (one of them may get a model back, or lose it)
+  G.refreshCast = () => { for (const a of rt.actors.values()) W.scene.remove(a.obj); rt.actors.clear(); rt.actorTimer = 0; refreshFollowers(); };
   function makeCastObj(id) {
     const c = D.CAST[id];
     if (c && c.animal) return W.animal(c.animal, c.color);

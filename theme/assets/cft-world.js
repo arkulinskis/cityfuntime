@@ -3397,10 +3397,11 @@ varying float vGL; varying vec2 vGUV;
   }
   W.person = function (look, npc) {
     look = look || W.randomLook(Math.random() * 1e6 | 0);
-    if (!GFX) return buildPerson(look, npc);
-    const prev = KOF;
-    KOF = personKOF(look);
-    try { return buildPerson(look, npc); } finally { KOF = prev; }
+    let g;
+    if (!GFX) g = buildPerson(look, npc);
+    else { const prev = KOF; KOF = personKOF(look); try { g = buildPerson(look, npc); } finally { KOF = prev; } }
+    if (look.model && W.castModels()[look.model]) wearModel(g, look.model);   // an Actor Troop character (see "the cast as real people")
+    return g;
   };
   function buildPerson(look, npc) {
     const P = npc ? (LOW ? PRIM_LO : PRIM_MID) : (LOW ? PRIM_MID : PRIM_HI);
@@ -3723,6 +3724,7 @@ varying float vGL; varying vec2 vGUV;
   W.mouth = function (fig, k) {
     const u = fig && fig.userData;
     if (!u || u.kind !== 'person' || !u.head) return;
+    if (u.modelId) { u.mouthOpen = Math.max(0, Math.min(1, k || 0)); if (u.model) { if (u.mouth) u.mouth.visible = false; return; } }   // a cast model: its lip bone
     if (!u.mouth) {
       if (!k) return;
       if (!MOUTH) MOUTH = { g: new THREE.SphereGeometry(1, 14, 10), m: new THREE.MeshBasicMaterial({ color: 0x3a1418 }), t: new THREE.MeshBasicMaterial({ color: 0xf4f1ea }) };
@@ -3736,6 +3738,89 @@ varying float vGL; varying vec2 vGUV;
     u.mouth.visible = o > 0.04;
     u.mouth.scale.set(0.85 + o * 0.25, 0.25 + o * 1.25, 1);
   };
+  // ---------------------------------------------------------------- the cast as real people (2026-11-24)
+  // Actor Troop's 11 characters (CC0 MakeHuman bodies + procedural clothes and hair, exported from Godot and slimmed by
+  // tools/cast_models/build.py) live on R2 as <media base>models/cft/<file> (D.CAST_MODELS). W.person(look) with
+  // look.model = id builds the usual figure first (it keeps every pose, the hand slots, shields and balloons), loads the
+  // model and, once it is there, hides the built parts: the model's bones copy the figure's joints right before every
+  // frame is drawn (syncModels in draw), so walking, fighting, climbing, riding, talking all work unchanged. The Actor
+  // Troop rig uses our conventions (faces -z, right hand +x, +x swings a limb forward, elbows +x, knees -x). The mouth
+  // (W.mouth) swings LipLower like Actor Troop does; the eyes blink now and then.
+  const MODEL_JOINTS = [['body', 'Hips'], ['head', 'Head'], ['legL', 'LeftUpperLeg'], ['kneeL', 'LeftLowerLeg'], ['legR', 'RightUpperLeg'],
+    ['kneeR', 'RightLowerLeg'], ['armL', 'LeftUpperArm'], ['elbowL', 'LeftLowerArm'], ['armR', 'RightUpperArm'], ['elbowR', 'RightLowerArm']];
+  const castSrc = {}, castWait = {}, modelPeople = new Set(), _mv = new THREE.Vector3(), XAX = new THREE.Vector3(1, 0, 0);
+  W.modelPeople = modelPeople;
+  const modelBase = () => window.CFT_MODEL_BASE || ((window.CFT_VO_BASE || (window.ArkMusic && window.ArkMusic.base) || 'https://arkvital-media.addanapp.workers.dev/').replace(/music\/?$/, '') + 'models/cft/');
+  W.castModels = () => (window.CFT_DATA && window.CFT_DATA.CAST_MODELS) || {};
+  W.modelsOn = () => !!(THREE.GLTFLoader && THREE.SkeletonUtils) && !opts.nomodels && !/[?&]nomodels=1/.test(location.search);
+  function castModel(id, cb) {
+    const e = W.castModels()[id];
+    if (!e || !W.modelsOn()) return;
+    const have = castSrc[id];
+    if (have) { if (have !== 'fail') cb(have); return; }
+    if (castWait[id]) { castWait[id].push(cb); return; }
+    castWait[id] = [cb];
+    new THREE.GLTFLoader().load(modelBase() + e.file, gl => {
+      const cbs = castWait[id] || []; delete castWait[id];
+      if (destroyed) return;
+      gl.scene.traverse(o => {
+        if (!o.isMesh) return;
+        o.frustumCulled = false; o.castShadow = !LOW;   // skinned + quantized: the bind-pose bounds are wrong, never cull
+        const m = o.material;
+        if (m.map) { m.map.encoding = THREE.LinearEncoding; m.map.anisotropy = 4; m.map.needsUpdate = true; }   // this game draws in display colours
+        if (m.envMapIntensity != null) m.envMapIntensity = 0.5;
+        m.metalness = 0;
+      });
+      castSrc[id] = { scene: gl.scene };
+      cbs.forEach(f => f(castSrc[id]));
+    }, undefined, () => { castSrc[id] = 'fail'; delete castWait[id]; });
+  }
+  W.preloadCast = id => castModel(id, () => {});
+  W.castReady = id => !!castSrc[id] && castSrc[id] !== 'fail';
+  function wearModel(g, id) {
+    const u = g.userData, built = [];
+    const keep = new Set([u.shield, u.prop, u.balloon].filter(Boolean));
+    const walk = o => { if (keep.has(o)) return; if (o.isMesh) built.push(o); for (const c of o.children) walk(c); };
+    walk(g);
+    u.modelId = id;
+    castModel(id, src => {
+      if (u.model) return;
+      const obj = THREE.SkeletonUtils.clone(src.scene), bones = {};
+      obj.traverse(o => { if (o.isBone) bones[o.name] = o; });
+      if (!bones.Hips) return;
+      for (const m of built) m.visible = false;
+      if (u.mouth) u.mouth.visible = false;
+      const holder = obj.getObjectByName('Body') || obj;
+      g.add(obj);
+      u.model = { obj, bones, hip: bones.Hips.position.clone(), k: 1 / (holder.scale.y || 1), blinkT: 1 + Math.random() * 4, blink: 0, miss: 0 };
+      modelPeople.add(g);
+    });
+  }
+  W.hasModel = g => !!(g && g.userData && g.userData.model);
+  function syncModels(dt) {
+    for (const g of modelPeople) {
+      const u = g.userData, m = u.model;
+      if (!g.parent) { if (++m.miss > 240) modelPeople.delete(g); continue; }
+      m.miss = 0;
+      const B = m.bones;
+      for (const [j, b] of MODEL_JOINTS) if (B[b] && u[j]) B[b].quaternion.copy(u[j].quaternion);
+      const bp = u.body.position;
+      B.Hips.position.set(m.hip.x + bp.x * m.k, m.hip.y + bp.y * m.k, m.hip.z + bp.z * m.k);
+      if (B.LipLower) B.LipLower.quaternion.setFromAxisAngle(XAX, 0.03 - (u.mouthOpen || 0) * 0.27);
+      m.blinkT -= dt;
+      if (m.blinkT <= 0) { m.blink = 0.16; m.blinkT = 2.5 + Math.random() * 4; }
+      const shut = m.blink > 0 ? Math.sin(Math.PI * Math.max(0, 1 - (m.blink -= dt) / 0.16)) : 0;
+      for (const l of ['LidL', 'LidR']) if (B[l]) B[l].quaternion.setFromAxisAngle(XAX, -shut * 0.77);
+      // the hand slots (weapons, balloons) follow the model's palms
+      for (const [slot, elbow, bone] of [['handR', 'elbowR', 'RightHand'], ['handL', 'elbowL', 'LeftHand']]) {
+        const h = u[slot];
+        if (!h || !h.children.length || !B[bone]) continue;
+        g.updateMatrixWorld(true);
+        _mv.set(0, -0.07, 0).applyMatrix4(B[bone].matrixWorld);
+        h.position.copy(u[elbow].worldToLocal(_mv));
+      }
+    }
+  }
   W.animal = function (kind, color) {
     const g = new THREE.Group(), body = new Merge(), { sph: S, sm: SM, cap: CAP } = PRIM_LO;
     const c = color || (kind === 'dog' ? 0xc8894a : kind === 'cat' ? 0x6b6b6b : kind === 'duck' ? 0x8a6a3a : 0x8b8f9c);
@@ -5580,7 +5665,9 @@ varying float vGL; varying vec2 vGUV;
   };
   // every frame goes through here: post-processing on high quality, else straight to the screen
   let lastDraw = 0;
+  let lastSync = 0;
   function draw(live) {
+    if (modelPeople.size) { const now = performance.now(); syncModels(Math.min(0.1, lastSync ? (now - lastSync) / 1000 : 0)); lastSync = now; }
     if (!POST) { renderer.render(scene, camera); return; }
     POST.render(scene, camera);
     if (live) { const now = performance.now(); if (lastDraw) POST.adapt((now - lastDraw) / 1000); lastDraw = now; }

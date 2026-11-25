@@ -22,6 +22,7 @@
     python -I tools/live/game_test.py --boroshots [OUTDIR] no tests: two boroughs side by side, the chip + banner, the big map with names
     python -I tools/live/game_test.py --rpg [OUTDIR]      only rpgtest.js (loot, talents, rested XP, discovery, reputation, achievements, rares)
     python -I tools/live/game_test.py --shots [OUTDIR]    no tests: screenshots of the city by day, at dusk and at night
+    python -I tools/live/game_test.py --castshots [OUTDIR]   no tests: Actor Troop cast models (line-up of poses, close-up, you as Ava, a giver)
     python -I tools/live/game_test.py --ground [OUTDIR]   no tests: the ground photo textures (pavement, road, lawn, plaza, woods/sand, overview, dusk)
     python -I tools/live/game_test.py --monsters [OUTDIR] no tests: the 15 monster types, a metro guardian, a fight, loot gear on you
     python -I tools/live/game_test.py --long [OUTDIR]     no tests: the Character / Reputation / Achievements apps, a Legendary drop, a rare monster, a level-up
@@ -223,6 +224,29 @@ GROUND = (
             " if (q) W.teleport(q.x + q.nx * 4.5, q.z + q.nz * 4.5, Math.atan2(q.nx, q.nz)); W.cam.pitch = 0.02; W.cam.dist = W.cam.cur = 2.6; console.log('[label] ' + (q ? q.t : 'none') + ' of ' + W.hnPlates.length);", 40)   # house-number plates (2026-11-24)
 )
 
+# The cast as real people (2026-11-24): Actor Troop's characters in a line-up (every pose), close-ups, you as one of
+# them, and a mission giver played by one. Models come from R2 (internet), so each shot waits for them.
+CAST_LINE = ("const ids = Object.keys(W.castModels()), poses = [null, 'walk', 'run', 'wave', 'talk', 'cheer', 'sit', 'phone', 'dance', 'pedal', 'air'];"
+             "s.clock = 12; const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 10) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw);"
+             "const fx = -Math.sin(W.player.face), fz = -Math.cos(W.player.face), rx = -fz, rz = fx;"
+             "(window.__line || []).forEach(o => W.scene.remove(o.g)); window.__line = ids.map((id, i) => { const g = W.person({ model: id, h: 1 });"
+             " const k = i - (ids.length - 1) / 2, x = p.x + fx * 7 + rx * k * 1.15, z = p.z + fz * 7 + rz * k * 1.15; g.position.set(x, W.standAt(x, z), z); g.rotation.y = W.player.face + Math.PI; W.scene.add(g);"
+             " return { g, pose: poses[i % poses.length], id }; });"
+             "clearInterval(window.__lineT); window.__lineT = setInterval(() => window.__line.forEach(o => { o.g.userData.talk = 0.8; W.animate(o.g, o.pose === 'walk' ? 4 : o.pose === 'run' ? 10 : 0, 0.03, o.pose === 'walk' || o.pose === 'run' ? null : o.pose); W.mouth(o.g, o.pose === 'talk' ? 0.6 : 0); }), 30);"
+             "W.cam.pitch = 0.12; W.cam.dist = W.cam.cur = 3.5;")
+CAST = (
+    [{"waitFor": "window.__cft.W.groundTextures === true", "timeout": 60000}]
+    + [{"eval": "(() => { " + PRE + CAST_LINE + POST % 30}]
+    + [{"waitFor": "window.__cft.W.modelPeople.size >= Object.keys(window.__cft.W.castModels()).length", "timeout": 180000}, {"wait": 1200}, {"shot": "k1-lineup"}]
+    + scene("k2-closeup", "const L = window.__line, a = L[2].g.position, b = L[4].g.position; const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2; W.teleport(mx - Math.sin(W.player.face + Math.PI) * -3.2, mz - Math.cos(W.player.face + Math.PI) * -3.2, W.player.face); look(mx, mz, 2.2, 0.05);", 10, 1500)
+    + scene("k3-you-ava", "clearInterval(window.__lineT); (window.__line || []).forEach(o => W.scene.remove(o.g)); window.__line = []; s.look = Object.assign({}, s.look || {}, { model: 'ava' }); W.setLook(G.playerLook()); G.refreshCast();"
+            "W.cam.pitch = 0.18; W.cam.dist = W.cam.cur = 3.2; W.cam.yaw = W.player.face + Math.PI;", 20, 1000)
+    + [{"waitFor": "window.__cft.W.avatar.children.some(c => window.__cft.W.hasModel(c))", "timeout": 120000}, {"wait": 800}, {"shot": "k3-you-ava"}]
+    + scene("k4-giver", "const a = [...G.rt.actors.values()].find(x => x.who === 'max') || [...G.rt.actors.values()][0]; if (a) { const yaw = a.obj.userData.standYaw || 0; W.teleport(a.x - Math.sin(yaw) * 3, a.z - Math.cos(yaw) * 3, yaw + Math.PI); look(a.x, a.z, 3.4, 0.08); }"
+            "console.log('[label] giver ' + (a ? a.who + ' model ' + (a.obj.userData.modelId || 'none') : 'none'));", 30, 6000)
+    + [{"eval": "(() => { window.__cft.ui.lookEditor(); return 'ok'; })()"}, {"wait": 1500}, {"shot": "k5-look-editor"}]
+)
+
 # Boroughs (2026-11-17): a street in the home borough, a street in the next one (its banner showing), from above, the map.
 BORO_WAIT = [{"waitFor": "window.__cft.W.districts().length > 0", "timeout": 60000}, {"wait": 1500}]
 BORO_O = "const ds = W.districts(), home = W.districtAt(0, 0), o = ds.filter(d => d.c !== 'city' && d.n !== home.n).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[%d];"
@@ -363,6 +387,8 @@ elif "--shots" in flags:
     steps = START + SCENES
 elif "--ground" in flags:
     steps = START + GROUND
+elif "--castshots" in flags:
+    steps = START + CAST
 elif "--people" in flags:
     steps = START + PEOPLE
 elif "--models" in flags:
@@ -434,13 +460,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--castshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--castshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

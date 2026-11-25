@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- City Fun Time cast portraits (tools/cast_models/build.py serves this with the slim models as m0.glb, m1.glb...
+     and screenshots it in headless Chrome): one 160 px head-and-shoulders portrait per model, side by side. -->
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#f3ead8;overflow:hidden}canvas{display:block}</style></head>
+<body><script src="three.min.js"></script><script src="three-gltf.js"></script><script>
+(async () => {
+  const F = 160, list = await (await fetch('list.json')).json(), n = list.length;
+  const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  r.setPixelRatio(1); r.setSize(F * n, F); r.setScissorTest(true);
+  document.body.appendChild(r.domElement);
+  const bgs = [0xffd9a8, 0xbfe3d0, 0xd9c8f0, 0xffe58f, 0xc8e6ff, 0xf7c6c6];
+  const loader = new THREE.GLTFLoader();
+  for (let i = 0; i < n; i++) {
+    const gl = await new Promise(res => loader.load('m' + i + '.glb', res, undefined, () => res(null)));
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(bgs[i % bgs.length]);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x9a8a7a, 0.9));
+    const key = new THREE.DirectionalLight(0xffffff, 0.9); key.position.set(-1.2, 2.2, -2.5); scene.add(key);
+    if (gl) {
+      gl.scene.traverse(o => { if (!o.isMesh) return; o.frustumCulled = false; if (o.material.map) o.material.map.encoding = THREE.LinearEncoding; });   // quantized skinned bounds are wrong: never cull
+      scene.add(gl.scene);
+      gl.scene.updateMatrixWorld(true);
+      const head = gl.scene.getObjectByName('Head'), p = new THREE.Vector3();
+      if (head) head.getWorldPosition(p); else p.set(0, 1.6, 0);
+      p.y += 0.06;
+      const cam = new THREE.PerspectiveCamera(30, 1, 0.05, 20);
+      cam.position.set(p.x - 0.12, p.y + 0.04, p.z - 0.85);   // in front (models face -z), a little to one side
+      cam.lookAt(p.x, p.y - 0.03, p.z);
+      r.setViewport(i * F, 0, F, F); r.setScissor(i * F, 0, F, F);
+      r.render(scene, cam);
+    }
+  }
+  document.title = 'done';
+})();
+</script></body></html>

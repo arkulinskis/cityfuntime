@@ -102,7 +102,8 @@ window.__cineOut = []; window.__cineDone = false;
       await sleep(900);
       const words = [...document.querySelectorAll('[data-ctext] span')];
       ok(words.length > 3 && words.some(w => w.classList.contains('on')) && words.some(w => !w.classList.contains('on')), 'words come in one by one (' + words.filter(w => w.classList.contains('on')).length + '/' + words.length + ' so far)');
-      ok(!!max.obj.userData.mouth, 'the giver\'s mouth moves (W.mouth made one)');
+      { const u = max.obj.userData;   // a built figure gets a mouth mesh; an Actor Troop model (Max = Marcus) swings its lip bone
+        ok(u.modelId ? u.mouthOpen != null : !!u.mouth, 'the giver\'s mouth moves (' + (u.modelId ? 'model ' + u.modelId + ': lip bone' : 'W.mouth made one') + ')'); }
       ok(W.cine.fov < 56, 'a cinematic lens, not the gameplay camera (fov ' + Math.round(W.cine.fov) + ')');
       const t1 = $('[data-ctext]').textContent;
       $('.cft-cine-wrap').click(); await sleep(60); $('.cft-cine-wrap').click();
