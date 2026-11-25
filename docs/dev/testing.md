@@ -190,7 +190,7 @@ Screenshot flags (no checks; exit code 1 only if a step failed). Pictures land i
 | `--long` | `l1-character`, `l2-talents`, `l3-reputation`, `l4-achievements`, `l5-legendary`, `l6-rare`, `l7-levelup` |
 | `--monsters` | `c1-lineup`, `c2-guardian`, `c3-fight`, `c4-gear`, `c5-character` |
 | `--heroshots` | `h1-street`, `h2-parry`, `h3-hype`, `h4-outpost`, `h5-wreck`, `h6-blips`, `h7-night`, `h8-phone` |
-| `--ground` | `g1-pavement`, `g2-road-above`, `g3-lawn`, `g4-plaza`, `g5-wood-sand`, `g6-overview`, `g7-dusk`, `g8-street-name` |
+| `--ground` | `g1-pavement`, `g2-road-above`, `g3-lawn`, `g4-plaza`, `g5-wood-sand`, `g6-overview`, `g7-dusk`, `g8-street-name`, `g9-house-numbers` |
 | `--gfx` | `g1-street`, `g2-facade`, `g3-facade-angle`, `g4-roofs`, `g5-cars`, `g6-you`, `g7-dusk`, `g8-night`, `g9-figments` (set `CFT_QS="&nopost=1"` to compare without post-processing) |
 | `--chaosshots` | `c1-street` … `c9-night` (street, park, dex, toys, sky, jetpack, fight, phone, night) |
 | `--campshots` | `k1-hud`, `k2-opening`, `k3-mega`, `k4-fire`, `k5-secret`, `k6-roof`, `k7-phone` |

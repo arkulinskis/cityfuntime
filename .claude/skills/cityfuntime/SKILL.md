@@ -968,6 +968,10 @@ importantly the face. Put graffiti on 10% of buildings."
 - **Raised pavement:** `KERB_Y` = 0.2 (one constant next to `standAt`). buildSub draws the brick top (`TL.sidewalk`, the drawn herringbone
   `cartoonPavement`, `real` 0.65), the kerb strip (`TL.path`, borough accent every 2.5 m) and two vertical stone faces (layer -1, `kerbSide`).
   Anything that stands must use `standAt`/`W.standAt` (or `surfaceAt`), never `groundAt`, or it sinks 20 cm into the pavement.
+- **Street names** repeat along the street (texture = name + gap, RepeatWrapping), one reading direction per street (left to right on
+  the map; no camera-based flip any more, it flickered), runs cut at sharp corners and around crossings with other named streets, whole names only.
+- **House numbers:** `houseNumbers(s, group)` after streetNames in buildSub: nearest car street point -> the OSM address point -> the first
+  wall on that line gets a plate (atlas canvas per sub-tile, `s.hnMat`, lod hi, not on LOW). `W.hnPlates` lists them.
 - **The opening is 3 minutes** (`D.CAMPAIGN.INTRO_SECS` 180); the first MEGA comes at `INTRO_SECS * 0.25`.
 
 ## Recipes

@@ -2378,6 +2378,7 @@ varying float vGL; varying vec2 vGUV;
     }
     if (!flat.empty) { const m = new THREE.Mesh(flat.build(), MAT.drape); m.receiveShadow = true; group.add(m); }
     streetNames(s, group);
+    houseNumbers(s, group);
     const walls = new Geo(true), roofs = new Geo(false);
     const wc = new THREE.Color(), rc = new THREE.Color(), gray = new THREE.Color(0x8c8b88), hsl = {}, gfc = new THREE.Color(), shopfront = new THREE.Color(0x3b3344), ccol = new THREE.Color(), white = new THREE.Color(0xffffff);
     s.buildings.forEach((b, idx) => {
@@ -2558,6 +2559,7 @@ varying float vGL; varying vec2 vGUV;
   function dropSub(s) {
     worldGroup.remove(s.group);
     s.group.traverse(o => { if (o.geometry && !SHARED.has(o.geometry)) o.geometry.dispose(); if (o.isInstancedMesh) o.dispose(); });
+    if (s.hnMat) { s.hnMat.map.dispose(); s.hnMat.dispose(); s.hnMat = null; }   // house-number plates
     s.group = null;
   }
   // base = the height floors count from (window rows line up with it); gcol = the street floor's colour (or none)
@@ -2760,51 +2762,47 @@ varying float vGL; varying vec2 vGUV;
   // double = two solid lines), so each borough's streets read differently at a glance.
   const DASH = { dash: [3, 9, 0.09], long: [6, 9, 0.11], dots: [0.6, 2.4, 0.16], double: [0, 0, 0.07] };
   // ---------------------------------------------------------------- street names on the road (2026-11-20)
-  // The street's name lies on the road like a carpet: yellow letters with a black outline, the capitals half the street
-  // wide, running along it and following its bends and hills. One label per NAME_GAP metres of a street, only where the
-  // street bends gently over the label's length. Each name is one canvas texture (cached, the oldest dropped past NAME_MAX).
-  const NAME_GAP = 160, NAME_MAX = 160, NAME_H = 128, NAME_CAP = 0.56, nameMats = new Map();
+  // The street's name lies on the road like a carpet: yellow letters with a black outline, running along it and following
+  // its bends and hills. Since 2026-11-24 (the user: "half size, always in the same direction so it doesn't flicker, a
+  // continuous text"): the letters are a quarter of the street wide, one reading direction per street (left to right on the
+  // map, never turned round by the camera), and the name repeats all along the street with one word's length between
+  // (the texture is "name + gap", repeated). The ribbon breaks at sharp corners and only ever shows whole names.
+  const NAME_MAX = 160, NAME_H = 128, NAME_CAP = 0.56, nameMats = new Map();
   const nameTint = new THREE.Color(1, 1, 1);  // shared by every name's material, set by the time of day
-  const nameSpots = W.nameSpots = [];  // where labels lie (tests, debug)
+  const nameSpots = W.nameSpots = [];  // where names lie (tests, debug)
   function nameMat(name) {
     let m = nameMats.get(name);
     if (m) { nameMats.delete(name); nameMats.set(name, m); return m; }
     const c = document.createElement('canvas'), g = c.getContext('2d');
     const font = '900 ' + Math.round(NAME_H * 0.78) + 'px "Arial Rounded MT Bold", "Arial Black", "Trebuchet MS", system-ui, sans-serif';
     g.font = font;
-    const tw = Math.ceil(g.measureText(name).width) + 40;
+    const nw = Math.ceil(g.measureText(name).width) + 24, gap = Math.ceil(g.measureText('Word').width), tw = nw + gap;
     c.width = Math.min(2048, tw); c.height = NAME_H;
     g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
-    g.setTransform(Math.min(1, c.width / tw), 0, 0, 1, c.width / 2, NAME_H / 2 + 5);
+    g.setTransform(Math.min(1, c.width / tw), 0, 0, 1, c.width / 2, NAME_H / 2 + 5);   // the name in the middle, half the gap each side
     g.lineWidth = 16; g.strokeStyle = '#111'; g.strokeText(name, 0, 0);
     g.fillStyle = '#ffd21f'; g.fillText(name, 0, 0);
     const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
     tex.anisotropy = Math.min(LOW ? 2 : 8, renderer.capabilities.getMaxAnisotropy());
     // unlit paint, dimmed by W.setClock (nameTint): a lit material came out nearly black under the high-quality lighting
     m = new THREE.MeshBasicMaterial({ map: tex, color: 0xffffff, alphaTest: 0.5, side: THREE.DoubleSide,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 });
-    // turned round on the GPU when the camera looks at it from the other side, so it never reads upside down
-    m.onBeforeCompile = sh => {
-      sh.vertexShader = 'attribute vec2 lup;\n' + sh.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>
-	vec3 camBack = vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
-	if (dot(-camBack.xz, lup) < 0.0) vUv = vec2(1.0) - vUv;`);
-    };
-    m.customProgramCacheKey = () => 'cft-street-name';
     m.color = nameTint;
-    m.userData.aspect = c.width / NAME_H;
+    m.userData.aspect = c.width / NAME_H;   // one name + gap, in letter heights
     nameMats.set(name, m);
     if (nameMats.size > NAME_MAX) { const [k, old] = nameMats.entries().next().value; nameMats.delete(k); old.map.dispose(); old.dispose(); }
     return m;
   }
   function streetNames(s, group) {
     if (!s.names || !s.names.length) return;
-    const placed = [];  // [name, x, z] so two pieces of one street don't both get a label close together
     for (const nm of s.names) {
       const p = nm.p, n = p.length / 2;
       if (n < 2) continue;
       const cum = [0];
       for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(p[2 * i] - p[2 * i - 2], p[2 * i + 1] - p[2 * i - 1]));
       const total = cum[n - 1];
+      if (total < 6) continue;
       const at = d => { // point + direction d metres along the line
         d = Math.max(0, Math.min(total, d));
         let i = 1; while (i < n - 1 && cum[i] < d) i++;
@@ -2814,37 +2812,54 @@ varying float vGL; varying vec2 vGUV;
       };
       const mid = at(total / 2), road = nearestRoad(s, mid[0], mid[1]);
       if (!road || !CAR.has(road.t) || road.t === 'track' || road.w < 4) continue;
-      const mat = nameMat(nm.n), Q = road.w / 2 / NAME_CAP, len = Q * mat.userData.aspect;
-      if (len + 4 > total) continue;
-      const count = Math.max(1, Math.floor(total / NAME_GAP));
-      for (let c = 0; c < count; c++) {
-        const cMid = total * (c + 0.5) / count, s0 = cMid - len / 2, s1 = cMid + len / 2;
-        // only where the street bends gently under the label
-        const a0 = at(s0), a1 = at(s1), am = at(cMid);
-        if (a0[2] * am[2] + a0[3] * am[3] < 0.94 || a1[2] * am[2] + a1[3] * am[3] < 0.94) continue;
-        if (placed.some(q => q[0] === nm.n && Math.hypot(q[1] - am[0], q[2] - am[1]) < NAME_GAP * 0.7)) continue;
-        const r = nearestRoad(s, am[0], am[1]);
-        if (!r || !CAR.has(r.t)) continue;
-        placed.push([nm.n, am[0], am[1]]);
-        nameSpots.push({ n: nm.n, x: am[0], z: am[1], ux: am[2], uz: am[3] }); if (nameSpots.length > 400) nameSpots.shift();
-        const flip = am[2] < 0;  // read left to right on the map
-        const hf = r.deck || groundAt, lift = roadStyle(r.t).y + 0.06;
-        const steps = Math.max(2, Math.ceil(len / 1.5)), pos = [], uv = [], idx = [], up = [], ugx = flip ? -am[3] : am[3], ugz = flip ? am[2] : -am[2];
+      const mat = nameMat(nm.n), Q = road.w / 4 / NAME_CAP, per = Q * mat.userData.aspect;   // letter height, one name + gap
+      const flip = p[2 * n - 2] - p[0] < 0;   // the whole street reads left to right on the map
+      const hf = road.deck || groundAt, lift = roadStyle(road.t).y + 0.06;
+      // runs between sharp corners
+      const runs = []; let r0 = 0;
+      for (let i = 1; i < n - 1; i++) {
+        const ax = p[2 * i] - p[2 * i - 2], az = p[2 * i + 1] - p[2 * i - 1], bx = p[2 * i + 2] - p[2 * i], bz = p[2 * i + 3] - p[2 * i + 1];
+        if ((ax * bx + az * bz) / ((Math.hypot(ax, az) * Math.hypot(bx, bz)) || 1) < 0.9) { runs.push([r0, cum[i]]); r0 = cum[i]; }
+      }
+      runs.push([r0, total]);
+      // and around every crossing with another named street, so two names never print over each other
+      let parts = runs;
+      for (const o of s.names) {
+        if (o === nm || o.n === nm.n) continue;
+        const q = o.p;
+        for (let i = 1; i < n; i++) {
+          const ax = p[2 * i - 2], az = p[2 * i - 1], sx = p[2 * i] - ax, sz = p[2 * i + 1] - az;
+          for (let k = 2; k < q.length; k += 2) {
+            const bx = q[k - 2], bz = q[k - 1], tx = q[k] - bx, tz = q[k + 1] - bz, den = sx * tz - sz * tx;
+            if (Math.abs(den) < 1e-9) continue;
+            const t = ((bx - ax) * tz - (bz - az) * tx) / den, u = ((bx - ax) * sz - (bz - az) * sx) / den;
+            if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+            const cr = nearestRoad(s, bx + tx * u, bz + tz * u), half = Math.max(5, (cr ? cr.w / 2 : 4) + 2.5), d = cum[i - 1] + t * Math.hypot(sx, sz);
+            parts = parts.flatMap(([r1, r2]) => d + half <= r1 || d - half >= r2 ? [[r1, r2]] : [[r1, d - half], [d + half, r2]].filter(r => r[1] - r[0] > 0.5));
+          }
+        }
+      }
+      for (const [a0, a1] of parts) {
+        const e0 = a0 + (a0 > 0 ? Q * 0.5 : 1), e1 = a1 - (a1 < total ? Q * 0.5 : 1), reps = Math.floor((e1 - e0) / per);
+        if (reps < 1) continue;
+        const len = reps * per, s0 = e0 + (e1 - e0 - len) / 2, s1 = s0 + len;   // whole names only, centred in the run
+        const am = at((s0 + s1) / 2);
+        nameSpots.push({ n: nm.n, x: am[0], z: am[1], ux: flip ? -am[2] : am[2], uz: flip ? -am[3] : am[3], reps }); if (nameSpots.length > 400) nameSpots.shift();
+        const steps = Math.max(2, Math.ceil(len / 1.5)), pos = [], uv = [], idx = [];
         for (let j = 0; j <= steps; j++) {
-          const d = s0 + len * j / steps, a = at(d), b = at(d - 1.2), e = at(d + 1.2);
+          const d = s0 + len * j / steps, a = at(d), b = at(Math.max(a0, d - 1.2)), e = at(Math.min(a1, d + 1.2));
           let ux = e[0] - b[0], uz = e[1] - b[1]; const l = Math.hypot(ux, uz) || 1; ux /= l; uz /= l;
           if (flip) { ux = -ux; uz = -uz; }
-          const nx = uz * Q / 2, nz = -ux * Q / 2, u = flip ? 1 - j / steps : j / steps;
+          const nx = uz * Q / 2, nz = -ux * Q / 2, u = (flip ? s1 - d : d - s0) / per;
           for (const [sx, v] of [[1, 1], [-1, 0]]) {
             const x = a[0] + nx * sx, z = a[1] + nz * sx;
-            pos.push(x, (hf === groundAt ? groundFace(x, z) : hf(x, z)) + lift, z); uv.push(u, v); up.push(ugx, ugz);
+            pos.push(x, (hf === groundAt ? groundFace(x, z) : hf(x, z)) + lift, z); uv.push(u, v);
           }
           if (j) { const k = 2 * j; idx.push(k - 2, k - 1, k, k - 1, k + 1, k); }
         }
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
         geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-        geo.setAttribute('lup', new THREE.Float32BufferAttribute(up, 2));
         geo.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0).map((_, i) => i % 3 === 1 ? 1 : 0), 3));
         geo.setIndex(idx); geo.computeBoundingSphere();
         const m = new THREE.Mesh(geo, mat);
@@ -2852,6 +2867,83 @@ varying float vGL; varying vec2 vGUV;
         group.add(m);
       }
     }
+  }
+  // ---------------------------------------------------------------- house numbers on the walls (2026-11-24)
+  // Every OSM house number becomes a little enamel plate (navy, white border and digits) on the wall facing the street:
+  // where the line from the nearest street to the address point meets the building, 2.3 m up (lower on low buildings).
+  // One atlas canvas + one mesh per sub-tile (s.hnMat, disposed in dropSub); only drawn near you (lod 'hi'), not on LOW.
+  const HN_W = 176, HN_H = 72, HN_COLS = 6, HN_PLATE = 0.3, HN_MAX = 360;
+  const hnPlates = W.hnPlates = [];   // where plates hang (tests, debug): {t, x, y, z, nx, nz}
+  function houseNumbers(s, group) {
+    if (s.hnMat) { s.hnMat.map.dispose(); s.hnMat.dispose(); s.hnMat = null; }
+    if (LOW || !s.hn || !s.hn.length || !s.buildings || !s.buildings.length) return;
+    const spots = [];
+    for (const h of s.hn) {
+      const t = String(h.t).trim().slice(0, 7);
+      if (!t || spots.length >= HN_MAX) continue;
+      let q = null, qd = 45;   // the nearest point on a street with cars
+      for (const sg of s.walk) {
+        if (!sg.car) continue;
+        const dx = sg.x2 - sg.x1, dz = sg.z2 - sg.z1, L = dx * dx + dz * dz;
+        const tt = L > 0 ? Math.max(0, Math.min(1, ((h.x - sg.x1) * dx + (h.z - sg.z1) * dz) / L)) : 0;
+        const px = sg.x1 + tt * dx, pz = sg.z1 + tt * dz, d = Math.hypot(px - h.x, pz - h.z);
+        if (d < qd) { qd = d; q = { x: px, z: pz }; }
+      }
+      if (!q || qd < 0.5) continue;
+      // from the street towards the address point (and 12 m past it): the first wall on the way
+      const ux = (h.x - q.x) / qd, uz = (h.z - q.z) / qd, reach = qd + 12, ex = q.x + ux * reach, ez = q.z + uz * reach;
+      let best = null, bt = reach;
+      for (const b of s.buildings) {
+        if (b.h < 2.6 || (b.m || 0) > 0.5) continue;
+        if (Math.max(q.x, ex) < b.x0 || Math.min(q.x, ex) > b.x1 || Math.max(q.z, ez) < b.z0 || Math.min(q.z, ez) > b.z1) continue;
+        const bp = b.p, bn = bp.length / 2;
+        for (let i = 0, k = bn - 1; i < bn; k = i++) {
+          const ax = bp[2 * k], az = bp[2 * k + 1], sx = bp[2 * i] - ax, sz = bp[2 * i + 1] - az, den = ux * sz - uz * sx;
+          if (Math.abs(den) < 1e-6) continue;
+          const wx = ax - q.x, wz = az - q.z, t1 = (wx * sz - wz * sx) / den, t2 = (wx * uz - wz * ux) / den;
+          if (t1 > 0.5 && t1 < bt && t2 > 0.05 && t2 < 0.95) { bt = t1; best = { x: q.x + ux * t1, z: q.z + uz * t1, sx, sz, b }; }
+        }
+      }
+      if (!best) continue;
+      const sl = Math.hypot(best.sx, best.sz) || 1;
+      let nx = -best.sz / sl, nz = best.sx / sl;
+      if (nx * ux + nz * uz > 0) { nx = -nx; nz = -nz; }   // out of the wall, towards the street
+      if (spots.some(o => o.t === t && Math.hypot(o.x - best.x, o.z - best.z) < 4)) continue;
+      spots.push({ t, x: best.x + nx * 0.04, z: best.z + nz * 0.04, nx, nz, y: groundAt(best.x, best.z) + Math.min(2.3, best.b.h - 0.5) });
+    }
+    if (!spots.length) return;
+    const rows = Math.ceil(spots.length / HN_COLS), c = document.createElement('canvas');
+    c.width = HN_W * HN_COLS; c.height = HN_H * rows;
+    const g = c.getContext('2d');
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    g.font = '900 46px "Arial Rounded MT Bold", "Arial Black", system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    spots.forEach((o, i) => {
+      const x0 = (i % HN_COLS) * HN_W, y0 = Math.floor(i / HN_COLS) * HN_H, txw = g.measureText(o.t).width || 1;
+      const w = Math.min(HN_W - 8, Math.max(HN_H, txw + 34)), px = x0 + (HN_W - w) / 2;
+      rr(px + 2, y0 + 3, w - 4, HN_H - 6, 12); g.fillStyle = '#23407a'; g.fill();
+      g.lineWidth = 4; g.strokeStyle = '#f4f1e8'; rr(px + 8, y0 + 9, w - 16, HN_H - 18, 8); g.stroke();
+      g.save(); g.translate(px + w / 2, y0 + HN_H / 2 + 2); g.scale(Math.min(1, (w - 26) / txw), 1); g.fillStyle = '#ffffff'; g.fillText(o.t, 0, 0); g.restore();
+      o.k = w / HN_H; o.u0 = px / c.width; o.u1 = (px + w) / c.width; o.v0 = 1 - (y0 + HN_H) / c.height; o.v1 = 1 - y0 / c.height;
+    });
+    const pos = [], nrm = [], uv = [];
+    for (const o of spots) {
+      const rx = o.nz, rz = -o.nx, hw = HN_PLATE * o.k / 2, hh = HN_PLATE / 2;   // right, as seen from the street
+      const V = (sx, sy, u, v) => { pos.push(o.x + rx * hw * sx, o.y + hh * sy, o.z + rz * hw * sx); nrm.push(o.nx, 0, o.nz); uv.push(u, v); };
+      V(-1, -1, o.u0, o.v0); V(1, -1, o.u1, o.v0); V(1, 1, o.u1, o.v1);
+      V(-1, -1, o.u0, o.v0); V(1, 1, o.u1, o.v1); V(-1, 1, o.u0, o.v1);
+      hnPlates.push({ t: o.t, x: o.x, y: o.y, z: o.z, nx: o.nx, nz: o.nz }); if (hnPlates.length > 600) hnPlates.shift();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.computeBoundingSphere();
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    s.hnMat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    const m = new THREE.Mesh(geo, s.hnMat);
+    m.userData.lod = 'hi'; m.raycast = () => {};
+    group.add(m);
   }
   function nearestRoad(s, x, z) { // the sub-tile's road closest to (x, z), within its half width + 2 m
     let best = null, bd = Infinity;

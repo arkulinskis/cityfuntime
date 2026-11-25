@@ -228,7 +228,7 @@ All inside `create(opts)` unless noted. Ranges from `tools/where.py --toc`.
 | 1530-1834 | sub-tile data | `registerSub` (buildings, roads, walk graph, grids, names, areas, water, house numbers, trees, props, decor, places, made-up shops), `realNear`, traffic-light nodes (`nodeAt`, `trySignal`, `groupEnds`, `sigState`), `indexProp`, `layProps`, `PAVE_MIX`, `AREA_DECOR`, `layDecor`, `carAt` |
 | 1835-2061 | smashing + borrowed cars | `PROP_HP`, `DEBRIS_COL`, `SMASH_FX`, `SMASH_Y`, `W.propNear`, `setInstance`, `W.hitProp`, `debris`, `fallTree`, `updateSmash`, `W.borrowCar`, `W.parkCar`, `W.borrowable`, `nearestWalkLocal`, `plantTrees` |
 | 2062-2557 | sub-tile 3D | `groundMesh`, `buildingBase`, `buildSub` (all 3D for one sub-tile), `lodSub`, `updateLod`, `dropSub`, `addWalls`, `facadeStyle`, `cornice`, `obox`, `builtAt`, `facadeExtras`, `gbox`, `roofClutter`, `gable`; road paint colours `edgeCol`, `paveCol`, `kerbCol`, `KERB_Y`, `DASH` |
-| 2558-2703 | street names + maps | `nameMat` (canvas texture, LRU of `NAME_MAX`), `streetNames`, `nearestRoad`, `dashes`, `disk`, `drawSubMap` |
+| 2558-2703 | street names + maps | `nameMat` (canvas texture, LRU of `NAME_MAX`), `streetNames`, `houseNumbers`, `nearestRoad`, `dashes`, `disk`, `drawSubMap` |
 | 2704-2881 | queries | `collide`, `gableRise`, `roofTop`, `roofAt`, `streetAt`, `nearestWalk`, `randomWalkSpot`, `buildingsNear`, `wallSpot`, `housenumbersNear`, `waterNear`, `areaNear`; the `Object.assign(W, {...})` export at ~L2875 |
 | 2882-3847 | builders | Look palettes, `W.randomLook`, `prims` / `PRIM_HI` / `PRIM_MID` / `PRIM_LO`, `torsoGeo`, `personKOF`, `W.person` / `buildPerson`, `W.animate`, `W.mouth`, `W.animal`, `W.monster`, glTF figments (`MON_MODELS`, `MON_H`, `loadMonsters` 1.2 s after create, `monModel`, `playMon`, `W.animateMonster`), `W.treeMesh`, `W.bushMesh`, `W.propMesh`, `W.decorMesh`, `W.shieldMesh`, `W.vehicle`, `W.emojiTex`, `W.label`, `W.foePlate`, `W.emojiSprite`, `W.say` |
 | 3848-4025 | player + ride | `avatar`, `W.setLook`, `holdWeapon`, `W.setWeapon`, swing arcs (`arcGeo`, `arcFx`), reach marker (`reachGeo`, `updateReach`), guides (`CHEV`, `W.guide`, `updateArcs`), `applyRidePose`, `W.setRide`, followers (`updateFollowers`) |
@@ -366,7 +366,8 @@ not here. cft-world.js never reads `window.CFT_DATA` directly.
 | `KERB_Y` | 0.13 m | pavement height; `standAt` adds the same |
 | `ROAD_STYLE[*].y` | 0.05-0.08 | road lift above the terrain (+0.03 in buildSub and `roadLiftCm`) |
 | `BORO_R`, `CITY_R`, `BORO_MIX`, `LOOK_GAP` | 6000, 25000, 0.5, 9000 | borough reach, city fallback, how much of the borough colour walls take, minimum distance between equal looks |
-| `NAME_GAP`, `NAME_MAX`, `NAME_CAP` | 160 m, 160, 0.56 | street-name spacing, texture cache, letter height vs street half width |
+| `NAME_MAX`, `NAME_CAP` | 160, 0.56 | street-name texture cache, letter height = street width / 4 / NAME_CAP (names repeat along the street) |
+| `HN_PLATE`, `HN_MAX` | 0.3 m, 360 | house-number plate height, plates per sub-tile (`houseNumbers`) |
 | `CG_N`, `CGW.BLOCK` | 48, 2000 m | colour-block texture size (96 km), block size |
 | `KID_H` | 0.78 | look height under which a person is a child |
 | `SHADOW` | 4096 / 2048 | shadow map size |
@@ -466,7 +467,7 @@ What to look at:
   so `dropSub` frees it; anything shared must be added with `shared(...)`. Materials are not disposed by `dropSub` (they
   are shared `MAT` entries); per-object materials you create need their own dispose (as `updateFx`, `updateArcs` and
   `dropSign` do). `fallTree` creates a crown material per fallen tree and does not dispose it.
-- **Shader cache keys**: `groundify` uses `cft-ground`, `nameMat` `cft-street-name`, `greyify` appends
+- **Shader cache keys**: `groundify` uses `cft-ground`, `greyify` appends
   `|cftgrey:<channel>`. Two materials with different patches and the same key share one program.
 - **Duplicated geometry rules that must stay in sync**: the road lift drawn in `buildSub` (`st.y + 0.03 + bridge 0.006`)
   and `roadLiftCm`; pavement band widths (2.0 m residential / 2.6 m other) in `registerSub` (pchunks) and `buildSub`;

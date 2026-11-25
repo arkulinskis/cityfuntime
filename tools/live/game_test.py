@@ -219,6 +219,8 @@ GROUND = (
     + scene("g7-dusk", "s.clock = 19.2; W.cam.pitch = 0.3; W.cam.dist = W.cam.cur = 9;", 60)
     + scene("g8-street-name", "s.clock = 12; const pp = W.player.pos, q = W.nameSpots.slice().sort((a, b) => Math.hypot(a.x - pp.x, a.z - pp.z) - Math.hypot(b.x - pp.x, b.z - pp.z))[0];"
             " if (q) W.teleport(q.x + q.uz * 4, q.z - q.ux * 4, Math.atan2(-q.uz, q.ux)); W.cam.pitch = 0.95; W.cam.dist = W.cam.cur = 18; console.log('[label] ' + (q ? q.n : 'none') + ' of ' + W.nameSpots.length);", 80)
+    + scene("g9-house-numbers", "s.clock = 12; const pp = W.player.pos, q = W.hnPlates.slice().sort((a, b) => Math.hypot(a.x - pp.x, a.z - pp.z) - Math.hypot(b.x - pp.x, b.z - pp.z))[0];"
+            " if (q) W.teleport(q.x + q.nx * 4.5, q.z + q.nz * 4.5, Math.atan2(q.nx, q.nz)); W.cam.pitch = 0.02; W.cam.dist = W.cam.cur = 2.6; console.log('[label] ' + (q ? q.t : 'none') + ' of ' + W.hnPlates.length);", 40)   # house-number plates (2026-11-24)
 )
 
 # Boroughs (2026-11-17): a street in the home borough, a street in the next one (its banner showing), from above, the map.

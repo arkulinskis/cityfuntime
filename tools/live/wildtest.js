@@ -73,6 +73,19 @@ window.__wildOut = []; window.__wildDone = false;
       else info('no passer-by on a pavement right now');
     } else info('no pavement found (low graphics?)');
 
+    // ---------- street names (one direction, repeating) and house numbers on the walls (2026-11-24)
+    {
+      const ns = W.nameSpots;
+      ok(ns.length > 0 && ns.every(q => q.reps >= 1), 'street names repeat along the street, whole names only (' + ns.length + ' runs, up to ' + Math.max(0, ...ns.map(q => q.reps)) + ' names each)');
+      const flips = []; W.scene.traverse(o => { const m = o.material; if (o.isMesh && m && m.map && m.map.wrapS === THREE.RepeatWrapping && m.userData && m.userData.aspect && m.onBeforeCompile && m.onBeforeCompile.toString().includes('lup')) flips.push(o); });
+      ok(!flips.length, 'street names never turn round with the camera (no flicker)');
+      const hp = W.hnPlates;
+      if (hp.length) {
+        const out = hp.filter(q => W.clearAt(q.x + q.nx * 1.6, q.z + q.nz * 1.6, 0.05)).length; ok(out >= hp.length * 0.9, 'house-number plates hang on the outside of walls, facing the street (' + out + ' of ' + hp.length + ' plates with open ground in front)');
+        ok(hp.every(q => { const g = W.groundAt(q.x, q.z); return q.y > g + 1.2 && q.y < g + 2.6; }), 'plates hang at door height');
+      } else info('no house numbers in this area');
+    }
+
     // ---------- climbing a building + the stamina donut
     let wall = null;
     for (const sb of W.subsNear(pp.x, pp.z, 160)) for (const b of sb.buildings) {
