@@ -317,6 +317,21 @@ extinguishers, water and lightning powers".
 - Click / tap / Space / E = next line, **Esc** or **Skip** = skip the scene. Settings: **Voiced missions** and **Cinematic
   mission scenes** (off = the old dialogue box, still voiced). Odd jobs keep the quick dialogue box.
 
+**The announcer, the face pass and graffiti (2026-11-24):**
+- **An announcer cheers you on**: every good-news notice (an achievement, a finished mission, a liberated store, a freed
+  metro station, a secret, a new block or borough, a level up, a new friend or sweetheart, a set or feat, a MEGA figment,
+  turf, a new home or business, epic loot...) is said out loud: first what you did ("Achievement unlocked: Local!",
+  "Mission complete: Bread Run!", "Store liberated! The people are free!"), then a cheer ("You're amazing!", "Absolute
+  legend!", 16 of them, never the same twice in a row). 316 extra Kokoro clips (voice af_bella) on Cloudflare R2. It waits
+  for mission scenes to finish, keeps a backlog short, and dips the music. Settings: **Announcer**.
+- **Better faces and bodies**: a sculpted head (brow ridge, eye sockets, cheekbones, jaw and chin in one smooth surface,
+  with a soft blush and shaded sockets), eyes with a dark ring round the iris, flecks, two glints, a lash line and lower
+  lids, arched brows, a real nose with nostrils, cupid's-bow lips, ears with a hollow and a lobe, freckles on some fair
+  faces, laugh lines and crow's feet with grey hair. You and the cast also get four fingers per hand, shoe laces and
+  shirt buttons.
+- **Graffiti on about one building in ten**: 16 painted pieces (bubble words like BONK, WOW!, HI MOM, YAY with drips and
+  a 3D drop, plus a grin, a crowned heart, a googly figment and a rainbow), always in full colour, even in a grey block.
+
 **Shooters, reach, footing, light and the balance wiki (2026-11-21):**
 - **Slot 5 = your shooter.** Every shooter you own (Spitball straw, water balloons, confetti cannon, banana boomerang,
   T-shirt cannon, mustard sniper, potato cannon, gnome bazooka...) sits on a belt next to water, lightning, the

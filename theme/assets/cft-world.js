@@ -2158,6 +2158,151 @@ varying float vGL; varying vec2 vGUV;
     m.receiveShadow = true;
     return m;
   }
+  // Graffiti (2026-11-24, the user: "put graffiti on 10% of buildings"). One painted atlas (graffitiAtlas: 16 pieces in a
+  // 4 x 4 grid, drawn once on a canvas: bubble-letter words with a 3D drop, outlines, shine and drips over a spray cloud,
+  // and four characters), one piece on the longest wall of about one building in ten (GRAFFITI_SHARE; the same buildings
+  // every visit: picked by a hash of the building's centre), all of a sub-tile's pieces in one mesh. Friendly words only.
+  // Never greyed: in a grey colour block (cft-color.js) the graffiti is the only colour on the street, the city's own paint
+  // holding out against the Static.
+  const GRAFFITI_SHARE = 0.1;
+  let GRAF = null;
+  function graffitiAtlas() {
+    if (GRAF) return GRAF;
+    const CW = 512, CH = 256, cv = document.createElement('canvas');
+    cv.width = CW * 4; cv.height = CH * 4;
+    const g = cv.getContext('2d');
+    const PAL = [['#ff5c8a', '#ffc21f'], ['#20c997', '#3fa7ff'], ['#6b4eff', '#ff5ce1'], ['#ff8a3d', '#ffe14d'], ['#3fe0c5', '#b6ff5a'], ['#ff4d4d', '#ff9f1c'], ['#7b8cff', '#4dfff3'], ['#ffd23f', '#ff6fa8']];
+    const WORDS = ['BONK', 'WOW!', 'YO!', 'FUN', 'ZAP', 'LOVE', 'HI MOM', 'POP!', 'COOL', 'SMILE', 'RAD', 'YAY'];
+    const FONT = "900 {s}px Fredoka, 'Arial Black', Impact, sans-serif";
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    function spray(cx, cy, rx, ry, col, n) { // a soft cloud of paint behind a piece
+      for (let i = 0; i < n; i++) {
+        const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()), x = cx + Math.cos(a) * rx * d, y = cy + Math.sin(a) * ry * d, r = 14 + rnd() * 34;
+        const gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, col); gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr; g.globalAlpha = 0.22; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+      }
+      g.globalAlpha = 1;
+    }
+    function drips(x0, x1, y, col, n) {
+      g.strokeStyle = col; g.fillStyle = col; g.lineCap = 'round';
+      for (let i = 0; i < n; i++) {
+        const x = x0 + rnd() * (x1 - x0), len = 12 + rnd() * 34, w = 4 + rnd() * 5;
+        g.lineWidth = w; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x, y + len); g.stroke();
+        g.beginPath(); g.arc(x, y + len + w * 0.3, w * 0.75, 0, Math.PI * 2); g.fill();
+      }
+    }
+    function star(x, y, r) {
+      g.fillStyle = '#ffffff'; g.beginPath();
+      for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? r * 0.3 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+      g.closePath(); g.fill();
+    }
+    function word(cx, cy, text, pal) {
+      let size = 150;
+      g.font = FONT.replace('{s}', size);
+      while (g.measureText(text).width > CW - 90 && size > 60) { size -= 8; g.font = FONT.replace('{s}', size); }
+      const w = g.measureText(text).width;
+      g.save(); g.translate(cx, cy); g.rotate((rnd() - 0.5) * 0.16); g.transform(1, 0, (rnd() - 0.5) * 0.3, 1, 0, 0);
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+      for (let k = 12; k > 0; k -= 2) { g.lineWidth = 22; g.strokeStyle = '#1f1a3d'; g.strokeText(text, k, k); g.fillStyle = '#1f1a3d'; g.fillText(text, k, k); }   // the 3D drop
+      g.lineWidth = 24; g.strokeStyle = '#1f1a3d'; g.strokeText(text, 0, 0);
+      g.lineWidth = 10; g.strokeStyle = '#ffffff'; g.strokeText(text, 0, 0);
+      const gr = g.createLinearGradient(0, -size * 0.45, 0, size * 0.45);
+      gr.addColorStop(0, pal[1]); gr.addColorStop(1, pal[0]);
+      g.fillStyle = gr; g.fillText(text, 0, 0);
+      g.save(); g.beginPath(); g.rect(-w, -size, w * 2, size * 0.42); g.clip(); g.globalAlpha = 0.35; g.fillStyle = '#ffffff'; g.fillText(text, 0, 0); g.restore();   // a shine across the top
+      drips(-w * 0.45, w * 0.45, size * 0.38, pal[0], 4 + Math.floor(rnd() * 3));
+      for (let i = 0; i < 3; i++) star(-w * 0.55 + rnd() * w * 1.1, -size * 0.55 + rnd() * size * 0.15, 8 + rnd() * 8);
+      g.restore();
+    }
+    function blob(cx, cy, r, fill) { g.beginPath(); for (let i = 0; i <= 24; i++) { const a = i / 24 * Math.PI * 2, rr = r * (0.9 + rnd() * 0.18); g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } g.closePath(); g.lineWidth = 12; g.strokeStyle = '#1f1a3d'; g.stroke(); g.fillStyle = fill; g.fill(); }
+    function character(cx, cy, kind, pal) {
+      g.save(); g.translate(cx, cy); g.lineJoin = 'round'; g.lineCap = 'round';
+      if (kind === 0) { // a big grin
+        blob(0, 0, 100, pal[1]);
+        g.fillStyle = '#1f1a3d'; g.beginPath(); g.ellipse(-34, -24, 13, 20, 0, 0, Math.PI * 2); g.ellipse(34, -24, 13, 20, 0, 0, Math.PI * 2); g.fill();
+        g.lineWidth = 12; g.strokeStyle = '#1f1a3d'; g.beginPath(); g.arc(0, 8, 56, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+        g.fillStyle = '#ffffff'; g.beginPath(); g.arc(-28, -32, 5, 0, Math.PI * 2); g.arc(40, -32, 5, 0, Math.PI * 2); g.fill();
+        drips(-60, 60, 92, pal[1], 4);
+      } else if (kind === 1) { // a heart with a crown
+        g.beginPath(); g.moveTo(0, 90); g.bezierCurveTo(-150, -10, -70, -110, 0, -45); g.bezierCurveTo(70, -110, 150, -10, 0, 90); g.closePath();
+        g.lineWidth = 14; g.strokeStyle = '#1f1a3d'; g.stroke(); g.fillStyle = pal[0]; g.fill();
+        g.fillStyle = '#ffd23f'; g.beginPath(); g.moveTo(-50, -70); g.lineTo(-50, -112); g.lineTo(-25, -88); g.lineTo(0, -122); g.lineTo(25, -88); g.lineTo(50, -112); g.lineTo(50, -70); g.closePath(); g.lineWidth = 8; g.stroke(); g.fill();
+        drips(-40, 40, 70, pal[0], 3);
+      } else if (kind === 2) { // a googly figment (the city's friendly monsters)
+        blob(0, 10, 92, pal[0]);
+        g.fillStyle = '#ffffff'; g.beginPath(); g.arc(-32, -10, 30, 0, Math.PI * 2); g.arc(34, -14, 24, 0, Math.PI * 2); g.fill(); g.lineWidth = 7; g.strokeStyle = '#1f1a3d'; g.stroke();
+        g.fillStyle = '#1f1a3d'; g.beginPath(); g.arc(-26, -4, 12, 0, Math.PI * 2); g.arc(40, -10, 10, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.ellipse(0, 46, 26, 16, 0, 0, Math.PI); g.fill();
+        drips(-50, 50, 96, pal[0], 4);
+      } else { // a rainbow over clouds
+        ['#ff4d4d', '#ff9f1c', '#ffe14d', '#3fe07a', '#3fa7ff', '#8a5cff'].forEach((c, i) => { g.lineWidth = 16; g.strokeStyle = c; g.beginPath(); g.arc(0, 60, 150 - i * 16, Math.PI, 0); g.stroke(); });
+        g.fillStyle = '#ffffff'; g.lineWidth = 10; g.strokeStyle = '#1f1a3d';
+        for (const [x, y, r] of [[-120, 60, 40], [-80, 50, 48], [120, 60, 40], [80, 50, 48]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke(); g.fill(); }
+      }
+      g.restore();
+    }
+    let wi = 0;
+    for (let i = 0; i < 16; i++) {
+      const x0 = (i % 4) * CW, y0 = Math.floor(i / 4) * CH, cx = x0 + CW / 2, cy = y0 + CH / 2, pal = PAL[i % PAL.length];
+      g.save(); g.beginPath(); g.rect(x0, y0, CW, CH); g.clip();
+      spray(cx, cy, CW * 0.36, CH * 0.3, pal[i % 2], 26);
+      if (i % 4 === 3) character(cx, cy - 4, Math.floor(i / 4), pal);
+      else word(cx, cy - 10, WORDS[wi++ % WORDS.length], pal);
+      g.restore();
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, alphaTest: 0.03, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    GRAF = { tex, mat, canvas: cv };
+    return GRAF;
+  }
+  W.graffitiAtlas = () => graffitiAtlas().canvas;
+  W.graffitiNear = (x, z, r) => { const out = []; for (const s of allSubs) if (s.group) for (const b of s.buildings) if (b.graffiti && Math.hypot(b.graffiti.x - x, b.graffiti.z - z) < r) out.push(b.graffiti); return out.sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z)); };
+  W.graffitiStats = () => { let n = 0, t = 0; for (const s of allSubs) if (s.group) for (const b of s.buildings) { n++; if (b.graffiti != null) t++; } return { buildings: n, tagged: t }; };
+  // the wall piece for building b, or null: {x, z, nx, nz, ux, uz, w, h, y, cell}
+  function graffitiSpot(b) {
+    if (b.m > 0.5 || b.h < 3.2 || b.area < 25) return null;
+    const hh = (Math.round(b.cx * 4) * 73856093) ^ (Math.round(b.cz * 4) * 19349663);
+    if (hash(hh) >= GRAFFITI_SHARE) return null;
+    const p = b.p, n = p.length / 2;
+    let best = null, bl = 4.5;
+    for (let i = 0, k = n - 1; i < n; k = i++) {
+      const x1 = p[2 * k], z1 = p[2 * k + 1], x2 = p[2 * i], z2 = p[2 * i + 1], L = Math.hypot(x2 - x1, z2 - z1);
+      if (L > bl) { bl = L; best = [x1, z1, x2, z2, L]; }
+    }
+    if (!best) return null;
+    const [x1, z1, x2, z2, L] = best, dx = (x2 - x1) / L, dz = (z2 - z1) / L;
+    let nx = dz, nz = -dx;
+    const t = 0.5 + (hash(hh + 1) - 0.5) * 0.3, mx = x1 + (x2 - x1) * t, mz = z1 + (z2 - z1) * t;
+    if (inRings(b.rings, mx + nx * 0.7, mz + nz * 0.7)) { nx = -nx; nz = -nz; }
+    const w = Math.min(L * 0.72, 7.5, 2 * (b.h - 0.9)), h = w / 2;
+    if (w < 2.4) return null;
+    const ux = nz, uz = -nx;   // to the right of someone facing the wall
+    const gy = Math.max(groundAt(mx + nx * 0.5, mz + nz * 0.5), groundAt(mx - ux * w / 2 + nx * 0.5, mz - uz * w / 2 + nz * 0.5), groundAt(mx + ux * w / 2 + nx * 0.5, mz + uz * w / 2 + nz * 0.5));
+    const y = gy + 0.3 + hash(hh + 2) * Math.max(0, Math.min(1.2, b.base + b.h - gy - h - 0.8));
+    if (y + h > b.base + b.h - 0.3) return null;
+    return { x: mx + nx * 0.06, z: mz + nz * 0.06, nx, nz, ux, uz, w, h, y, cell: Math.floor(hash(hh + 3) * 16) % 16 };
+  }
+  function graffitiMesh(s) {
+    const pos = [], nrm = [], uv = [];
+    for (const b of s.buildings) {
+      const q = graffitiSpot(b);
+      if (!q) continue;
+      const hw = q.w / 2, u0 = (q.cell % 4) / 4, v1 = 1 - Math.floor(q.cell / 4) / 4, u1 = u0 + 0.25, v0 = v1 - 0.25;
+      const BL = [q.x - q.ux * hw, q.y, q.z - q.uz * hw], BR = [q.x + q.ux * hw, q.y, q.z + q.uz * hw], TR = [BR[0], q.y + q.h, BR[2]], TL = [BL[0], q.y + q.h, BL[2]];
+      for (const [v, a, c] of [[BL, u0, v0], [BR, u1, v0], [TR, u1, v1], [BL, u0, v0], [TR, u1, v1], [TL, u0, v1]]) { pos.push(v[0], v[1], v[2]); nrm.push(q.nx, 0, q.nz); uv.push(a, c); }
+      b.graffiti = q;
+    }
+    if (!pos.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.computeBoundingSphere();
+    const m = new THREE.Mesh(geo, graffitiAtlas().mat);
+    m.receiveShadow = !LOW; m.renderOrder = 1; m.userData.graffiti = pos.length / 18;
+    return m;
+  }
   // Where a building stands: its walls start at the lowest ground under it (so no gap on a slope) and its floors
   // count from a little above that.
   function buildingBase(b) {
@@ -2279,6 +2424,8 @@ varying float vGL; varying vec2 vGUV;
       m.castShadow = m.receiveShadow = !LOW;
       group.add(m);
     }
+    const gm2 = graffitiMesh(s);   // graffiti on about one building in ten
+    if (gm2) group.add(gm2);
     // Trees, street furniture and parked cars are instanced per sub-tile. three r149 never culls an InstancedMesh, so
     // each one sits at the sub-tile's centre with a bounding sphere the size of the sub-tile (cullGeo): out of view, not drawn.
     const ccx = (s.x0 + s.x1) / 2, ccz = (s.z0 + s.z1) / 2, ccy = groundAt(ccx, ccz);
@@ -2986,6 +3133,8 @@ varying float vGL; varying vec2 vGUV;
   };
   const PRIM_HI = prims(26, 18, 14, 10, 6, 18, 26, 9, 22, 18), PRIM_MID = LOW ? prims(10, 7, 6, 3, 2, 8, 10, 4, 10, 8) : prims(14, 10, 8, 5, 3, 10, 14, 5, 12, 10),  // smoother since 2026-11-19 (high quality)
     PRIM_LO = prims(8, 5, 5, 3, 1, 6, 8, 3, 8, 6);
+  // brows, lash lines and fingers (the face pass): small, so a few sides are plenty
+  const STROKE = new THREE.CapsuleGeometry(0.5, 1, 1, 6).toNonIndexed(), FINGER = new THREE.CapsuleGeometry(0.5, 1, 2, 7).toNonIndexed();
   const DUCK_RING = new THREE.TorusGeometry(0.5, 0.16, 6, 16).rotateX(Math.PI / 2).toNonIndexed();
   const shade = (c, k) => { _c.set(c).multiplyScalar(k); return _c.getHex(); };
   const mix = (a, b, t) => { _c.set(a).lerp(new THREE.Color(b), t); return _c.getHex(); };
@@ -3028,6 +3177,81 @@ varying float vGL; varying vec2 vGUV;
     const at = y => { let i = 0; while (i < R.length - 2 && R[i + 1][0] < y) i++; const p = R[i], q = R[i + 1], t = Math.min(1, Math.max(0, (y - p[0]) / ((q[0] - p[0]) || 1))); const hw = p[1] + (q[1] - p[1]) * t, hd = p[2] + (q[2] - p[2]) * t, zo = p[3] + (q[3] - p[3]) * t; return { hw, hd, zo, front: zo - hd, back: zo + hd }; };
     return { geo: g.toNonIndexed(), at };
   }
+  // The face pass (2026-11-24, the user: "more effort into the model design... more advanced, more edges and better looking.
+  // Most importantly the face"). The skull, jaw and chin are one sculpted surface turned ring by ring (HEAD_ROWS: [y, half
+  // width, front depth, back depth] in the head group's metres, a superellipse per ring so the face is flatter than the back
+  // of the head), then shaped by bumps on the front: brow ridge, eye sockets, cheekbones, the muzzle round the mouth, the
+  // chin and the groove under the lower lip. Vertex colours carry the soft parts: a blush on the cheeks, shade in the eye
+  // sockets and under the brow. headZ(x, y, f) = the front surface at (x, y): the eyes, brows, nose and lips sit on it.
+  // look.fig narrows the jaw a little (f quantised to 0 / 0.5 / 1 so passers-by share a few cached shapes per skin).
+  const HEAD_ROWS = [
+    [0.004, 0.022, 0.072, 0.02], [0.016, 0.04, 0.097, 0.034], [0.03, 0.054, 0.104, 0.047], [0.046, 0.065, 0.105, 0.059],
+    [0.062, 0.074, 0.106, 0.071], [0.08, 0.083, 0.106, 0.084], [0.1, 0.091, 0.106, 0.095], [0.118, 0.095, 0.104, 0.101],
+    [0.136, 0.0965, 0.102, 0.104], [0.154, 0.096, 0.104, 0.106], [0.172, 0.092, 0.1, 0.106], [0.19, 0.085, 0.092, 0.102],
+    [0.207, 0.074, 0.08, 0.092], [0.222, 0.058, 0.063, 0.076], [0.234, 0.037, 0.04, 0.05], [0.2405, 0.012, 0.013, 0.017],
+  ];
+  const HEAD_ZC = 0.005, HEAD_E = 0.9, HEAD_EF = 0.8;
+  const gss = (x, y, x0, y0, sx, sy) => Math.exp(-((x - x0) / sx) * ((x - x0) / sx) - ((y - y0) / sy) * ((y - y0) / sy));
+  // how far the front of the face moves forward (negative z) at (x, y), before the ring's own curve
+  function headBump(x, y) {
+    const ax = Math.abs(x);
+    return -0.005 * Math.exp(-((y - 0.152) / 0.012) * ((y - 0.152) / 0.012)) * Math.exp(-Math.pow(x / 0.07, 4))   // brow ridge
+      + 0.007 * gss(ax, y, 0.04, 0.128, 0.022, 0.016)                                                               // eye sockets
+      - 0.004 * gss(ax, y, 0.058, 0.098, 0.02, 0.02)                                                                // cheekbones
+      - 0.003 * gss(x, y, 0, 0.068, 0.035, 0.03)                                                                    // muzzle
+      - 0.004 * gss(x, y, 0, 0.022, 0.022, 0.014)                                                                   // chin
+      + 0.0025 * gss(x, y, 0, 0.04, 0.025, 0.006);                                                                  // under the lower lip
+  }
+  function headRow(y, f) {
+    const R = HEAD_ROWS;
+    let i = 0; while (i < R.length - 2 && R[i + 1][0] < y) i++;
+    const p = R[i], q = R[i + 1], t = Math.min(1, Math.max(0, (y - p[0]) / (q[0] - p[0])));
+    const jaw = 1 - 0.07 * f * Math.min(1, Math.max(0, (0.11 - y) / 0.08));
+    return [(p[1] + (q[1] - p[1]) * t) * jaw, p[2] + (q[2] - p[2]) * t, p[3] + (q[3] - p[3]) * t];
+  }
+  function headZ(x, y, f) {
+    const r = headRow(y, f || 0), s = Math.min(0.999, Math.pow(Math.min(1, Math.abs(x) / r[0]), 1 / HEAD_E)), c = Math.sqrt(1 - s * s);
+    return HEAD_ZC - r[1] * Math.pow(c, HEAD_EF) + headBump(x, y) * c;
+  }
+  const headCache = new Map();
+  function headGeo(skin, f, n) {
+    const fq = Math.round(f * 2) / 2, key = skin + '|' + fq + '|' + n;
+    if (headCache.has(key)) return headCache.get(key);
+    const R = HEAD_ROWS, pos = [], col = [], idx = [], base = new THREE.Color(skin), blush = new THREE.Color(0xe0806a), c = new THREE.Color();
+    const row = n + 1;
+    for (const r0 of R) {
+      const [hw, fd, bd] = headRow(r0[0], fq), y = r0[0];
+      for (let j = 0; j <= n; j++) {
+        const th = j / n * Math.PI * 2, s = Math.sin(th), cs = Math.cos(th);   // th = 0 at the back: the seam hides under the hair
+        let x = hw * Math.sign(s) * Math.pow(Math.abs(s), HEAD_E), z;
+        if (cs >= 0) z = HEAD_ZC + bd * Math.pow(cs, HEAD_E);
+        else {
+          const fw = -cs;
+          z = HEAD_ZC - fd * Math.pow(fw, HEAD_EF) + headBump(x, y) * fw;
+          x += Math.sign(x) * 0.003 * gss(Math.abs(x), y, 0.058, 0.098, 0.02, 0.02) * fw;          // cheekbones stand out a little sideways too
+        }
+        x *= 1 - 0.035 * Math.exp(-((y - 0.165) / 0.03) * ((y - 0.165) / 0.03)) * Math.max(0, Math.abs(s) - 0.6) / 0.4;   // temples
+        pos.push(x, y, z);
+        const front = Math.max(0, -cs), ax = Math.abs(x);
+        c.copy(base).lerp(blush, 0.2 * gss(ax, y, 0.052, 0.09, 0.024, 0.02) * front);                                 // cheeks
+        c.multiplyScalar(1 - 0.1 * gss(ax, y, 0.04, 0.132, 0.024, 0.018) * front - 0.05 * gss(ax, y, 0.03, 0.144, 0.03, 0.008) * front);  // sockets, under the brow
+        col.push(c.r, c.g, c.b);
+      }
+    }
+    for (let i = 0; i + 1 < R.length; i++) for (let j = 0; j < n; j++) { const A = i * row + j, B = A + 1, C2 = A + row, D2 = C2 + 1; idx.push(A, B, C2, B, D2, C2); }
+    const bot = pos.length / 3; pos.push(0, -0.002, -0.028); col.push(base.r, base.g, base.b);
+    const top = pos.length / 3; pos.push(0, 0.2425, 0.012); col.push(base.r, base.g, base.b);
+    const last = (R.length - 1) * row;
+    for (let j = 0; j < n; j++) { idx.push(bot, j + 1, j); idx.push(top, last + j, last + j + 1); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    const out = g.toNonIndexed();
+    if (headCache.size > 80) headCache.clear();
+    headCache.set(key, out);
+    return out;
+  }
+  W.headZ = headZ;
   // A person, facing -z. userData: {body, head, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, handL, handR, prop}:
   // the body group holds a head and four limbs, each limb a pivot with a second pivot (knee / elbow) inside, so people can
   // walk, run, sit, pedal, wave and dance; handR/handL are in the palm (weapons attach there).
@@ -3081,6 +3305,7 @@ varying float vGL; varying vec2 vGUV;
     if (look.stripes) for (const y of [1.18, 1.3]) { const w = at(y); t.add(P_RING, look.stripes, 0, y, w.zo, 0, 0, 0, w.hw * 2 + 0.01, 0.045, w.hd * 2 + 0.01); }
     if (look.logo && !look.apron && !look.tie) t.add(P_SM, look.logo, 0.035, 1.3, at(1.3).front + 0.002, 0, 0, 0, 0.07, 0.07, 0.016);
     if (look.collar || look.tie) { const z = at(1.49).front - 0.006; t.box(0.065, 0.045, 0.025, 0xf4f1ea, -0.035, 1.485, z, 0, 0, 0.5); t.box(0.065, 0.045, 0.025, 0xf4f1ea, 0.035, 1.485, z, 0, 0, -0.5); }
+    if (look.collar && !look.tie && !look.coat && !look.apron && !npc && !LOW) for (const y of [1.42, 1.34, 1.26, 1.18]) t.add(P_SM, shade(shirt, 0.6), 0, y, at(y).front - 0.003, 0, 0, 0, 0.014, 0.014, 0.006);   // shirt buttons
     if (look.tie) { const z = at(1.3).front - 0.008; t.box(0.045, 0.28, 0.012, look.tie, 0, 1.3, z, 0.08); t.box(0.05, 0.045, 0.02, look.tie, 0, 1.45, at(1.45).front - 0.008); }
     if (look.apron) { t.box(0.3, 0.56, 0.018, look.apron, 0, 1.08, at(1.15).front - 0.012); t.box(0.22, 0.03, 0.018, look.apron, 0, 1.38, at(1.38).front - 0.01); }
     if (look.cape) t.box(0.4, 0.82, 0.025, look.cape, 0, 1.08, at(1.3).back + 0.03, -0.08);
@@ -3100,28 +3325,66 @@ varying float vGL; varying vec2 vGUV;
     if (kid) head.scale.setScalar(1.22);
     body.add(head);
     const hm = new Merge(), dark = 0x1c1a24, angry = look.mood === 'angry', eye = look.eye != null ? look.eye : EYES[(look.hs || 0) % EYES.length];
-    const lip = mix(skin, 0xa84848, 0.38), lid = shade(skin, 0.94);
-    hm.add(P_SPH, skin, 0, 0.13, 0.005, 0, 0, 0, 0.19, 0.225, 0.215);                                      // skull
-    hm.add(P_SPH, skin, 0, 0.068, -0.02, 0, 0, 0, 0.152 - 0.01 * f, 0.13, 0.17);                           // jaw and cheeks
-    hm.add(P_SM, skin, 0, 0.022, -0.078, 0, 0, 0, 0.07 - 0.012 * f, 0.055, 0.055);                          // chin
-    for (const sx of [-1, 1]) hm.add(P_SM, shade(skin, 0.95), sx * 0.096, 0.112, 0.012, 0, sx * 0.25, 0, 0.022, 0.056, 0.036);   // ears
-    hm.add(P_SM, skin, 0, 0.112, -0.103, -0.15, 0, 0, 0.026, 0.05, 0.03);                                  // nose: bridge, tip, wings
-    hm.add(P_SM, shade(skin, 0.97), 0, 0.087, -0.113, 0, 0, 0, 0.034, 0.027, 0.03);
-    for (const sx of [-1, 1]) hm.add(P_SM, shade(skin, 0.92), sx * 0.015, 0.084, -0.104, 0, 0, 0, 0.018, 0.016, 0.02);
-    for (const sx of [-1, 1]) {
-      const ex = sx * 0.04, ey = 0.128;
-      hm.add(P_SM, 0xfbfaf6, ex, ey, -0.085, 0, 0, 0, 0.04, 0.03, 0.03);                                   // eye
-      hm.add(P_SM, eye, ex, ey - 0.001, -0.0985, 0, 0, 0, 0.022, 0.024, 0.01);                             // iris
-      hm.add(P_SM, dark, ex, ey - 0.001, -0.1013, 0, 0, 0, 0.011, 0.012, 0.006);                           // pupil
-      hm.add(P_SM, 0xffffff, ex + 0.005, ey + 0.006, -0.1043, 0, 0, 0, 0.006, 0.006, 0.003);              // glint
-      hm.add(P_SM, lid, ex, angry ? 0.14 : 0.1465, -0.086, angry ? 0 : -0.25, 0, angry ? sx * 0.3 : 0, 0.043, 0.014, 0.031); // upper lid
-      hm.box(0.042, 0.009, 0.014, shade(hair, 0.8), sx * 0.041, angry ? 0.152 : 0.159, -0.1, 0, 0, angry ? sx * 0.42 : -sx * 0.08);   // brow
+    const lip = mix(skin, 0xa84848, 0.38), lid = shade(skin, 0.94), hi = !npc && !LOW;   // hi = you and the cast: every detail
+    const fz = (x, y) => headZ(x, y, f);   // the face's front surface here
+    const old = shade(hair, 1) === 0x8a8a8a || shade(hair, 1) === 0xd9d4cc, lashes = !look.beard && (f > 0.55 || !!look.long || look.style === 1 || look.style === 3 || look.style === 6);
+    const skinK = KOF && KOF[_c.set(skin).getHex()];
+    hm.as(skinK || 0); hm.addRaw(headGeo(skin, f, npc ? (LOW ? 12 : 20) : (LOW ? 20 : 40))); hm.k = null;   // skull, jaw, cheeks, chin: one sculpted surface
+    for (const sx of [-1, 1]) {   // ears: rim, the hollow inside, the lobe
+      hm.add(P_SM, shade(skin, 0.95), sx * 0.095, 0.112, 0.012, 0, sx * 0.25, 0, 0.022, 0.056, 0.036);
+      hm.add(P_SM, shade(skin, 0.74), sx * 0.104, 0.114, 0.01, 0, sx * 0.25, 0, 0.008, 0.034, 0.02);
+      if (hi) hm.add(P_SM, shade(skin, 0.97), sx * 0.099, 0.082, 0.014, 0, 0, 0, 0.014, 0.017, 0.015);
     }
-    if (look.beard) { hm.add(P_SPH, hair, 0, 0.045, -0.035, 0, 0, 0, 0.16, 0.1, 0.15); hm.box(0.07, 0.014, 0.016, hair, 0, 0.072, -0.108); }
-    if (!look.beard || angry) {
-      hm.add(P_SM, lip, 0, 0.062, -0.104, 0, 0, 0, 0.044, 0.012, 0.014);                                 // upper lip
-      hm.add(P_SM, shade(lip, 1.06), 0, 0.05, -0.102, 0, 0, 0, 0.038, 0.014, 0.014);                     // lower lip
-      if (!angry && !look.beard) for (const sx of [-1, 1]) hm.box(0.012, 0.006, 0.01, shade(lip, 0.8), sx * 0.024, 0.061, -0.099, 0, 0, sx * 0.6);   // a little smile
+    // nose: bridge, tip, wings and nostrils
+    hm.add(P_SM, skin, 0, 0.114, fz(0, 0.114) + 0.004, -0.22, 0, 0, 0.018, 0.046, 0.02);
+    hm.add(P_SM, skin, 0, 0.098, fz(0, 0.098) + 0.001, -0.35, 0, 0, 0.024, 0.036, 0.024);
+    hm.add(P_SM, skin, 0, 0.0885, fz(0, 0.0885) - 0.003, 0, 0, 0, 0.024, 0.022, 0.021);
+    for (const sx of [-1, 1]) {
+      hm.add(P_SM, shade(skin, 0.97), sx * 0.0125, 0.0835, fz(0.0125, 0.0835) + 0.0005, 0, 0, sx * 0.2, 0.014, 0.0125, 0.013);
+      hm.add(P_SM, shade(skin, 0.4), sx * 0.0075, 0.0785, fz(0.0075, 0.0785) - 0.0045, 0.3, 0, 0, 0.0075, 0.0035, 0.006);
+    }
+    for (const sx of [-1, 1]) {
+      const ex = sx * 0.04, ey = 0.128, ez = fz(ex, ey) - 0.003;
+      hm.add(P_SM, 0xf6f3ee, ex, ey, ez + 0.0015, 0, 0, 0, 0.034, 0.028, 0.026);                                      // eyeball
+      hm.add(P_SM, shade(eye, 0.5), ex, ey - 0.001, ez - 0.0125, 0, 0, 0, 0.025, 0.026, 0.008);              // the dark ring round the iris
+      hm.add(P_SM, eye, ex, ey - 0.001, ez - 0.0135, 0, 0, 0, 0.021, 0.022, 0.01);                          // iris
+      if (hi) hm.add(P_SM, mix(eye, 0xffffff, 0.3), ex, ey - 0.001, ez - 0.0162, 0, 0, 0, 0.014, 0.015, 0.006);   // lighter flecks round the pupil
+      hm.add(P_SM, dark, ex, ey - 0.001, ez - 0.0168, 0, 0, 0, 0.01, 0.011, 0.006);                         // pupil
+      hm.add(P_SM, 0xffffff, ex + 0.006, ey + 0.006, ez - 0.0195, 0, 0, 0, 0.0065, 0.0065, 0.003);          // glints: a big one, a small one
+      if (hi) hm.add(P_SM, 0xffffff, ex - 0.005, ey - 0.005, ez - 0.019, 0, 0, 0, 0.003, 0.003, 0.002);
+      // upper lid with the lash line along its edge; lower lid
+      hm.add(P_SM, lid, ex, angry ? 0.14 : 0.1462, ez - 0.0005, angry ? 0 : -0.25, 0, angry ? sx * 0.3 : 0, 0.041, 0.012, 0.029);
+      const ly = angry ? 0.1365 : 0.1405, lz = ez - 0.0125;
+      const stroke = (x, y, z, len, th, rz) => hm.add(STROKE, dark, x, y, z, 0, 0, Math.PI / 2 + rz, th, len / 2, th * 0.8);
+      stroke(ex - sx * 0.011, ly - 0.0015, lz + 0.001, 0.02, 0.0034, sx * (angry ? 0.45 : 0.24));
+      stroke(ex + sx * 0.005, ly + 0.0004, lz, 0.018, 0.0036, angry ? sx * 0.3 : 0);
+      stroke(ex + sx * 0.018, ly - 0.0022, lz + 0.002, 0.014, 0.0032, angry ? 0 : -sx * 0.32);
+      if (lashes) stroke(ex + sx * 0.026, ly + 0.0012, lz + 0.004, 0.012, 0.0026, sx * 0.75);   // a flick at the outer corner
+      hm.add(P_SM, shade(skin, 0.97), ex, ey - 0.0165, ez - 0.004, 0.2, 0, 0, 0.04, 0.009, 0.026);
+      if (old) hm.box(0.016, 0.0025, 0.003, shade(skin, 0.8), ex + sx * 0.03, ey - 0.006, fz(ex + sx * 0.03, ey - 0.006) - 0.0005, 0, sx * 0.6, sx * 0.4);   // crow's feet
+      // brows: three tapered pieces along an arch (angry: low and slanted in)
+      const bc = shade(hair, 0.78), bt = look.beard || (!look.long && f < 0.4) ? 1.25 : 1;
+      const brow = angry ? [[0.02, 0.146, 0.45], [0.04, 0.153, 0.3], [0.058, 0.157, 0.1]] : [[0.021, 0.156, -0.05], [0.04, 0.1615, -0.12], [0.058, 0.158, -0.42]];
+      brow.forEach((b, k) => { const bx = sx * b[0]; hm.add(STROKE, bc, bx, b[1], fz(bx, b[1]) - 0.0025, 0, sx * k * 0.3, Math.PI / 2 + sx * b[2], (0.0105 - k * 0.0018) * bt, 0.0148, 0.006); });
+    }
+    // freckles (fair skin, one in four) and laugh lines (grey hair)
+    if (((look.hs || 0) % 4 === 1) && _c.set(skin).getHSL({}).l > 0.68) for (let k = 0; k < (hi ? 9 : 5); k++) {
+      const sx = k % 2 ? 1 : -1, fx = sx * (0.03 + hash(k * 7 + (look.hs || 0)) * 0.035), fy = 0.098 + hash(k * 13 + 3) * 0.018;
+      hm.add(P_SM, shade(skin, 0.8), fx, fy, fz(fx, fy) + 0.0004, 0, 0, 0, 0.0032, 0.0032, 0.002);
+    }
+    if (old) for (const sx of [-1, 1]) hm.box(0.0035, 0.032, 0.004, shade(skin, 0.82), sx * 0.033, 0.072, fz(sx * 0.033, 0.072) - 0.0004, 0, 0, sx * 0.38);
+    if (look.beard) { // a beard following the jaw, a moustache in two halves
+      hm.add(P_SPH, hair, 0, 0.044, -0.03, 0, 0, 0, 0.152 - 0.012 * f, 0.1, 0.152);
+      hm.add(P_SM, hair, 0, 0.022, fz(0, 0.022) + 0.006, 0, 0, 0, 0.06, 0.05, 0.04);
+      for (const sx of [-1, 1]) hm.add(P_SM, hair, sx * 0.018, 0.071, fz(0.018, 0.071) - 0.002, 0, 0, -sx * 0.25, 0.042, 0.016, 0.018);
+    }
+    if (!look.beard || angry) {   // lips: a cupid's bow on top, a fuller lower lip, the line between them, smile corners
+      const mz = fz(0, 0.058) + 0.001;
+      for (const sx of [-1, 1]) hm.add(P_SM, lip, sx * 0.0105, 0.0625, mz, 0, 0, sx * 0.18, 0.027, 0.0115, 0.013);
+      hm.add(P_SM, shade(lip, 1.08), 0, 0.0505, mz + 0.0015, 0, 0, 0, 0.036, 0.0145, 0.012);
+      hm.box(0.038, 0.0022, 0.004, shade(lip, 0.45), 0, 0.0568, mz - 0.0045);
+      if (!angry && !look.beard) for (const sx of [-1, 1]) hm.box(0.011, 0.0045, 0.006, shade(lip, 0.62), sx * 0.022, 0.0588, mz - 0.0015, 0, sx * 0.4, sx * 0.55);
+      if (angry) for (const sx of [-1, 1]) hm.box(0.01, 0.004, 0.006, shade(lip, 0.6), sx * 0.021, 0.054, mz - 0.0015, 0, sx * 0.4, -sx * 0.5);
     }
     const gl = look.glasses || silly === 'nosegl';
     if (gl) {
@@ -3195,6 +3458,7 @@ varying float vGL; varying vec2 vGUV;
       m.add(P_SM, shade(shoe, 0.9), 0, -len - 0.036, 0.048, 0, 0, 0, 0.084, 0.07, 0.08);
       m.box(0.094, 0.026, 0.25, sole, 0, -len - 0.07, -0.042);
       if (!darkShoe) m.box(0.04, 0.012, 0.08, shade(shoe, 1.15), 0, -len - 0.004, -0.07, 0.55);
+      if (hi) for (let k = 0; k < 3; k++) m.box(0.05, 0.005, 0.007, darkShoe ? 0x9a9a9a : 0xfafafa, 0, -len - 0.004 - k * 0.012, -0.075 - k * 0.022, 0.55);   // laces
     };
     const [legL, kneeL] = limb(-0.092, 0.92, 0.44, 0.41, thigh, shin);
     const [legR, kneeR] = limb(0.092, 0.92, 0.44, 0.41, thigh, shin);
@@ -3208,7 +3472,12 @@ varying float vGL; varying vec2 vGUV;
       m.add(P.fore, sleeve === 'long' ? shirt : skin, 0, 0, 0, 0, 0, 0, foreR, len, foreR * 0.9);
       if (sleeve === 'long') m.add(P_RING, shade(shirt, 0.8), 0, -len + 0.03, 0, 0, 0, 0, foreR * 2.15, 0.035, foreR * 2.0);
       m.add(P_SM, skin, 0, -len - 0.045, -0.004, 0, 0, 0, 0.034, 0.09, 0.075);                               // palm (facing the thigh)
-      m.add(P_SM, skin, 0, -len - 0.108, -0.008, 0.12, 0, 0, 0.028, 0.075, 0.066);                           // fingers
+      if (hi) { // four fingers, slightly curled, the middle one longest; knuckles
+        [[-0.023, 0.052], [-0.006, 0.058], [0.011, 0.054], [0.026, 0.044]].forEach(([fzz, fl]) => {
+          m.add(FINGER, skin, 0, -len - 0.088 - fl * 0.5, fzz - 0.004, 0.18, 0, 0, 0.019, fl * 0.5, 0.018);
+          m.add(P_SM, shade(skin, 0.97), 0.002, -len - 0.087, fzz - 0.002, 0, 0, 0, 0.022, 0.016, 0.019);
+        });
+      } else m.add(P_SM, skin, 0, -len - 0.108, -0.008, 0.12, 0, 0, 0.028, 0.075, 0.066);                     // fingers
       m.add(P_CAP, skin, 0, -len - 0.05, -0.038, 0.5, 0, 0, 0.022, 0.03, 0.022);                             // thumb
     };
     const sw = 0.19 - 0.018 * f;

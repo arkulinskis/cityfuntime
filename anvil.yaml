@@ -404,7 +404,7 @@ native_deps:
     <meta name="cft-asset" content="_/theme/three-gltf.js?v=a19eaa4fef">
     <meta name="cft-asset" content="_/theme/cft-content.js?v=30eae6ff6e">
     <meta name="cft-asset" content="_/theme/cft-tiles.js?v=e580641d28">
-    <meta name="cft-asset" content="_/theme/cft-world.js?v=a90733be8d">
+    <meta name="cft-asset" content="_/theme/cft-world.js?v=80958f24a6">
     <meta name="cft-asset" content="_/theme/cft-fun.js?v=89c1cc1b7a">
     <meta name="cft-asset" content="_/theme/cft-rpg.js?v=8912d65110">
     <meta name="cft-asset" content="_/theme/cft-hero.js?v=5cd4eb386e">
@@ -414,11 +414,11 @@ native_deps:
     <meta name="cft-asset" content="_/theme/cft-aim.js?v=58b4a8a5f3">
     <meta name="cft-asset" content="_/theme/cft-color.js?v=e41cf40151">
     <meta name="cft-asset" content="_/theme/cft-stunt.js?v=cce8b850fc">
-    <meta name="cft-asset" content="_/theme/cft-vo.js?v=5105a08b20">
-    <meta name="cft-asset" content="_/theme/cft-cine.js?v=06bf7065c4">
+    <meta name="cft-asset" content="_/theme/cft-vo.js?v=0fcb66d96a">
+    <meta name="cft-asset" content="_/theme/cft-cine.js?v=7f746c3425">
     <meta name="cft-asset" content="_/theme/cft-debug.js?v=14d9d860dc">
     <meta name="cft-asset" content="_/theme/cft-wiki.js?v=dd1832505e">
-    <meta name="cft-asset" content="_/theme/cft-ui.js?v=84aa6b5d14">
+    <meta name="cft-asset" content="_/theme/cft-ui.js?v=17e28338e0">
     <meta name="cft-asset" content="_/theme/cft-game.js?v=fb006c463d">
 package_name: City_Fun_Time
 runtime_options:

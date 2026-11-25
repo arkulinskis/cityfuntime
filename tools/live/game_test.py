@@ -129,7 +129,13 @@ MODELS = (
           "const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 11) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw); W.cam.pitch = 0.02; W.cam.dist = W.cam.cur = 1.0;" + MO +
           "[{ seed: 3, fig: 0.1, beard: true, silly: null }, { seed: 8, fig: 0.9, long: true, style: 1, silly: null, glasses: false }, { seed: 12, fig: 0.4, glasses: true, silly: null, skin: 0x6b4126 }, { seed: 21, fig: 0.8, style: 4, silly: null, skin: 0xd39d6c }]"
           ".forEach((l, i) => person(l, 1.9, (i - 1.5) * 0.62, null));", 20)
-    + scene("m2-silly", "W.cam.dist = W.cam.cur = 4.2; W.cam.pitch = 0.06;" + MO +
+    + scene("m1b-face-closeup", "W.cam.pitch = 0.0; W.cam.dist = W.cam.cur = 1.0;" + MO +
+            "const fs = [{ seed: 8, fig: 0.9, long: true, style: 1, silly: null, glasses: false, hs: 1, skin: 0xf1c9a5 }, { seed: 3, fig: 0.1, beard: false, silly: null, skin: 0xb57b4a }, { seed: 30, fig: 0.5, silly: null, hair: 0x8a8a8a, skin: 0xe9b98f, beard: true }]"
+            ".map((l, i) => person(l, 3.0, (i - 1) * 0.34, null)); const hd = fs[1].position, hy = hd.y + 1.535 * (fs[1].scale.y) + 0.12;"
+            "W.cine = { pos: { x: p.x, y: hy, z: p.z }, look: { x: hd.x, y: hy - 0.02, z: hd.z }, fov: 13 };", 20)
+    + scene("m1c-face-threequarter", "const o = window.__mo[0], hy = o.position.y + 1.535 * o.scale.y + 0.12, a = W.cam.yaw + 0.75;"
+            "W.cine = { pos: { x: o.position.x + Math.sin(a) * 1.1, y: hy + 0.05, z: o.position.z + Math.cos(a) * 1.1 }, look: { x: o.position.x, y: hy - 0.01, z: o.position.z }, fov: 22 };", 20)
+    + scene("m2-silly", "W.cine = null; W.cam.dist = W.cam.cur = 4.2; W.cam.pitch = 0.06;" + MO +
             "W.SILLY.forEach((k, i) => person({ seed: 40 + i, silly: k, h: 1, dress: false }, 4.2, (i - 4.5) * 0.85, i % 3 === 1 ? 'wave' : null));", 20)
     + scene("m3-cars", "W.cam.dist = W.cam.cur = 7; W.cam.pitch = 0.2;" + MO +
             "['car', 'suv', 'sports', 'taxi', 'police', 'van'].forEach((k, i) => put(W.vehicle(k, [0xe8453c, 0x2b6cb0, 0xf2b134, 0, 0, 0xf4f1ea][i]), 9 + (i % 2) * 6, (Math.floor(i / 2) - 1) * 3.4 + (i % 2) * 1.6, 0.9));", 20)
@@ -139,6 +145,8 @@ MODELS = (
             "[0, 1, 2, 3].forEach(k => put(W.treeMesh(k), 14, (k - 1.5) * 5)); [0, 1, 2].forEach(k => put(W.bushMesh(k), 9, (k - 1) * 2.4));", 20)
     + scene("m6-animals", "W.cam.dist = W.cam.cur = 1.6; W.cam.pitch = 0.3;" + MO +
             "[['dog'], ['cat'], ['pigeon'], ['duck'], ['dog', 0x2b2b2b]].forEach((a, i) => { const g = W.animal(a[0], a[1]); W.animate(g, 0, 0.3); put(g, 2.2, (i - 2) * 0.6, 0.5); });", 20)
+    + scene("m8-graffiti", "W.cine = null; (window.__mo || []).forEach(o => W.scene.remove(o)); window.__mo = []; W.avatar.visible = true; const gq = W.graffitiNear(p.x, p.z, 400).filter(q => q.w > 4)[0] || W.graffitiNear(p.x, p.z, 400)[0];"
+            "if (gq) { W.teleport(gq.x + gq.nx * 9, gq.z + gq.nz * 9); look(gq.x, gq.z, 4, 0.08); }", 60)
     + scene("m7-street", "(window.__mo || []).forEach(o => W.scene.remove(o)); window.__mo = []; W.avatar.visible = true; W.cam.dist = W.cam.cur = 14; W.cam.pitch = 0.32; W.cam.yaw += 0.6;", 40)
 )
 

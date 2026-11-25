@@ -38,6 +38,7 @@ PROC = "v1"                            # bump to re-render everything after chan
 
 # speaker -> (Kokoro voice or blend, speed, pitch factor). Pitch > 1 = higher (rendered slower, then resampled).
 VOICES = {
+    "announcer": ("af_bella", 1.08, 1.0),   # the hype voice: says what you did, then cheers
     "narrator": ("bm_george*0.55+am_onyx*0.45", 0.9, 1.0),
     "max": ("am_michael", 1.0, 1.0),           # laid-back musician cousin
     "rosa": ("bf_isabella*0.7+af_kore*0.3", 0.93, 1.0),   # the nonna

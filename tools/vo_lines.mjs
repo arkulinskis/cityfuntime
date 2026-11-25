@@ -65,4 +65,6 @@ for (const ch of D.CHAPTERS) {
   const raw = C.chapterRaw(ch);
   out.push({ key: C.key('narrator', raw, ''), variant: null, speaker: 'narrator', raw, say: voiceText(C.chapterSay(ch), '', null) });
 }
+// the announcer (C.SHOUT): every good-news banner said out loud, then a cheer
+for (const raw of C.SHOUT.lines(D)) out.push({ key: C.key('announcer', raw, ''), variant: null, speaker: 'announcer', raw, say: voiceText(raw, '', null) });
 process.stdout.write(JSON.stringify({ lines: out, caps: [...caps].sort() }));

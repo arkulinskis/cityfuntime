@@ -54,6 +54,82 @@ C.chapterRaw = ch => 'Chapter ' + ch.id + ': ' + ch.n + '. ' + ch.blurb;
 C.chapterSay = ch => (ch.id === 10 ? 'And around the block... ' : 'Chapter ' + ORD[ch.id] + '. ' + ch.n + '. ') + ch.blurb;
 C.NUM = ORD;
 
+// ------------------------------------------------------------------ the announcer (2026-11-24)
+// The user: "every time you get an achievement, or do something, a voice should announce what you did and that you are
+// amazing or great. Link it to the notifications that show up when you liberate a store and discover something."
+// Every good-news banner (U.banner) gets a voice: first WHAT you did ("Achievement unlocked: Local!", "Mission complete:
+// Bread Run!", "Store liberated!"), then a cheer ("You're amazing!"). Lines are pre-voiced with Kokoro like the missions
+// (speaker 'announcer', tools/voice_missions.py), so these must stay pure: tools/vo_lines.mjs lists them at build time.
+// SHOUT.ev: id -> [what the announcer says, priority]. SHOUT.match turns a banner into an event id (or null = silent).
+C.SHOUT = {
+  ev: {
+    liberated: ['Store liberated! The people are free!', 3], metro: ['Metro station freed!', 3], secret: ['Secret found!', 3],
+    dex: ['New discovery for the Dex!', 2], level: ['Level up!', 3], colour: ['The colour is coming back!', 3],
+    block: ['Block restored! Full colour!', 3], friend: ['You made a new friend!', 2], crush: ['Somebody has a crush on you!', 2],
+    date: ['What a lovely date!', 2], set: ['Sticker set complete!', 3], feat: ['New feat unlocked!', 2],
+    borough: ['New borough discovered!', 2], discover: ['New block discovered!', 2], mega: ['Mega figment defeated!', 3],
+    boss: ['King Blob is defeated!', 3], rare: ['Rare monster down!', 2], turf: ['This block is yours now!', 3],
+    home: ['Welcome to your new home!', 2], biz: ['Grand opening! Your business is open!', 3], crown: ['All hail the new royalty of the streets!', 3],
+    shooter: ['New shooter unlocked!', 2], star: ['You were the star of the show!', 2], loot: ['Epic loot!', 2],
+    monsters: ['Monster hunter!', 2], rep: ['Your reputation is growing!', 2], ride: ['New ride! Time to cruise!', 2],
+    pet: ['A new best friend!', 2], tuned: ['Tuned in! The whole neighbourhood is on your map!', 2], ufo: ['Close encounter!', 1],
+    crate: ['Look what was in the crate!', 1], generic: ['Nice work!', 1],
+  },
+  praise: ["You're amazing!", "You're incredible!", 'Absolute legend!', 'The city loves you!', "You're on fire!", 'Unstoppable!',
+    "Who's awesome? You're awesome!", 'Brilliant work!', 'Superstar!', 'Nobody does it like you!', 'Look at you go!',
+    'Hero of the block!', 'Outstanding!', 'Pure greatness!', "You're the best!", 'What a champion!'],
+};
+C.SHOUT.achRaw = n => 'Achievement unlocked: ' + n + '!';
+C.SHOUT.missionRaw = t => 'Mission complete: ' + t + '!';
+// banner (title, kind) -> {id, raw, pri} or null. Bad news (fail), plain notices (day) and borough greetings stay silent.
+C.SHOUT.match = function (title, kind, D) {
+  const t = String(title || ''), k = String(kind || ''), bare = t.replace(/^\S+\s+/, '');
+  const ev = id => ({ id, raw: C.SHOUT.ev[id][0], pri: C.SHOUT.ev[id][1] });
+  if (k === 'fail' || k === 'day' && !/^🗺️ Discovered/.test(t)) return null;
+  if (k === 'ach') { const a = D && D.RPG && D.RPG.ACH.find(x => x.n === bare); return a ? { id: 'ach', raw: C.SHOUT.achRaw(a.n), pri: 4 } : ev('generic'); }
+  if (/^🏆 /.test(t) && D) { const m = D.MISSIONS.find(x => x.title === bare); if (m) return { id: 'mission', raw: C.SHOUT.missionRaw(m.title), pri: 4 }; }
+  if (/^🚇 .* is free!$/.test(t)) return ev('metro');
+  if (/ is free!$/.test(t)) return ev('liberated');
+  if (/^🔍 Secret/.test(t)) return ev('secret');
+  if (/New in the Dex/.test(t)) return ev('dex');
+  if (/^Level \d+!$/.test(t)) return ev('level');
+  if (/BLOCK RESTORED/.test(t)) return ev('block');
+  if (/in full colour!$/.test(t)) return ev('colour');
+  if (/New friend!/.test(t)) return ev('friend');
+  if (/likes you!$/.test(t)) return ev('crush');
+  if (/lovely date/.test(t)) return ev('date');
+  if (/Set complete!/.test(t)) return ev('set');
+  if (/^\S+ Feat: /.test(t)) return ev('feat');
+  if (/New borough:/.test(t)) return ev('borough');
+  if (/^🗺️ Discovered/.test(t)) return ev('discover');
+  if (/MEGA DOWN/.test(t)) return ev('mega');
+  if (/King Blob is no more/.test(t)) return ev('boss');
+  if (/^💀 .* is down!$/.test(t)) return ev('rare');
+  if (/ is yours!$/.test(t)) return ev('turf');
+  if (/Home sweet home/.test(t)) return ev('home');
+  if (/Grand opening/.test(t)) return ev('biz');
+  if (/ of the Streets!$/.test(t)) return ev('crown');
+  if (/New shooter/.test(t)) return ev('shooter');
+  if (/You were the star/.test(t)) return ev('star');
+  if (/New best friend/.test(t)) return ev('pet');
+  if (/Tuned in/.test(t)) return ev('tuned');
+  if (/Close encounter/.test(t)) return ev('ufo');
+  if (/It was in the crate|was in the crate/.test(t)) return ev('crate');
+  if (/^loot/.test(k)) { const q = +(/q(\d)/.exec(k) || [0, 0])[1]; return q >= 3 ? ev('loot') : null; }
+  if (k === 'boro') return null;                       // "Welcome to <borough>" (the new-borough banner matched above)
+  if (k === 'level' && /monsters bonked/.test(t + '')) return ev('monsters');
+  if (k === 'friend' && /: /.test(t)) return ev('rep');
+  if (k === 'done' && /!$/.test(t) && /Press V|ride/i.test(t)) return ev('ride');
+  return k === 'done' || k === 'level' || k === 'friend' ? ev('generic') : null;
+};
+// every line the announcer can say (for tools/vo_lines.mjs)
+C.SHOUT.lines = function (D) {
+  const out = Object.keys(C.SHOUT.ev).map(id => C.SHOUT.ev[id][0]).concat(C.SHOUT.praise);
+  for (const a of D.RPG.ACH) out.push(C.SHOUT.achRaw(a.n));
+  for (const m of D.MISSIONS) out.push(C.SHOUT.missionRaw(m.title));
+  return [...new Set(out)];
+};
+
 C.attach = function (G) {
   const D = G.D, W = G.W, U = G.ui, THREE = W.THREE;
   const Cn = { playing: false };
@@ -420,7 +496,54 @@ C.attach = function (G) {
     s.ch[ch.id] = 1;
     return ch;
   };
-  Cn.destroy = () => { alive = false; Cn.skip(); };
+  Cn.destroy = () => { alive = false; Cn.skip(); shoutVq.stop(); clearTimeout(shoutT); if (U.banner === shoutBanner) U.banner = rawBanner; };
+
+  // ---- the announcer: every good-news banner is said out loud, then a cheer (C.SHOUT above)
+  // One at a time; while a mission scene talks it waits; a backlog keeps only the two most important (and none older than 12 s).
+  // Cn.shoutLog = what it said (tests read it, also when voices are muted). settings.announcer false = silent.
+  const shoutVq = new VoiceQueue([]), shoutQ = [];
+  let shoutBusy = false, shoutT = 0, lastPraise = -1;
+  Cn.shoutLog = [];
+  const shoutOn = () => G.save.settings.announcer !== false;
+  Cn.shout = function (title, kind) {
+    if (!alive || !shoutOn()) return null;
+    const e = C.SHOUT.match(title, kind, D);
+    if (!e) return null;
+    let p;
+    do { p = Math.floor(Math.random() * C.SHOUT.praise.length); } while (p === lastPraise && C.SHOUT.praise.length > 1);
+    lastPraise = p;
+    e.praise = C.SHOUT.praise[p]; e.at = Date.now();
+    Cn.shoutLog.push({ id: e.id, raw: e.raw, praise: e.praise });
+    if (Cn.shoutLog.length > 30) Cn.shoutLog.shift();
+    shoutQ.push(e);
+    if (shoutQ.length > 2) { shoutQ.sort((a, b) => b.pri - a.pri || b.at - a.at); shoutQ.length = 2; }
+    if (!shoutBusy) nextShout();
+    return e;
+  };
+  function nextShout() {
+    clearTimeout(shoutT);
+    if (!alive) return;
+    while (shoutQ.length && Date.now() - shoutQ[0].at > 12000) shoutQ.shift();
+    const e = shoutQ.shift();
+    if (!e) { shoutBusy = false; return; }
+    shoutBusy = true;
+    if (Cn.playing) { shoutQ.unshift(e); shoutT = setTimeout(nextShout, 600); return; }   // a mission scene is talking: after it
+    const a = Cn.clip('announcer', e.raw, ''), b = Cn.clip('announcer', e.praise, '');
+    if (!voiceOn() || (!a && !b)) { shoutT = setTimeout(nextShout, 300); return; }
+    if (window.ArkMusic) window.ArkMusic.duck(0.45);
+    const done = () => { if (window.ArkMusic && !Cn.playing) window.ArkMusic.duck(1); shoutT = setTimeout(nextShout, 700); };
+    const play = (clip, then) => {
+      const h = shoutVq.playClip(clip);
+      if (!h) { then(); return; }
+      const t0 = Date.now(), lim = (clip.dur + 1.5) * 1000;
+      const tick = () => { if (!alive) return; if (h.ended() || Date.now() - t0 > lim || Cn.playing) then(); else shoutT = setTimeout(tick, 120); };
+      shoutT = setTimeout(tick, 150);
+    };
+    play(a, () => { shoutT = setTimeout(() => play(b, done), a ? 120 : 0); });
+  }
+  const rawBanner = U.banner;
+  const shoutBanner = function (title, sub, kind, color) { const r = rawBanner.apply(this, arguments); try { Cn.shout(title, kind); } catch (err) { /* never break a banner */ } return r; };
+  U.banner = shoutBanner;
 
   const COLS = { max: '#8fd14f', rosa: '#ff7aa2', kim: '#ff8a5c', okafor: '#b49bff', priya: '#9fb4ff', dmitri: '#6fb7ff', luna: '#3fe0c5', kai: '#ffd23f', jay: '#c79bff',
     noor: '#f4f1ea', benny: '#ffa45c', zoe: '#e58cff', ollie: '#b6e35a', sam: '#ff9ccc', tomas: '#ffffff', bouchard: '#8fb3ff', chad: '#ffd166', mayor: '#ffc21f', kid: '#ffe08a' };

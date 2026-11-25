@@ -1184,6 +1184,7 @@ function create(G, root) {
       '<div class="cft-sec"><h4>Game</h4><label class="cft-check"><input type="checkbox" data-set="sound" ' + (st.sound ? 'checked' : '') + '> Sound effects</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="music" ' + (st.music !== false ? 'checked' : '') + '> Music</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="voice" ' + (st.voice !== false ? 'checked' : '') + '> Voiced missions</label>' +
+      '<label class="cft-check"><input type="checkbox" data-set="announcer" ' + (st.announcer !== false ? 'checked' : '') + '> Announcer (cheers out loud when you do something great)</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="cine" ' + (st.cine !== false ? 'checked' : '') + '> Cinematic mission scenes</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="reach" ' + (st.reach !== false ? 'checked' : '') + '> Show how far my bonk reaches (gold arc on the ground)</label>' +
       '<label class="cft-check"><input type="checkbox" data-set="colour" ' + (st.colour !== false ? 'checked' : '') + '> Colour comes back block by block (off = full colour everywhere)</label>' +

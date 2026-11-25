@@ -165,6 +165,8 @@ Everything below is a property of the returned `W`. "Called by" lists modules (`
 | `W.guide` (~L3935) / `W.guides` | `(x, z, {max, speed, waves, hue})` | Rainbow chevrons on the floor toward a point | aim, stunt |
 | `W.setRide` (~L3980) / `W.ride` | `(spec)` / `()` | `{kind, mode:'foot'\|'ride'\|'drive', walk, run, jump, radius, turn, accel, color}` | game, hero |
 | `W.setFollowers` (~L3994) / `W.followers` | `(list of Groups)` | Partner/kids/pets trailing a breadcrumb path | game |
+| `W.headZ` | `(x, y, f) -> z` | The face's front surface in head-group metres (the face pass, 2026-11-24): place face parts on it | tests |
+| `W.graffitiNear` / `W.graffitiStats` / `W.graffitiAtlas` | `(x, z, r)` / `()` / `()` | Graffiti spots near a point / {buildings, tagged} / the painted atlas canvas | tests |
 | `W.teleport` (~L4436) | `(x, z, yaw?)` | Moves the player to the surface, clears velocity and car air | chaos, debug, game, hero, tests |
 | `W.carAir` / `W.carLaunch` / `W.rampAt` / `W.ramps` / `W.STUNT` / `W.GRAV` | | Car air state, launch, ramp surface, the ramp list (written by cft-stunt), stunt tuning, gravity | stunt |
 | `W.lock` / `W.unlock` / `W.isLocked` | | Pointer lock | ui, camp, chaos |

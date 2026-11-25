@@ -925,6 +925,39 @@ at the sky." The write-up: **`docs/colour-blocks.md`**.
 - **Not verified on a real device:** the grey look and the waves on a real GPU with post-processing, plate readability at
   distance, looking up with a real mouse and on touch.
 
+## The announcer, the face pass and graffiti (2026-11-24)
+
+The user: "every time you get an achievement, or do something, a voice should announce what you did and that you are
+amazing... link it to the notifications system. More effort into the model design, more edges, better looking, most
+importantly the face. Put graffiti on 10% of buildings."
+- **Announcer (cft-cine.js, `C.SHOUT` + `Cn.shout`):** `C.attach` wraps `U.banner`; every banner goes through
+  `C.SHOUT.match(title, kind, D)` -> an event (`C.SHOUT.ev[id] = [line, priority]`), an achievement by name
+  (`achRaw`, kind `ach`) or a mission by title (`missionRaw`, title `🏆 <mission title>`), or null (kinds `fail`, `day`
+  except "🗺️ Discovered", `boro` greetings, loot below Epic). Then a cheer from `C.SHOUT.praise`. Spoken by speaker
+  `announcer` (`VOICES` in tools/voice_missions.py: af_bella, 1.08); tools/vo_lines.mjs adds `C.SHOUT.lines(D)`, so a
+  new achievement, mission or banner line just needs `python tools/voice_missions.py` + `r2_deploy.py --only=vo/cft/`.
+  Queue: one at a time, waits while `Cn.playing`, keeps the 2 most important, drops anything older than 12 s, ducks
+  ArkMusic to 0.45. `Cn.shoutLog` = what it said (tests read it while voices are muted). `settings.announcer` false =
+  silent. **A new good-news banner whose title the matcher doesn't know is announced as "Nice work!"** (kinds done,
+  level, friend): give it its own `ev` line and regex if it deserves better.
+- **Faces (cft-world.js, before `W.person`):** `HEAD_ROWS` + `headRow` + `headBump` + `headGeo(skin, f, segments)` (cached
+  per skin / jaw / quality) build the skull-jaw-chin surface; `headZ(x, y, f)` (also `W.headZ`) is the front surface:
+  **place every face part with `fz(x, y)` so it sits on the face** (eyes, brows, nose, lips, freckles, lines). `hi` (=
+  not npc, not LOW) adds the finer parts: iris flecks, a second glint, ear lobes, fingers (`fore`), laces (`shin`),
+  shirt buttons. Brows and lash lines are capsules (`P_CAP` turned on z by pi/2): scale x = thickness, y = half length.
+  Hair is still fitted to the old big head (`hm.addMerge(hr, ...)`): the new skull keeps the old outer size on purpose.
+  Pictures: `game_test.py --models DIR` -> `m1b-face-closeup.png` (portrait lens through `W.cine`) and
+  `m1c-face-threequarter.png`.
+- **Graffiti (cft-world.js, before `buildingBase`):** `graffitiAtlas()` paints 16 pieces once (canvas 2048 x 1024, 4 x 4
+  cells of 512 x 256; words in `WORDS`, characters in `character`), `graffitiSpot(b)` picks about one building in ten
+  (`GRAFFITI_SHARE`, hash of the building centre, so the same walls every visit; longest edge >= 4.5 m, height >= 3.2 m,
+  2:1 piece up to 7.5 m wide, 0.3-1.5 m above the ground), `graffitiMesh(s)` merges a sub-tile's pieces into one mesh in
+  `buildSub` (disposed with the sub-tile). Not greyified on purpose (colour in grey blocks). `b.graffiti` = the spot;
+  `W.graffitiNear(x, z, r)`, `W.graffitiStats()`, `W.graffitiAtlas()` for tests. Picture: `--models` -> `m8-graffiti.png`.
+- **Tests:** funtest (detail of you vs passers-by, the face surface, graffiti share 4-17%), cinetest (every announcer
+  line has a clip, the matcher for achievements / missions / liberation / secrets / discoveries / levels, silence for bad
+  news, a fresh cheer each time, the setting).
+
 ## Recipes
 
 - **New page:** copy a similar `client_code/Pages/<Name>/`, register it in `client_code/router.py`; new field on Life / Quests /

@@ -132,6 +132,29 @@ window.__cineOut = []; window.__cineDone = false;
     ok($('[data-ccall]').hidden && $('[data-cwho]').hidden, 'a narrated line: no phone call, no name');
     Cn.skip(); await pNar;
 
+    // ---------- the announcer (2026-11-24): good-news banners are said out loud, then a cheer
+    {
+      const miss = C.SHOUT.lines(D).filter(raw => !Cn.clip('announcer', raw, ''));
+      ok(!miss.length, 'every announcer line has a voiced clip (' + C.SHOUT.lines(D).length + ' lines)' + (miss.length ? ': missing ' + miss.slice(0, 3).join(' | ') : ''));
+      const said = (title, kind) => { Cn.shoutLog.length = 0; const n = 0; U.banner(title, 'test', kind); return Cn.shoutLog.length > n ? Cn.shoutLog[Cn.shoutLog.length - 1] : null; };
+      U.clearBanners();
+      const a = D.RPG.ACH[0], m = D.MISSIONS[0];
+      let r = said('🏆 ' + a.n, 'ach');
+      ok(r && r.id === 'ach' && r.raw.indexOf(a.n) > 0 && C.SHOUT.praise.includes(r.praise), 'an achievement: "' + (r && r.raw) + ' ' + (r && r.praise) + '"');
+      r = said('🏆 ' + m.title, 'done'); ok(r && r.id === 'mission' && r.raw.indexOf(m.title) > 0, 'a finished mission is announced by name: "' + (r && r.raw) + '"');
+      r = said('🍩 Tom Heartons is free!', 'done'); ok(r && r.id === 'liberated', 'a liberated store: "' + (r && r.raw) + '"');
+      r = said('🔍 Secret #2 found!', 'done'); ok(r && r.id === 'secret', 'a secret found');
+      r = said('🗺️ Discovered: Rue Test', 'day'); ok(r && r.id === 'discover', 'a new block discovered');
+      r = said('Level 7!', 'level'); ok(r && r.id === 'level', 'a level up');
+      ok(!said('💫 You blacked out', 'fail') && !said('☀️ Day 4', 'day'), 'bad news and plain notices stay silent');
+      const p1 = said('📸 New in the Dex: 👾 Test', 'done'), p2 = said('🚇 Test Station is free!', 'done');
+      ok(p1 && p2 && p1.praise !== p2.praise, 'the cheer changes every time');
+      s.settings.announcer = false;
+      ok(!said('🏆 ' + a.n, 'ach'), '"Announcer" off: silent');
+      delete s.settings.announcer;
+      U.clearBanners();
+    }
+
     // ---------- the setting
     s.settings.cine = false;
     const pOff = Cn.play({ who: 'max', raw: ['Old school.'], kind: 'say', m: D.MISSIONS[0] });
@@ -140,7 +163,7 @@ window.__cineOut = []; window.__cineDone = false;
     await drain(); await pOff;
     delete s.settings.cine;
     U.phone('settings'); await sleep(200);
-    ok(!!document.querySelector('[data-set="voice"]') && !!document.querySelector('[data-set="cine"]'), 'Settings has "Voiced missions" and "Cinematic mission scenes"');
+    ok(!!document.querySelector('[data-set="voice"]') && !!document.querySelector('[data-set="cine"]') && !!document.querySelector('[data-set="announcer"]'), 'Settings has "Voiced missions", "Announcer" and "Cinematic mission scenes"');
     U.closeAll();
   } catch (e) {
     ok(false, 'EXCEPTION ' + (e && e.stack || e));

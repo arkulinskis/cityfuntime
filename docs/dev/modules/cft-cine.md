@@ -133,6 +133,15 @@ Because file names change whenever text or voice changes, the year-long Worker c
 
 Data: `D.CAST` (names for speaker matching), `D.CHAPTERS` (`id`, `n`, `e`, `blurb`), `D.KINDS` (intro place words), `D.MISSIONS` (via cft-game; `intro`, `outro`, `steps[].say`, `ch`, `title`). No `D.TUNE` values. Hard-coded timings in `Cn.play`: 28 m speaker range, title card 1.9 s, stamp 1.7 s, 58 ms per character without audio (min 2.2 s), line tail 0.25 s / 380 ms, safety `dur + 4` s, duck level 0.32; shot geometry numbers live in `makeShot`; subtitle colours in `COLS`; voices in `tools/voice_missions.py` `VOICES`.
 
+## 7b. The announcer (2026-11-24)
+
+`C.SHOUT` (pure, also read by tools/vo_lines.mjs): `ev` (id -> [line, priority]), `praise` (16 cheers), `achRaw(name)`,
+`missionRaw(title)`, `match(title, kind, D)` -> `{id, raw, pri}` or null, `lines(D)` = every line to voice. In `attach`:
+`U.banner` is wrapped (`shoutBanner`; `Cn.destroy` puts the original back), `Cn.shout(title, kind)` queues an event plus a
+cheer, `nextShout` plays the two clips through its own `VoiceQueue` (`shoutVq`), waiting while `Cn.playing`, at most 2
+queued (highest priority first), none older than 12 s, music ducked to 0.45. `Cn.shoutLog` (last 30) is written even when
+voices are muted (tests). Off: `settings.announcer === false`. Speaker id `announcer` = af_bella in voice_missions.py.
+
 ## 8. How to test
 
 - `python -I tools/live/game_test.py --cine [OUTDIR]`: cinetest.js checks every line has a clip, paired voices, speakers/narrator, the old box without `CFT_TEST.cine`, a full intro scene (HUD hidden, bars, chapter + title cards, camera, word-by-word subtitles, mouth, next, Esc), accept + cheer, outro stamp, phone call, settings.

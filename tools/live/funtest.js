@@ -114,7 +114,15 @@ window.__funOut = []; window.__funDone = false;
       const u = W.life.peds[0].fig.userData, tris = o => { let n = 0; o.traverse(m => { if (m.isMesh) n += m.geometry.attributes.position.count / 3; }); return Math.round(n); };
       ok(!!(u.head && u.kneeL && u.kneeR && u.elbowL && u.elbowR && u.handR), 'people have heads that turn, knees, elbows and hands');
       const t1 = tris(W.life.peds[0].fig);
-      ok(t1 > 1000 && t1 < 7000, 'a passer-by is built from ' + t1 + ' triangles (the old box figures had about 130; smoother since the 2026-11-19 graphics overhaul)');
+      ok(t1 > 1000 && t1 < 9500, 'a passer-by is built from ' + t1 + ' triangles (the old box figures had about 130; smoother since the 2026-11-19 graphics overhaul; the 2026-11-24 face pass: about 7,300 from 5,800)');
+      // the face pass (2026-11-24): a sculpted head with the face on its surface; you get fingers and the finest face
+      const hero = W.person(Object.assign(W.randomLook(5), { silly: null }), false), th = tris(hero);
+      ok(th > t1 && th < 30000, 'you and the cast are more detailed than passers-by: ' + th + ' triangles vs ' + t1);
+      ok(W.headZ(0, 0.06) < -0.095 && W.headZ(0, 0.06) > -0.115 && W.headZ(0.04, 0.128) > W.headZ(0, 0.152), 'the face surface: lips forward, eye sockets set back from the brow');
+      // graffiti on about one building in ten
+      const gs = W.graffitiStats(), gc = W.graffitiAtlas();
+      ok(gc.width === 2048 && gc.height === 1024, 'the graffiti atlas is painted (16 pieces)');
+      ok(gs.buildings > 80 ? gs.tagged / gs.buildings > 0.04 && gs.tagged / gs.buildings < 0.17 : gs.tagged >= 0, 'graffiti on ' + gs.tagged + ' of ' + gs.buildings + ' buildings (' + Math.round(gs.tagged / Math.max(1, gs.buildings) * 100) + '%)');
       const walker = W.life.peds.find(q => q.type === 'walk' && !q.pause && !q.hold);
       if (walker) { let bend = 0; for (let i = 0; i < 40; i++) { sim(1); bend = Math.min(bend, walker.fig.userData.kneeL.rotation.x, walker.fig.userData.kneeR.rotation.x); } ok(bend < -0.1, 'knees bend when they walk (' + bend.toFixed(2) + ' rad)'); }
       const me = G.playerLook();
