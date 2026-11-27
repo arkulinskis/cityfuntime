@@ -3455,7 +3455,7 @@ varying float vGL; varying vec2 vGUV;
     let g;
     if (!GFX) g = buildPerson(look, npc);
     else { const prev = KOF; KOF = personKOF(look); try { g = buildPerson(look, npc); } finally { KOF = prev; } }
-    if (look.model && W.castModels()[look.model]) wearModel(g, look.model);   // an Actor Troop character (see "the cast as real people")
+    if (look.model && modelEntry(look.model)) wearModel(g, look.model, look.mk);   // a cast member or a townsperson (see "the cast as real people")
     return g;
   };
   function buildPerson(look, npc) {
@@ -3807,9 +3807,11 @@ varying float vGL; varying vec2 vGUV;
   W.modelPeople = modelPeople;
   const modelBase = () => window.CFT_MODEL_BASE || ((window.CFT_VO_BASE || (window.ArkMusic && window.ArkMusic.base) || 'https://arkvital-media.addanapp.workers.dev/').replace(/music\/?$/, '') + 'models/cft/');
   W.castModels = () => (window.CFT_DATA && window.CFT_DATA.CAST_MODELS) || {};
+  W.crowdModels = () => (window.CFT_DATA && window.CFT_DATA.CROWD_MODELS) || {};
+  const modelEntry = id => W.castModels()[id] || W.crowdModels()[id];
   W.modelsOn = () => !!(THREE.GLTFLoader && THREE.SkeletonUtils) && !opts.nomodels && !/[?&]nomodels=1/.test(location.search);
   function castModel(id, cb) {
-    const e = W.castModels()[id];
+    const e = modelEntry(id);
     if (!e || !W.modelsOn()) return;
     const have = castSrc[id];
     if (have) { if (have !== 'fail') cb(have); return; }
@@ -3825,6 +3827,7 @@ varying float vGL; varying vec2 vGUV;
         if (m.map) { m.map.encoding = THREE.LinearEncoding; m.map.anisotropy = 4; m.map.needsUpdate = true; }   // this game draws in display colours
         if (m.envMapIntensity != null) m.envMapIntensity = 0.5;
         m.metalness = 0;
+        if (e.crowd) { m.alphaTest = 0.35; m.transparent = false; }   // one atlas material: hair cards and brows cut out
       });
       castSrc[id] = { scene: gl.scene };
       cbs.forEach(f => f(castSrc[id]));
@@ -3832,7 +3835,7 @@ varying float vGL; varying vec2 vGUV;
   }
   W.preloadCast = id => castModel(id, () => {});
   W.castReady = id => !!castSrc[id] && castSrc[id] !== 'fail';
-  function wearModel(g, id) {
+  function wearModel(g, id, mk) {
     const u = g.userData, built = [];
     const keep = new Set([u.shield, u.prop, u.balloon].filter(Boolean));
     const walk = o => { if (keep.has(o)) return; if (o.isMesh) built.push(o); for (const c of o.children) walk(c); };
@@ -3846,12 +3849,33 @@ varying float vGL; varying vec2 vGUV;
       for (const m of built) m.visible = false;
       if (u.mouth) u.mouth.visible = false;
       const holder = obj.getObjectByName('Body') || obj;
+      if (mk) obj.scale.setScalar(mk);   // townspeople: g is scaled by look.h, the model has its own height (W.crowdFor)
       g.add(obj);
-      u.model = { obj, bones, hip: bones.Hips.position.clone(), k: 1 / (holder.scale.y || 1), blinkT: 1 + Math.random() * 4, blink: 0, miss: 0 };
+      u.model = { obj, bones, hip: bones.Hips.position.clone(), k: 1 / ((holder.scale.y || 1) * (mk || 1)), blinkT: 1 + Math.random() * 4, blink: 0, miss: 0 };
       modelPeople.add(g);
     });
   }
   W.hasModel = g => !!(g && g.userData && g.userData.model);
+  // Townspeople (2026-11-27): D.CROWD_MODELS = realistic MPFB passers-by built in Blender (tools/cast_models/mpfb/
+  // build_crowd.py: one skinned mesh + one 1024 px atlas each). W.crowdFor(look, type) picks the one closest to a random
+  // look: kid or adult, woman (long hair or a dress) or man, an older body for elders, the nearest skin tone, then the
+  // look's own seed (look.hs) among the three best. Sets look.model + look.mk (model scale, so the height stays the
+  // model's own whatever look.h is; kids keep their small look.h for W.isKid). Passers-by with a silly extra stay
+  // built (the silliness lives on the built figure), and so does everyone on low quality.
+  const skinTone = c => { _c.set(c == null ? 0xe9b98f : c); return 0.299 * _c.r + 0.587 * _c.g + 0.114 * _c.b; };
+  W.crowdFor = function (look, type) {
+    const M = W.crowdModels(), ids = Object.keys(M);
+    if (!ids.length || LOW || !W.modelsOn() || look.silly || look.model) return null;
+    const kid = W.isKid(look, type), fem = !!(look.dress || look.long), old = type === 'elder', tone = skinTone(look.skin);
+    const best = ids.filter(id => !!M[id].kid === kid && (kid || (M[id].g === 0) === fem))
+      .map(id => [Math.abs(M[id].tone - tone) + (old ? (M[id].age >= 60 ? 0 : 0.4) : (M[id].age >= 60 ? 0.25 : 0)), id])
+      .sort((a, b) => a[0] - b[0]).slice(0, 3);
+    if (!best.length) return null;
+    const id = best[(look.hs || 0) % best.length][1];
+    look.model = id;
+    look.mk = kid ? 0.95 / 0.62 : (0.97 + ((look.hs || 0) % 7) * 0.01) / (look.h || 1);
+    return id;
+  };
   function syncModels(dt) {
     for (const g of modelPeople) {
       const u = g.userData, m = u.model;
@@ -5296,6 +5320,7 @@ varying float vGL; varying vec2 vGUV;
     else if (q < 0.27) { type = 'elder'; speed = 0.65 + Math.random() * 0.2; look.hair = 0xd9d4cc; look.glasses = true; look.h = 0.9; }
     else if (q < 0.33) { type = 'skate'; speed = 4 + Math.random() * 1.5; wheels = 'skateboard'; look.dress = false; }
     else if (q < 0.41) { type = 'bike'; speed = 4.8 + Math.random() * 1.6; wheels = 'bike'; look.dress = false; look.hat = 0xf2b134; }
+    W.crowdFor(look, type);   // most passers-by are realistic townspeople (D.CROWD_MODELS)
     const fig = W.person(look, true);
     let obj = fig;
     if (wheels) { // the figure stands on (or sits over) its wheels inside a holder that does the moving

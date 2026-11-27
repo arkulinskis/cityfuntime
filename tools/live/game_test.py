@@ -26,6 +26,7 @@
     python -I tools/live/game_test.py --ground [OUTDIR]   no tests: the ground photo textures (pavement, road, lawn, plaza, woods/sand, overview, dusk)
     python -I tools/live/game_test.py --monsters [OUTDIR] no tests: the 15 monster types, a metro guardian, a fight, loot gear on you
     python -I tools/live/game_test.py --long [OUTDIR]     no tests: the Character / Reputation / Achievements apps, a Legendary drop, a rare monster, a level-up
+    python -I tools/live/game_test.py --crowdshots [OUTDIR]  no tests: the townspeople (realistic passers-by) line-ups + a street
     python -I tools/live/game_test.py --people [OUTDIR]   no tests: close-ups of the characters (you, passers-by in poses, the look editor)
     python -I tools/live/game_test.py --models [OUTDIR]   no tests: the 3D models up close (faces, silly extras, every vehicle, trees, bushes, animals)
     python -I tools/live/game_test.py --gfx [OUTDIR]      no tests: the graphics overhaul (facades up close, a street, roofs from above, cars, you, dusk, night)
@@ -247,6 +248,27 @@ CAST = (
     + [{"eval": "(() => { window.__cft.ui.lookEditor(); return 'ok'; })()"}, {"wait": 1500}, {"shot": "k5-look-editor"}]
 )
 
+# Townspeople (2026-11-27): the realistic passers-by (D.CROWD_MODELS) in two line-ups, then real passers-by on a street.
+def crowd_line(a, b):
+    return ("const ids = Object.keys(W.crowdModels()).slice(%d, %d);" % (a, b)
+            + "s.clock = 12; const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 10) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw);"
+            "const fx = -Math.sin(W.player.face), fz = -Math.cos(W.player.face), rx = -fz, rz = fx;"
+            "(window.__line || []).forEach(o => W.scene.remove(o.g)); window.__line = ids.map((id, i) => { const g = W.person({ model: id, h: 1 });"
+            " const k = i - (ids.length - 1) / 2, x = p.x + fx * 9 + rx * k * 0.85, z = p.z + fz * 9 + rz * k * 0.85; g.position.set(x, W.standAt(x, z), z); g.rotation.y = W.player.face + Math.PI; W.scene.add(g);"
+            " W.animate(g, 0, 0.03, i % 3 === 1 ? 'wave' : null); return { g, id }; });"
+            "W.cam.pitch = 0.1; W.cam.dist = W.cam.cur = 3.5; W.avatar.visible = false;")
+CROWD = (
+    [{"waitFor": "window.__cft.W.groundTextures === true", "timeout": 60000}]
+    + [{"eval": "(() => { " + PRE + crowd_line(0, 15) + POST % 30}]
+    + [{"waitFor": "window.__line.every(o => window.__cft.W.hasModel(o.g))", "timeout": 180000}, {"wait": 1200}, {"shot": "c1-lineup-a"}]
+    + [{"eval": "(() => { " + PRE + crowd_line(15, 40) + POST % 30}]
+    + [{"waitFor": "window.__line.every(o => window.__cft.W.hasModel(o.g))", "timeout": 180000}, {"wait": 1200}, {"shot": "c2-lineup-b"}]
+    + scene("c3-street", "(window.__line || []).forEach(o => W.scene.remove(o.g)); window.__line = []; W.avatar.visible = true;"
+            "console.log('[label] passers-by ' + W.life.peds.length + ', as townspeople ' + W.life.peds.filter(q => q.look.model).length);"
+            "const t = near(W.life.peds.filter(q => q.type === 'walk' && q.look.model), q => q.obj.position); if (t) { const o = t.obj.position; W.teleport(o.x + 4, o.z + 3); look(o.x, o.z, 6, 0.14); }", 60, 4000)
+    + scene("c4-street-wide", "W.cam.dist = W.cam.cur = 14; W.cam.pitch = 0.3;", 20, 1500)
+)
+
 # Boroughs (2026-11-17): a street in the home borough, a street in the next one (its banner showing), from above, the map.
 BORO_WAIT = [{"waitFor": "window.__cft.W.districts().length > 0", "timeout": 60000}, {"wait": 1500}]
 BORO_O = "const ds = W.districts(), home = W.districtAt(0, 0), o = ds.filter(d => d.c !== 'city' && d.n !== home.n).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[%d];"
@@ -389,6 +411,8 @@ elif "--ground" in flags:
     steps = START + GROUND
 elif "--castshots" in flags:
     steps = START + CAST
+elif "--crowdshots" in flags:
+    steps = START + CROWD
 elif "--people" in flags:
     steps = START + PEOPLE
 elif "--models" in flags:
@@ -460,13 +484,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--castshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--castshots" in flags or "--crowdshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--castshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile:
+if "--shots" in flags or "--ground" in flags or "--castshots" in flags or "--crowdshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

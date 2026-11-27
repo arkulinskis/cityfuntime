@@ -1,6 +1,6 @@
 // Slims Actor Troop .glb exports for the browser (2026-11-24): drops tangents + normal maps (too fine to see in the
 // game), welds, simplifies (meshoptimizer) and quantizes (KHR_mesh_quantization: three's stock GLTFLoader reads it,
-// no decoder needed). Usage: node slim_glb.mjs IN_DIR OUT_DIR [ratio]
+// no decoder needed). Usage: node slim_glb.mjs IN_DIR OUT_DIR [ratio]   (env SLIM_ERROR: simplifier error, default 0.0006)
 // Needs: npm install @gltf-transform/core@4.1.1 @gltf-transform/functions@4.1.1 @gltf-transform/extensions@4.1.1 meshoptimizer@0.22.0
 // (set NODE_PATH to that folder's node_modules, see README.md here).
 import fs from 'node:fs';
@@ -21,7 +21,7 @@ for (const f of fs.readdirSync(inDir).filter(f => f.endsWith('.glb'))) {
   if (!process.env.KEEP_NORMALS) for (const m of doc.getRoot().listMaterials()) m.setNormalTexture(null);   // the MPFB build keeps its cloth normal maps
   await doc.transform(
     dedup(), weld(),
-    simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.0006 }),
+    simplify({ simplifier: MeshoptSimplifier, ratio, error: +(process.env.SLIM_ERROR || 0.0006) }),
     quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12, quantizeColor: 8, quantizeWeight: 8 }),
     prune(),
   );
