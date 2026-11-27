@@ -145,3 +145,6 @@ The harness fake answers `tile_archive`, `tile_backup`, `get_balance`, `admin_ba
 - [ ] `persist` still writes localStorage synchronously on every call; server pushes stay throttled (rate limit on `put_save`: 240 per hour).
 - [ ] Listeners added in `mountGame` are removed in `destroy`.
 - [ ] `python tools/assets.py` run; `python tools/check.py` passes; `ui_test.py` for page changes.
+
+## 2026-11-27
+`ALL` loads `cft-addr.js` (the start screen's address check, [cft-addr](cft-addr.md)) after `cft-tiles.js`.

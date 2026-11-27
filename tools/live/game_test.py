@@ -23,6 +23,9 @@
     python -I tools/live/game_test.py --rpg [OUTDIR]      only rpgtest.js (loot, talents, rested XP, discovery, reputation, achievements, rares)
     python -I tools/live/game_test.py --shots [OUTDIR]    no tests: screenshots of the city by day, at dusk and at night
     python -I tools/live/game_test.py --castshots [OUTDIR]   no tests: Actor Troop cast models (line-up of poses, close-up, you as Ava, a giver)
+    python -I tools/live/game_test.py --holes [OUTDIR]    only holetest.js (elevation clean-up, every sub-tile built at six spots, no cliffs: W.groundCheck)
+    python -I tools/live/game_test.py --addr [OUTDIR]     the start screen's address check: card + map, tap to move the pin, move in at the pin
+    python -I tools/live/game_test.py --aerial [OUTDIR]   no tests: the city from 150-190 m up over six spots (holes in the ground show)
     python -I tools/live/game_test.py --ground [OUTDIR]   no tests: the ground photo textures (pavement, road, lawn, plaza, woods/sand, overview, dusk)
     python -I tools/live/game_test.py --monsters [OUTDIR] no tests: the 15 monster types, a metro guardian, a fight, loot gear on you
     python -I tools/live/game_test.py --long [OUTDIR]     no tests: the Character / Reputation / Achievements apps, a Legendary drop, a rare monster, a level-up
@@ -69,6 +72,11 @@ START = [
     {"waitFor": "window.__cft && window.__cft.state() === 'play'", "timeout": 180000},
     {"wait": 2500},
 ]
+# CFT_START="lat,lon" in the environment: move in there instead of the Plateau (typed coordinates skip the address check)
+_start = __import__("os").environ.get("CFT_START")
+if _start:
+    START[1] = {"eval": "(() => { const f = document.querySelector('.cft-start-form'); f.elements.name.value = 'Tester'; f.elements.q.value = %s;"
+                        " f.requestSubmit(); return true; })()" % json.dumps(_start)}
 
 
 def script(name, done, result, wait):
@@ -257,6 +265,11 @@ def crowd_line(a, b):
             " const k = i - (ids.length - 1) / 2, x = p.x + fx * 9 + rx * k * 0.85, z = p.z + fz * 9 + rz * k * 0.85; g.position.set(x, W.standAt(x, z), z); g.rotation.y = W.player.face + Math.PI; W.scene.add(g);"
             " W.animate(g, 0, 0.03, i % 3 === 1 ? 'wave' : null); return { g, id }; });"
             "W.cam.pitch = 0.1; W.cam.dist = W.cam.cur = 3.5; W.avatar.visible = false;")
+LINE_AT = ("s.clock = 12; const q = W.randomWalkSpot(0, 0, 30, 200, (x, z, sg) => sg.car && sg.w >= 10) || W.nearestWalk(0, 0, 200); W.teleport(q.x, q.z, q.yaw);"
+           "const fx = -Math.sin(W.player.face), fz = -Math.cos(W.player.face), rx = -fz, rz = fx; (window.__line || []).forEach(o => W.scene.remove(o.g));")
+LINE_DRAW = ("window.__line = looks.map((l, i) => { const g = W.person(l); const k = i - (looks.length - 1) / 2, x = p.x + fx * 7 + rx * k * 0.9, z = p.z + fz * 7 + rz * k * 0.9;"
+             " g.position.set(x, W.standAt(x, z), z); g.rotation.y = W.player.face + Math.PI; W.scene.add(g); W.animate(g, 0, 0.03, null); return { g }; });"
+             "W.cam.pitch = 0.08; W.cam.dist = W.cam.cur = 3.2; W.avatar.visible = false;")
 CROWD = (
     [{"waitFor": "window.__cft.W.groundTextures === true", "timeout": 60000}]
     + [{"eval": "(() => { " + PRE + crowd_line(0, 15) + POST % 30}]
@@ -267,6 +280,18 @@ CROWD = (
             "console.log('[label] passers-by ' + W.life.peds.length + ', as townspeople ' + W.life.peds.filter(q => q.look.model).length);"
             "const t = near(W.life.peds.filter(q => q.type === 'walk' && q.look.model), q => q.obj.position); if (t) { const o = t.obj.position; W.teleport(o.x + 4, o.z + 3); look(o.x, o.z, 6, 0.14); }", 60, 4000)
     + scene("c4-street-wide", "W.cam.dist = W.cam.cur = 14; W.cam.pitch = 0.3;", 20, 1500)
+    # 2026-11-27: everybody realistic. Silly passers-by (their extra on the model's head), then you (own look), a
+    # shopkeeper, street folk, a kid and a crew boss, all matched to the closest townsperson (W.realPerson).
+    + [{"eval": "(() => { " + PRE + LINE_AT + "const looks = W.SILLY.map((k, i) => { const l = W.randomLook(4000 + i * 13); l.silly = k; W.crowdFor(l, 'walk'); return l; });"
+                + LINE_DRAW + POST % 30}]
+    + [{"waitFor": "window.__line.every(o => window.__cft.W.hasModel(o.g))", "timeout": 180000}, {"wait": 1200}, {"shot": "c5-silly-realistic"}]
+    + [{"eval": "(() => { " + PRE + LINE_AT + "const R = (l, t) => { const c = Object.assign({}, l); W.crowdFor(c, t, { match: true }); return c; };"
+                "const looks = [R(G.save.look, 'player'), R(Object.assign(W.randomLook(77), { apron: 0xf4f1ea, hat: 0xffffff, mood: 'angry' })),"
+                " R(Object.assign(W.randomLook(913), { hair: 0xd9d4cc, beard: true }), 'elder'), R(Object.assign(W.randomLook(5), { h: 0.6 }), 'kid'),"
+                " R(Object.assign(W.randomLook(99), { shirt: 0x1f1f22, hair: 0x1d1d1d })), R(Object.assign(W.randomLook(12), { long: true, dress: true, shirt: 0xe8453c }))];"
+                "console.log('[label] matched ' + looks.map(l => l.model).join(' '));"
+                + LINE_DRAW + POST % 30}]
+    + [{"waitFor": "window.__line.every(o => window.__cft.W.hasModel(o.g))", "timeout": 180000}, {"wait": 1200}, {"shot": "c6-everyone-realistic"}]
 )
 
 # Boroughs (2026-11-17): a street in the home borough, a street in the next one (its banner showing), from above, the map.
@@ -391,6 +416,40 @@ CINESHOTS = (
     + cine_at("c7-outro-line", SUB_ON, 3000)
     + [NEXT] + cine_at("c8-mission-complete", "document.querySelector('.cft-cine-card.stamp.in')", 2000)
 )
+# Aerial views (2026-11-27, the user: "some areas of the city have huge holes"): the camera high over several spots, so holes
+# in the ground (unbuilt sub-tiles, terrain pits, seams between tiles) show at a glance. Pair with tools/live/holetest.js.
+AERIAL_AT = ("W.teleport(%d, %d); G.stepSim(1); for (let k = 0; k < 60; k++) W.pumpAt(%d, %d, 400);"
+             " const c = W.player.pos, gy = W.groundAt(c.x, c.z); W.cine = { pos: { x: c.x - 160, y: gy + %d, z: c.z + 160 }, look: { x: c.x, y: gy, z: c.z }, fov: 60 };")
+AERIAL = [{"waitFor": "window.__cft.W.groundTextures === true", "timeout": 60000}]
+for _i, (_x, _z, _h) in enumerate([(0, 0, 150), (900, -600, 170), (-1200, 700, 170), (1800, 1800, 190), (-2400, -900, 190), (0, 2600, 190)]):
+    AERIAL += scene("a%d-aerial-%d-%d" % (_i + 1, _x, _z), "s.m['c1-couch'] = { s: 'done', done: 1 }; s.clock = 12; s.settings.colour = false; if (G.color) G.color.apply('snap');"
+                    + AERIAL_AT % (_x, _z, _x, _z, _h), 40, 9000)
+
+# The address check on the start screen (2026-11-27): type an address, see the "Is this your place?" card + map, tap the map,
+# move in, and the new life is built at the pin. Real Nominatim / Photon / tiles (needs internet).
+ADDR_Q = "1234 Rue Saint-Denis, Montréal"
+ADDR = [
+    {"waitFor": "document.querySelector('.cft-start-form')", "timeout": 60000},
+    {"eval": "(() => { const f = document.querySelector('.cft-start-form'); f.elements.name.value = 'Tester'; f.elements.q.value = %s; f.requestSubmit(); return true; })()" % json.dumps(ADDR_Q)},
+    {"waitFor": "document.querySelector('[data-addr]:not([hidden]) .cft-addr-map img')", "timeout": 60000},
+    {"wait": 2500}, {"shot": "addr1-card"},
+    {"eval": "(() => { const b = document.querySelector('[data-addr]'), t = b.querySelector('.cft-addr-badge').textContent, s = b.querySelector('[data-ashort]').textContent;"
+             " window.__a1 = { t, s }; const m = b.querySelector('[data-amap]'), r = m.getBoundingClientRect();"
+             " m.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: r.left + r.width / 2 + 60, clientY: r.top + r.height / 2 + 20 })); return t + ' | ' + s; })()"},
+    {"wait": 3000}, {"shot": "addr2-pinned"},
+    {"eval": "(() => { const b = document.querySelector('[data-addr]'); window.__a2 = { t: b.querySelector('.cft-addr-badge').textContent, s: b.querySelector('[data-ashort]').textContent }; b.querySelector('[data-ago]').click(); return window.__a2; })()"},
+    {"waitFor": "window.__cft && window.__cft.state() === 'play'", "timeout": 180000},
+    {"wait": 1500},
+    {"eval": "(() => { const h = window.__cft.save.home, out = [], ok = (c, m) => out.push((c ? 'PASS ' : 'FAIL ') + m);"
+             " ok(/Best guess|Found your address/.test(window.__a1.t), 'the card says how sure it is: ' + window.__a1.t);"
+             " ok(/Saint-Denis/.test(window.__a1.s) && /Montr/.test(window.__a1.s), 'it shows the address it found: ' + window.__a1.s);"
+             " ok(h.lat > 45.50 && h.lat < 45.535 && h.lon > -73.60 && h.lon < -73.54, 'the found spot is in Montreal (not Laval): ' + h.lat.toFixed(4) + ', ' + h.lon.toFixed(4));"
+             " ok(/You placed the pin/.test(window.__a2.t), 'tapping the map moves the pin: ' + window.__a2.t);"
+             " ok(h.check === 'pinned', 'the life starts at the pin (home.check = ' + h.check + ', ' + (h.short || '') + ')');"
+             " return out; })()"},
+    {"shot": "addr3-moved-in"},
+]
+
 if evalfile:
     steps = START + [{"eval": evalfile}, {"wait": 1500}, {"shot": "eval"}]
 elif "--campshots" in flags:
@@ -409,6 +468,10 @@ elif "--shots" in flags:
     steps = START + SCENES
 elif "--ground" in flags:
     steps = START + GROUND
+elif "--aerial" in flags:
+    steps = START + AERIAL
+elif "--addr" in flags:
+    steps = ADDR
 elif "--castshots" in flags:
     steps = START + CAST
 elif "--crowdshots" in flags:
@@ -431,6 +494,8 @@ else:
         steps += script("combattest.js", "__cmbDone", "__cmbOut", 500000)
     elif "--hero" in flags:
         steps += script("herotest.js", "__heroDone", "__heroOut", 600000)
+    elif "--holes" in flags:
+        steps += script("holetest.js", "__holeDone", "__holeOut", 600000)
     elif "--rpg" in flags:
         steps += script("rpgtest.js", "__rpgDone", "__rpgOut", 500000)
     elif "--boro" in flags:
@@ -484,13 +549,13 @@ for line in r.stdout.splitlines():
                 passes += 1
             elif not item.startswith("INFO"):
                 fails += 1
-    elif line.startswith("[eval] ") and ("--shots" in flags or "--ground" in flags or "--castshots" in flags or "--crowdshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile):
+    elif line.startswith("[eval] ") and ("--shots" in flags or "--aerial" in flags or "--ground" in flags or "--castshots" in flags or "--crowdshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile):
         print(line)
     elif any(k in line for k in ("EXCEPTION", "console.error", "TIMEOUT", "EVAL ERROR", "driver error")):
         print(line)
         fails += 1
 print("screenshots:", out)
-if "--shots" in flags or "--ground" in flags or "--castshots" in flags or "--crowdshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile:
+if "--shots" in flags or "--aerial" in flags or "--ground" in flags or "--castshots" in flags or "--crowdshots" in flags or "--people" in flags or "--models" in flags or "--gfx" in flags or "--long" in flags or "--monsters" in flags or "--heroshots" in flags or "--boroshots" in flags or "--chaosshots" in flags or "--campshots" in flags or "--aimshots" in flags or "--stuntshots" in flags or "--cineshots" in flags or evalfile:
     sys.exit(1 if fails else 0)
 print("GAME TEST " + ("PASSED (%d checks)" % passes if not fails and passes else "FAILED (%d)" % fails))
 sys.exit(1 if fails or not passes else 0)

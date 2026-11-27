@@ -51,8 +51,13 @@ CROWD = {
 
 
 def meta(cid):
-    """What the game's picker (cft-world W.crowdFor) needs: gender, age, kid, skin tone (0-1 luminance), height."""
+    """What the game's picker (cft-world W.crowdFor) needs: gender, age, kid, skin tone (0-1 luminance), height, and
+    (2026-11-27, matching a player's own look or a named character to the nearest townsperson) hair colour hc, top colour
+    tc, long hair lh, facial hair fb, glasses gl."""
     c = CROWD[cid]
     a, ca, af = c["race"]
     tone = (a * 0.72 + ca * 0.82 + af * 0.42) / max(a + ca + af, 1e-6)
-    return dict(g=int(c["g"]), age=c["age"], kid=c["age"] < 14, tone=round(tone, 2), h=c["h"])
+    top = next((v.get("top") or v.get("whole") for k, v in c["clothes"].items() if "suit" in k and (v.get("top") or v.get("whole"))), "#808080")
+    long_hair = any(w in (c["hair"] or "") for w in ("long", "ponytail", "braid", "afro"))
+    return dict(g=int(c["g"]), age=c["age"], kid=c["age"] < 14, tone=round(tone, 2), h=c["h"],
+                hc=c["hair_col"], tc=top, lh=long_hair, fb=bool(c.get("facial")), gl="glasses" in (c.get("extra") or []))

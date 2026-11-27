@@ -870,6 +870,7 @@ function mount(root, opts) {
     if (id === 'sam' && save.pref === 'bf' && c.lookB) return Object.assign(W.randomLook(5), c.lookB);
     const look = Object.assign(W.randomLook(id.length * 131 + id.charCodeAt(0)), c.look || {}), mid = castModelFor(id);
     if (mid) { look.model = mid; look.h = 1; }   // the model has its own height
+    else if (!c.kid) W.crowdFor(look, c.elder ? 'elder' : null, { match: true });   // no Actor Troop model: the closest townsperson
     return look;
   }
   G.castLook = castLook;
@@ -880,7 +881,7 @@ function mount(root, opts) {
     if (c && c.animal) return W.animal(c.animal, c.color);
     if (id === 'kid' || (id && id.startsWith('kid:'))) {
       const k = save.kids[id === 'kid' ? 0 : +id.split(':')[1]] || { seed: 1, name: 'Kid' };
-      return W.person(Object.assign(W.randomLook(k.seed), { h: save.day - k.born > 12 ? 0.68 : 0.5, hat: null, bag: null }));
+      return W.realPerson(Object.assign(W.randomLook(k.seed), { h: save.day - k.born > 12 ? 0.68 : 0.5, hat: null, bag: null }), 'kid');
     }
     return W.person(castLook(id));
   }
@@ -1170,7 +1171,7 @@ function mount(root, opts) {
       for (const [key, s] of spots) {
         if (rt.actors.has(key) || Math.hypot(s.x - p.x, s.z - p.z) > 240) continue;
         let obj, name, e;
-        if (s.who === 'boss') { const crew = CREW[turfCrew(s.turf)]; obj = W.person(Object.assign(W.randomLook(crew.id.length * 99), crew.look)); name = crew.boss; e = crew.e; }
+        if (s.who === 'boss') { const crew = CREW[turfCrew(s.turf)]; obj = W.realPerson(Object.assign(W.randomLook(crew.id.length * 99), crew.look)); name = crew.boss; e = crew.e; }
         else { obj = makeCastObj(s.who); name = D.CAST[s.who].n; e = D.CAST[s.who].e; }
         // a fixed place on the pavement in front of their spot, facing the street (2026-11-24: the old random nudge put
         // givers inside shops); people sharing a spot stand a slot apart along the kerb
@@ -1874,7 +1875,7 @@ function mount(root, opts) {
       else if (crew.ch === 'quiz') res = await U.quiz(crew.id === 'latte' ? D.QUIZ.coffee : crew.id === 'oldmoney' ? D.QUIZ.posh : D.QUIZ.trivia, 3, { n: crew.boss, e: crew.e });
       else if (crew.ch === 'cred') res = true;
       else if (crew.ch === 'race') { const a = rt.actors.get('boss@' + id); startRace({ n: 4 + ring, time: 60 + ring * 12, x: a ? a.x : P().x, z: a ? a.z : P().z, onWin: () => winTurf(id), onFail: () => U.banner(crew.boss + ' wins this time', 'Talk to them to try again.', 'fail') }); return; }
-      else if (crew.ch === 'chase') { startChase({ obj: W.person(Object.assign(W.randomLook(9), crew.look)), name: crew.boss, taunt: crew.taunt.split('!')[0] + '!', speed: 6 + ring * 0.6, time: 60, onWin: () => winTurf(id), onFail: () => U.banner(crew.boss + ' got away', 'Talk to them to try again.', 'fail') }); return; }
+      else if (crew.ch === 'chase') { startChase({ obj: W.realPerson(Object.assign(W.randomLook(9), crew.look)), name: crew.boss, taunt: crew.taunt.split('!')[0] + '!', speed: 6 + ring * 0.6, time: 60, onWin: () => winTurf(id), onFail: () => U.banner(crew.boss + ' got away', 'Talk to them to try again.', 'fail') }); return; }
     } finally { rt.busy = false; }
     if (res) winTurf(id); else if (res === false) U.banner(crew.boss + ' wins this round', 'Try again when you\'re ready.', 'fail');
   }

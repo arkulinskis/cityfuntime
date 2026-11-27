@@ -83,6 +83,7 @@ saves), [modules/cft-game.md](modules/cft-game.md) (mount, loop).
 | 4 | three-gltf.js | `THREE.GLTFLoader` | glTF loader for figment models (vendor) | – |
 | 5 | cft-content.js | `CFT_DATA` (`D`) | every data table + `D.TUNE` balance knobs | [cft-content](modules/cft-content.md), [balance](balance.md) |
 | 6 | cft-tiles.js | `TileMaker` | MVT/protobuf decoder → sub-tiles | [cft-tiles](modules/cft-tiles.md) |
+| 6b | cft-addr.js | `CFTAddr` | start screen address lookup + check (since 2026-11-27) | [cft-addr](modules/cft-addr.md) |
 | 7 | cft-world.js | `CFTWorld` | the 3D city, player movement, camera, rides | [cft-world](modules/cft-world.md) |
 | 8 | cft-ui.js | `CFTUI` | HUD, feed, dialogs, phone, panels, minigames | [cft-ui](modules/cft-ui.md) |
 | 9 | cft-fun.js | `CFTFun` | street life + combat | [cft-fun](modules/cft-fun.md) |

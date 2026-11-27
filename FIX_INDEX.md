@@ -145,6 +145,10 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Talking animation, mouth, cheer | "mouth too big", "arms flap too much", "giver doesn't cheer" | cft-world `W.mouth`, poses `talk` `cheer` `phone` in `W.animate`; cft-game `updateActors` (`cheerT`) | | --cine --cineshots |
 | Subtitles, call card, letterbox look | "subtitles too small on phone", "bars too thick" | app.css block "voiced cinematic missions" (`--bar`, `.cft-cine-sub`), cft-cine `buildOverlay` | | --cineshots (also WINDOW=390,844) |
 | Play-test panel | | cft-debug.js (`?debug=1`) | | |
+| Start screen address ("wrong address", "moved me to another city", "card wrong") | "found the wrong street", "pin far from my door" | cft-addr.js `lookup` `score` `interpolate` `between` `beyond` `parse` (words: `TYPE`, `SAINT`); cft-ui `confirmAddress` `addrLookup` `streetTile` `ADDR_BADGE`; CSS `.cft-addr*` | score weights in `score`, `NEAR_M`, `MAX_TILES` | node tools/testing/addr_test.js, addr_live.js, --addr |
+| Holes in the ground, cliffs, banks too steep | "huge hole", "grey wall by the river", "square missing" | cft-world `cleanHeights` `decodeTerrain` (`DETAIL_M`, `boxBlur`) `terrainSource` `requestTerrain` (`TERR_TRIES`, `neighbourHeight`) `safeBuild` stand-in ground `t.ph` in pumpTiles, `W.groundCheck` | `SPIKE_M`, `DETAIL_M`, `EXAG`, `URGENT_R` | --holes, --aerial |
+| Grass tufts, pebbles (3D ground detail) | "grass too sparse", "pebbles on the road", "laggy in parks" | cft-world `updateDetail` `detCell` `detFill` `detKindAt` `detailMeshes` | `DET_KIND` (per-kind density + height), `DET_R`, `DET_CELL`, `DET_GRASS_MAX` | --ground |
+| Old-looking people (not realistic) | "this person looks blocky" | cft-world `W.crowdFor` (`match`), `W.realPerson`, `sillyTopper` (`TOPPER_OF`), `W.setLook`; cft-game `castLook`; data `D.CROWD_MODELS` (`build.py --crowd-manifest`) | | --crowdshots (c5, c6) |
 
 ## Tests (pick the narrowest)
 
@@ -160,6 +164,8 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | `python -I tools/live/game_test.py --aim` | right-mouse sight + slots, the web, weapon reach + arcs, gabled roofs, scaling, no level cap, rainbow guides, the Dex gallery | ~2 min |
 | `python -I tools/live/game_test.py --camp` | HUD + map size, crazy list + mission cap, the opening, ammo, powers, fire, storms, MEGA figments, secrets, bouncy world | ~2 min |
 | `python -I tools/live/game_test.py --boro` | borough names, looks, HUD chip, banners, discovery | ~1 min |
+| `python -I tools/live/game_test.py --holes` | elevation clean-up, every sub-tile built at six spots, no cliffs (`CFT_START="lat,lon"` = another city) | ~3 min |
+| `python -I tools/live/game_test.py --addr` | the start screen's address card: found, map, tap to move the pin, move in at the pin | ~2 min |
 | `... --fun` / `--combat` / `--rpg` | street life / monsters, health, guardians / loot, talents | 2-3 min each |
 | `... ` (no flag) | everything (gametest + fun + rpg + combat + hero) | 5-7 min |
 | `... --heroshots DIR` / `--shots` / `--monsters` / `--people` / `--models` | screenshots to look at (no checks) | 2-3 min |

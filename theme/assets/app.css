@@ -750,6 +750,23 @@ button.cft-slot { font: inherit; color: #1f1a3d; cursor: pointer; } .cft-slot.em
 .cft-places { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .cft-place { display: grid; justify-items: start; gap: 2px; text-align: left; padding: 10px; border: 2.5px solid #1f1a3d; border-radius: 14px; background: #fff8ea; box-shadow: 2px 2px 0 #1f1a3d; cursor: pointer; }
 .cft-place:hover { background: #ffe9a8; } .cft-place span { font-size: 1.5rem; font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif; } .cft-place b { font: 700 .9rem/1.15 var(--font-display); } .cft-place em { font-style: normal; font-size: .75rem; color: #5f5980; }
+/* the address check (2026-11-27): "Is this your place?" card under the search box (cft-ui confirmAddress) */
+.cft-addr { margin: 4px 0 14px; padding: 12px; border: 2.5px solid #1f1a3d; border-radius: 16px; background: #fffaf0; box-shadow: 3px 3px 0 #1f1a3d; }
+.cft-addr-head { display: grid; gap: 3px; margin-bottom: 10px; }
+.cft-addr-head b { font: 700 1.05rem/1.2 var(--font-display); color: #1f1a3d; overflow-wrap: anywhere; }
+.cft-addr-head small { font-size: .78rem; color: #5f5980; overflow-wrap: anywhere; }
+.cft-addr-badge { justify-self: start; font-weight: 800; font-size: .8rem; padding: 3px 10px; border-radius: 99px; border: 2px solid #1f1a3d; }
+.cft-addr-badge.ok { background: #d9f7e8; } .cft-addr-badge.warn { background: #ffe9a8; }
+.cft-addr-map { position: relative; height: 220px; overflow: hidden; border: 2.5px solid #1f1a3d; border-radius: 12px; background: #e9e4d8; cursor: crosshair; touch-action: manipulation; user-select: none; }
+.cft-addr-tiles img { position: absolute; width: 256px; height: 256px; max-width: none; pointer-events: none; }
+.cft-addr-pin { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -92%); font-size: 2.1rem; font-style: normal; line-height: 1; pointer-events: none; filter: drop-shadow(0 2px 1px rgba(0,0,0,.35)); font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif; }
+.cft-addr-zoom { position: absolute; right: 8px; top: 8px; display: grid; gap: 6px; }
+.cft-addr-zoom .cft-btn { min-width: 36px; min-height: 36px; padding: 0; font-size: 1.1rem; }
+.cft-addr-attr { position: absolute; right: 0; bottom: 0; font-size: .72rem; background: rgba(255,255,255,.85); padding: 1px 6px; border-top-left-radius: 6px; color: #1f1a3d; }
+.cft-addr-attr a { color: inherit; }
+.cft-addr [data-anote] { margin: 8px 0 4px; }
+.cft-addr-alt { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 2px; }
+.cft-addr-go { margin-top: 10px; }
 /* the phone */
 .cft-phone-wrap { display: grid; place-items: center; background: rgba(31,26,61,.4); padding: 12px; }
 .cft-phone { width: min(440px, 100%); height: min(760px, 100%); background: #fff8ea; border: 4px solid #1f1a3d; border-radius: 32px; box-shadow: 8px 8px 0 #1f1a3d; display: flex; flex-direction: column; overflow: hidden; animation: cft-phonein .25s cubic-bezier(.2,1.3,.4,1); }

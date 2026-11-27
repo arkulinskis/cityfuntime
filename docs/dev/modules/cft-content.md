@@ -450,3 +450,8 @@ Area flags for content in update sections: `--fun` (weapons, monsters, street fo
 - [ ] **Voice lines regenerated** for any added/changed `intro`/`say`/`outro` line (`python tools/voice_missions.py`, R2 upload, `python tools/assets.py`), and new speakers have a voice in `VOICES`.
 - [ ] **Rewards and prices** are in line with neighbouring missions / items of the same tier (no 10× outliers); server copies (`BIZ_COST` / `APT_VALUE` in server_code/Game.py) updated if business costs or apartment values change.
 - [ ] `node tools/live/content_check.mjs` prints `CONTENT OK`, `python tools/assets.py` was run, `python tools/check.py` passes, and the relevant `game_test.py` flag passes.
+
+## 2026-11-27: `D.CROWD_MODELS` fields
+Besides `file g age kid tone h crowd`: `hc` hair colour, `tc` top colour, `lh` long hair, `fb` facial hair, `gl` glasses
+(generated from `tools/cast_models/mpfb/crowd_looks.py` `meta` by `build.py --crowd-manifest`, no Blender needed).
+cft-world `W.crowdFor` uses them to match a named look to the closest townsperson.

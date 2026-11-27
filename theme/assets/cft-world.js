@@ -20,7 +20,7 @@
 'use strict';
 
 const CELL = 1.5, CH = 32, BUCKET = 25;
-const SHOW_R = 600, HIDE_R = 900, LOAD_R = 850;
+const SHOW_R = 600, HIDE_R = 900, LOAD_R = 850, URGENT_R = 140;
 const GRAV = 26;
 const EXAG = 1.5;  // hills are drawn 1.5x taller than real, so gentle slopes still show
 const TERRAIN_URL = 'https://tiles.mapterhorn.com/{z}/{x}/{y}.webp', TZ = 15, TZ_MIN = 8;
@@ -1303,7 +1303,7 @@ varying float vGL; varying vec2 vGUV;
     if (r.up) queueArchive(k);
     return r.buf.byteLength ? r.buf : null;
   }
-  async function decodeTerrain(buf) {
+  async function decodeTerrain(buf, z, y) {
     const blob = new Blob([buf], { type: 'image/webp' });
     let img;
     try { img = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }); }
@@ -1317,23 +1317,103 @@ varying float vGL; varying vec2 vGUV;
     const g = c.getContext('2d', { willReadFrequently: true });
     g.drawImage(img, 0, 0);
     if (img.close) img.close();
-    const d = g.getImageData(0, 0, N, N).data, n = N >> 1, h = new Float32Array(n * n);
-    const px = o => d[o] * 256 + d[o + 1] + d[o + 2] / 256 - 32768;
-    let mn = Infinity;
+    const d = g.getImageData(0, 0, N, N).data;
+    const full = cleanHeights(d, N);
+    const n = N >> 1, h = new Float32Array(n * n);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-      const o = (2 * j * N + 2 * i) * 4, v = (px(o) + px(o + 4) + px(o + N * 4) + px(o + N * 4 + 4)) / 4;
-      h[j * n + i] = v; if (v < mn) mn = v;
+      const o = 2 * j * N + 2 * i;
+      h[j * n + i] = (full[o] + full[o + 1] + full[o + N] + full[o + N + 1]) / 4;
     }
-    return { h, n, min: mn };
+    // Hills are drawn EXAG x taller, but only the broad shape (a DETAIL_M blur): banks, quays, trenches and railway cuts keep
+    // their real height. Stored = smooth + (raw - smooth) / EXAG, so (stored - h0) x EXAG = EXAG x (smooth - h0) + detail.
+    // Before 2026-11-27 a 10 m river quay became a 15 m grey wall and a sunken highway a canyon: holes, to the user's eye.
+    if (z != null) {
+      const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + 0.5) / Math.pow(2, z)))), pxM = 40075016.7 * Math.cos(lat) / Math.pow(2, z) / n;
+      const R = Math.round(DETAIL_M / pxM);
+      if (R >= 1) { const sm = boxBlur(h, n, R); for (let k = 0; k < n * n; k++) h[k] = sm[k] + (h[k] - sm[k]) / EXAG; }
+    }
+    let mn = Infinity;
+    for (let k = 0; k < n * n; k++) if (h[k] < mn) mn = h[k];
+    return { h, n, min: mn, fixed: full.fixed };
+  }
+  // Box blur of an n x n grid, radius R, rows then columns. Past the edge the grid is mirrored around the edge value
+  // (2 x edge - mirror), which keeps a straight slope straight, so neighbouring tiles meet without a step.
+  const DETAIL_M = 60;
+  function boxBlur(src, n, R) {
+    const tmp = new Float32Array(n * n), out = new Float32Array(n * n), ext = new Float32Array(n + 2 * R), w = 2 * R + 1;
+    const pass = (from, to, rowStep, colStep) => {
+      for (let r = 0; r < n; r++) {
+        const base = r * rowStep, at = i => from[base + i * colStep];
+        const e0 = at(0), e1 = at(n - 1);
+        for (let i = -R; i < n + R; i++) {
+          let v;
+          if (i < 0) v = 2 * e0 - at(Math.min(n - 1, -i));
+          else if (i >= n) v = 2 * e1 - at(Math.max(0, 2 * (n - 1) - i));
+          else v = at(i);
+          ext[i + R] = v;
+        }
+        let sum = 0;
+        for (let i = 0; i < w; i++) sum += ext[i];
+        for (let i = 0; i < n; i++) { to[base + i * colStep] = sum / w; sum += ext[i + w] - ext[i]; }
+      }
+    };
+    pass(src, tmp, n, 1);
+    pass(tmp, out, 1, n);
+    return out;
+  }
+  // Holes in the ground (2026-11-27, the user: "some areas of the city have huge holes, as if map topology data is bad").
+  // One wrong pixel used to become a pit: Terrarium puts 256 m in the red channel, so a browser that adds noise to canvas
+  // read-back (Brave, Safari private windows, privacy add-ons) or a no-data pixel (R=G=B=0 = -32768 m) drops a 3 m square
+  // hundreds of metres. Values outside -450..9000 m are dropped, a pixel more than SPIKE_M from the median of its 3 x 3
+  // neighbours takes that median, and dropped pixels are filled from their neighbours. A tile that is mostly unreadable throws
+  // (the caller tries a lower zoom, then keeps the area level with its neighbours). TERR_FIX counts the repairs (W.groundCheck).
+  const SPIKE_M = 12, TERR_FIX = { spikes: 0, filled: 0, unreadable: 0 };
+  function cleanHeights(d, N) {
+    const NN = N * N, H = new Float32Array(NN);
+    let bad = 0;
+    for (let k = 0; k < NN; k++) {
+      const o = k * 4, v = d[o] * 256 + d[o + 1] + d[o + 2] / 256 - 32768;
+      if (v > -450 && v < 9000) H[k] = v; else { H[k] = NaN; bad++; }
+    }
+    if (bad > NN * 0.5) { TERR_FIX.unreadable++; throw new Error('unreadable elevation tile'); }
+    const out = new Float32Array(NN), w = new Float32Array(9);
+    let spikes = 0, filled = 0;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const k = j * N + i, v = H[k];
+      let m = 0;
+      for (let b = -1; b <= 1; b++) { const jj = j + b; if (jj < 0 || jj >= N) continue; for (let a = -1; a <= 1; a++) { const ii = i + a; if (ii < 0 || ii >= N) continue; const q = H[jj * N + ii]; if (q === q) { let t = m++; while (t > 0 && w[t - 1] > q) { w[t] = w[t - 1]; t--; } w[t] = q; } } }
+      if (!m) { out[k] = NaN; continue; }
+      const med = m & 1 ? w[m >> 1] : (w[(m >> 1) - 1] + w[m >> 1]) / 2;
+      if (v !== v) { out[k] = med; filled++; } else if (Math.abs(v - med) > SPIKE_M) { out[k] = med; spikes++; } else out[k] = v;
+    }
+    // bigger no-data patches: grow inwards from the known edge, a ring per pass
+    for (let pass = 0, left = 1; left && pass < 64; pass++) {
+      left = 0;
+      for (let k = 0; k < NN; k++) {
+        if (out[k] === out[k]) continue;
+        const i = k % N; let sum = 0, c = 0;
+        if (i > 0 && out[k - 1] === out[k - 1]) { sum += out[k - 1]; c++; }
+        if (i < N - 1 && out[k + 1] === out[k + 1]) { sum += out[k + 1]; c++; }
+        if (k >= N && out[k - N] === out[k - N]) { sum += out[k - N]; c++; }
+        if (k < NN - N && out[k + N] === out[k + N]) { sum += out[k + N]; c++; }
+        if (c) { out[k] = sum / c; filled++; } else left++;
+      }
+    }
+    TERR_FIX.spikes += spikes; TERR_FIX.filled += filled;
+    out.fixed = spikes + filled;
+    return out;
   }
   function terrainSource(z, x, y) { // the best tile covering z/x/y: {h, n, min, z, x, y} or null (no heights at all)
     const k = z + '/' + x + '/' + y;
     let p = terr.src.get(k);
     if (!p) {
       p = (async () => {
-        const buf = await terrainBuffer(z, x, y);
-        if (buf) return Object.assign(await decodeTerrain(buf), { z, x, y });
-        return z > TZ_MIN ? terrainSource(z - 1, x >> 1, y >> 1) : null;
+        let buf = null, err = null;
+        try { buf = await terrainBuffer(z, x, y); if (buf) return Object.assign(await decodeTerrain(buf, z, y), { z, x, y }); }
+        catch (e) { err = e; }   // unreachable or unreadable: the coarser tile above still has the hill (2026-11-27)
+        if (z > TZ_MIN) { try { const up = await terrainSource(z - 1, x >> 1, y >> 1); if (up || !err) return up; } catch (e2) { if (!err) throw e2; } }
+        if (err) throw err;
+        return null;
       })();
       p.catch(() => terr.src.delete(k));
       terr.src.set(k, p);
@@ -1353,9 +1433,25 @@ varying float vGL; varying vec2 vGUV;
       if (g !== gen) return;
       console.warn('terrain', k, err);
       t.tries++;
-      if (t.tries >= 2) { t.state = 'flat'; onTerrain(t); } // give up: this square stays at home height
-      else { t.state = 'error'; t.retryAt = performance.now() + 2500; }
+      if (t.tries >= TERR_TRIES) { t.state = 'flat'; t.flatH = neighbourHeight(tx, ty); onTerrain(t); } // give up: level with the squares around it
+      else { t.state = 'error'; t.retryAt = performance.now() + 2500 * Math.pow(2, t.tries - 1); }
     }).finally(() => { if (g === gen) terr.inflight--; });
+  }
+  // A square whose heights never arrive is drawn level with the squares around it: the mean of their heights along the
+  // shared edges (home height only when nothing around it is known). It used to sit at home height, so on a hillside it
+  // became a pit or a mesa as wide as the square (~1 km): the "huge holes".
+  const TERR_TRIES = 5;
+  function neighbourHeight(tx, ty) {
+    let sum = 0, c = 0;
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const q = terr.tiles.get((tx + dx) + '/' + (ty + dy));
+      if (!q || q.state !== 'ready') continue;
+      for (let f = 0.1; f < 1; f += 0.2) {   // five points along the edge the two squares share
+        const gx = dx ? (dx < 0 ? tx : tx + 1) : tx + f, gy = dy ? (dy < 0 ? ty : ty + 1) : ty + f;
+        sum += sampleRaw(q, gx, gy); c++;
+      }
+    }
+    return c ? sum / c : null;
   }
   function onTerrain(t) {
     if (terr.h0 == null && !terr.off && t.k === terr.homeKey) {
@@ -1371,12 +1467,12 @@ varying float vGL; varying vec2 vGUV;
     const i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j, h = s.h, o = j * n + i;
     return (h[o] * (1 - fu) + h[o + 1] * fu) * (1 - fv) + (h[o + n] * (1 - fu) + h[o + n + 1] * fu) * fv;
   }
-  function elevAt(x, z) { // real metres above sea level, NaN while unknown
+  function elevAt(x, z) { // metres above sea level (local bumps scaled by 1/EXAG, see decodeTerrain), NaN while unknown
     if (!origin) return NaN;
     const [gx, gy] = to15(x, z), t = terr.tiles.get(Math.floor(gx) + '/' + Math.floor(gy));
     if (!t) return NaN;
     if (t.state === 'ready') return sampleRaw(t, gx, gy);
-    return t.state === 'flat' && terr.h0 != null ? terr.h0 : NaN;
+    return t.state === 'flat' && terr.h0 != null ? (t.flatH != null ? t.flatH : terr.h0) : NaN;
   }
   function node(i, j) { // ground height at grid node (i, j), cached once known
     const k = ckey(i, j), idx = (j - Math.floor(j / CH) * CH) * CH + (i - Math.floor(i / CH) * CH);
@@ -1485,7 +1581,8 @@ varying float vGL; varying vec2 vGUV;
   function requestTile(x, y) {
     const k = TM.key(x, y), g = gen;
     const M = origin.M, ox = (x - origin.gx0) * M, oz = (y - origin.gy0) * M;
-    const t = { k, x, y, state: 'loading', ox, oz, s: M / TM.EXT, subs: [], tries: (tiles.get(k) || {}).tries || 0 };
+    const old = tiles.get(k) || {};
+    const t = { k, x, y, state: 'loading', ox, oz, s: M / TM.EXT, subs: [], tries: old.tries || 0, ph: old.ph || null };
     tiles.set(k, t);
     inflight++;
     tileBuffer(x, y).then(buf => {
@@ -1496,6 +1593,7 @@ varying float vGL; varying vec2 vGUV;
         x1: ox + (i % n + 1) * w, z1: oz + (Math.floor(i / n) + 1) * w, reg: false, group: null }));
       allSubs.push(...t.subs);
       t.state = 'ready';
+      if (t.ph) { dropSub({ group: t.ph }); t.ph = null; }   // the stand-in ground goes: the real sub-tiles take over
     }).catch(err => {
       if (g !== gen) return;
       console.warn('tile', k, err);
@@ -1521,20 +1619,34 @@ varying float vGL; varying vec2 vGUV;
     }
     pumpTerrain(px, pz);
     pumpBoroughs(px, pz);
+    // A street tile that failed to load (retried with a back-off) gets plain ground meanwhile: without it, its 1.7 km square
+    // showed the far floor, metres below the hills (2026-11-27).
+    for (const t of tiles.values()) {
+      if (t.state === 'ready') continue;
+      const r = { x0: t.ox, z0: t.oz, x1: t.ox + M, z1: t.oz + M }, d = rectDist(r, px, pz);
+      if (t.ph && d > HIDE_R) { dropSub({ group: t.ph }); t.ph = null; }
+      else if (!t.ph && t.state === 'error' && d < SHOW_R && terrainReady(r, true)) {
+        const g = new THREE.Group(), gm = groundMesh(r);
+        if (gm) g.add(gm);
+        worldGroup.add(g); t.ph = g; W.stats.standIns++;
+      }
+    }
     ground.position.y = terr.minY - 1.5;
     const t0 = performance.now();
     for (const s of boro.stale) { // a borough's look arrived or changed: rebuild in place (the old group stays until the new one is up)
       if (performance.now() - t0 > budget) break;
       boro.stale.delete(s);
       if (!s.group) continue;
-      const old = s.group; buildSub(s); dropSub({ group: old }); s.canvas = drawSubMap(s);
+      const old = s.group; safeBuild(s); dropSub({ group: old }); s.canvas = drawSubMap(s);
     }
     const near = allSubs.map(s => [rectDist(s, px, pz), s]).sort((a, b) => a[0] - b[0]);
+    // an unbuilt sub-tile within URGENT_R (you drove, flew or took the metro there): a bigger budget, so the hole closes now
+    const bud = near.some(([d, s]) => d < URGENT_R && !s.group) ? Math.max(budget, 24) : budget;
     for (const [d, s] of near) {
       if (d < SHOW_R) {
-        if (performance.now() - t0 > budget) continue;
+        if (performance.now() - t0 > bud) continue;
         if (!s.reg) registerSub(s);
-        if (!s.group && terrainReady(s, true)) { const b0 = performance.now(); buildSub(s); W.stats.builds++; W.stats.buildMs += performance.now() - b0; W.stats.maxMs = Math.max(W.stats.maxMs, performance.now() - b0); }
+        if (!s.group && terrainReady(s, true)) { const b0 = performance.now(); safeBuild(s); W.stats.builds++; W.stats.buildMs += performance.now() - b0; W.stats.maxMs = Math.max(W.stats.maxMs, performance.now() - b0); }
       } else if (d > HIDE_R && s.group) dropSub(s);
     }
     busy = near.some(([d, s]) => d < SHOW_R && !s.group);
@@ -1543,8 +1655,43 @@ varying float vGL; varying vec2 vGUV;
       if (Math.hypot(Math.max(t.ox - px, 0, px - t.ox - M), Math.max(t.oz - pz, 0, pz - t.oz - M)) < SHOW_R) { busy = true; break; }
     }
   }
+  // A sub-tile whose map data breaks the builder (a bad polygon, NaN heights) still gets its ground, so it is never a hole
+  // down to the far floor; the error is counted (W.groundCheck) and logged once per sub-tile.
+  const buildErrors = [];
+  function safeBuild(s) {
+    try { buildSub(s); s.fallback = false; return; }
+    catch (e) {
+      if (!s.fallback) { console.warn('sub-tile', s.tile.k + '#' + s.idx, 'could not be built:', e && e.message); buildErrors.push({ k: s.tile.k + '#' + s.idx, err: String(e && e.message || e).slice(0, 120) }); }
+    }
+    const g = new THREE.Group(), gm = groundMesh(s);
+    if (gm) g.add(gm);
+    worldGroup.add(g);
+    s.group = g; s.fallback = true;
+  }
+  // The ground check (2026-11-27): everything that can leave a hole near (x, z), for tests and the play-test panel.
+  //   unbuilt  sub-tiles within r that have no 3D yet       fallback  sub-tiles that broke the builder (ground only)
+  //   flat     hills squares that never loaded (level with their neighbours)   tileErrors  street tiles still failing
+  //   spikes / filled  bad elevation pixels repaired so far    maxStep  the steepest step between two ground grid nodes
+  //   (metres over GS, the drawn ground) and where it is      unreadable  elevation tiles the browser could not read
+  W.groundCheck = (x, z, r) => {
+    r = r || SHOW_R;
+    const near = allSubs.filter(q => rectDist(q, x, z) < r);
+    let maxStep = 0, at = null;
+    if (terr.h0 != null) for (let j = Math.floor((z - r) / GS); j < (z + r) / GS; j++) for (let i = Math.floor((x - r) / GS); i < (x + r) / GS; i++) {
+      if (Math.hypot(i * GS - x, j * GS - z) > r) continue;
+      const tq = terr.tiles.get(to15(i * GS, j * GS).map(Math.floor).join('/'));
+      if (!tq || (tq.state !== 'ready' && tq.state !== 'flat')) continue;
+      const a = node(i, j), st = Math.max(Math.abs(node(i + 1, j) - a), Math.abs(node(i, j + 1) - a));
+      if (st > maxStep) { maxStep = st; at = { x: i * GS, z: j * GS }; }
+    }
+    return { subs: near.length, unbuilt: near.filter(q => !q.group).length, fallback: near.filter(q => q.fallback).length,
+      flat: [...terr.tiles.values()].filter(t => t.state === 'flat').length, tileErrors: [...tiles.values()].filter(t => t.state === 'error').length,
+      spikes: TERR_FIX.spikes, filled: TERR_FIX.filled, unreadable: TERR_FIX.unreadable, maxStep: Math.round(maxStep * 10) / 10, maxStepAt: at,
+      gs: GS, errors: buildErrors.slice(-5) };
+  };
+  W.cleanHeights = cleanHeights;   // tests: tools/live/holetest.js feeds it noisy pixels
   W.isBusy = () => busy;
-  W.stats = { builds: 0, buildMs: 0, maxMs: 0 }; // how long turning sub-tiles into 3D takes (tests, tuning)
+  W.stats = { builds: 0, buildMs: 0, maxMs: 0, standIns: 0 }; // how long turning sub-tiles into 3D takes (tests, tuning)
   // Registers (physics + data, no 3D) every loaded sub-tile within r of a point. Used to look further than SHOW_R.
   W.registerAround = (x, z, r) => { for (const s of allSubs) if (!s.reg && rectDist(s, x, z) < r) registerSub(s); };
   W.loadStatus = (x, z, r) => {
@@ -3673,7 +3820,7 @@ varying float vGL; varying vec2 vGUV;
     }
     let shield = null;
     if (look.shield) { shield = W.shieldMesh(look.shield.kind, look.shield.col); shield.position.set(-0.31, 1.0, 0.03); shield.rotation.y = Math.PI / 2; body.add(shield); }
-    g.userData = Object.assign(g.userData || {}, { body, head, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, handL, handR, phase: Math.random() * 6, kind: 'person', kid, shield, prop });
+    g.userData = Object.assign(g.userData || {}, { body, head, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, handL, handR, phase: Math.random() * 6, kind: 'person', kid, shield, prop, silly });
     body.scale.x = 1 + ((look.build || 1) - 1) * 0.6;
     g.scale.setScalar(look.h || 1);
     return g;
@@ -3852,6 +3999,15 @@ varying float vGL; varying vec2 vGUV;
       if (mk) obj.scale.setScalar(mk);   // townspeople: g is scaled by look.h, the model has its own height (W.crowdFor)
       g.add(obj);
       u.model = { obj, bones, hip: bones.Hips.position.clone(), k: 1 / ((holder.scale.y || 1) * (mk || 1)), blinkT: 1 + Math.random() * 4, blink: 0, miss: 0 };
+      if (u.silly && u.silly !== 'balloon' && bones.Head) {
+        if (src.top == null) {   // the crown of the head above the Head bone, in metres (rest pose), measured once per model
+          obj.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(obj), hp = bones.Head.getWorldPosition(new THREE.Vector3());
+          src.top = Math.min(0.32, Math.max(0.12, (box.max.y - hp.y) / Math.max(1e-6, g.scale.y * (mk || 1)) * 0.94));
+        }
+        const t = sillyTopper(u.silly, src.top);
+        if (t) { t.scale.setScalar(u.model.k); bones.Head.add(t); }
+      }
       modelPeople.add(g);
     });
   }
@@ -3860,22 +4016,56 @@ varying float vGL; varying vec2 vGUV;
   // build_crowd.py: one skinned mesh + one 1024 px atlas each). W.crowdFor(look, type) picks the one closest to a random
   // look: kid or adult, woman (long hair or a dress) or man, an older body for elders, the nearest skin tone, then the
   // look's own seed (look.hs) among the three best. Sets look.model + look.mk (model scale, so the height stays the
-  // model's own whatever look.h is; kids keep their small look.h for W.isKid). Passers-by with a silly extra stay
-  // built (the silliness lives on the built figure), and so does everyone on low quality.
+  // model's own whatever look.h is; kids keep their small look.h for W.isKid). Everyone on low quality stays built.
+  // Since 2026-11-27 (the user: "some models are up to date, and some are not") everybody is realistic, not only the
+  // passers-by: how = { match: true } also weighs the look's hair and shirt colour, beard, glasses and long hair against
+  // each townsperson (D.CROWD_MODELS hc / tc / fb / gl / lh) and takes the single closest one. Used for your own look
+  // (W.setLook), story characters without an Actor Troop model (cft-game castLook), your kids, sweethearts, street folk,
+  // shopkeepers and crew bosses. Passers-by with a silly extra are realistic too: the extra goes on the model's head
+  // (sillyTopper) or stays in the hand (the balloon).
   const skinTone = c => { _c.set(c == null ? 0xe9b98f : c); return 0.299 * _c.r + 0.587 * _c.g + 0.114 * _c.b; };
-  W.crowdFor = function (look, type) {
+  const _c2 = new THREE.Color();
+  const colGap = (a, b) => { if (a == null || b == null) return 0.3; _c.set(a); _c2.set(b); return Math.hypot(_c.r - _c2.r, _c.g - _c2.g, _c.b - _c2.b) / 1.732; };
+  W.crowdFor = function (look, type, how) {
     const M = W.crowdModels(), ids = Object.keys(M);
-    if (!ids.length || LOW || !W.modelsOn() || look.silly || look.model) return null;
-    const kid = W.isKid(look, type), fem = !!(look.dress || look.long), old = type === 'elder', tone = skinTone(look.skin);
+    if (!ids.length || LOW || !W.modelsOn() || look.model) return null;
+    const match = !!(how && how.match), grey = look.hair === 0xd9d4cc || look.hair === 0xc8c4be;
+    const kid = W.isKid(look, type), fem = !!(look.dress || look.long), old = type === 'elder' || (match && grey), tone = skinTone(look.skin);
+    const gap = id => {
+      const m = M[id];
+      let d = Math.abs(m.tone - tone) + (old ? (m.age >= 60 ? 0 : 0.4) : (m.age >= 60 ? 0.25 : 0));
+      if (match) d += 0.5 * colGap(m.hc, look.hair) + 0.35 * colGap(m.tc, look.shirt) + (look.beard ? (m.fb ? 0 : 0.3) : (m.fb ? 0.12 : 0))
+        + (look.glasses ? (m.gl ? 0 : 0.15) : (m.gl ? 0.08 : 0)) + (m.lh != null && !!m.lh !== !!look.long ? 0.12 : 0);
+      return d;
+    };
     const best = ids.filter(id => !!M[id].kid === kid && (kid || (M[id].g === 0) === fem))
-      .map(id => [Math.abs(M[id].tone - tone) + (old ? (M[id].age >= 60 ? 0 : 0.4) : (M[id].age >= 60 ? 0.25 : 0)), id])
-      .sort((a, b) => a[0] - b[0]).slice(0, 3);
+      .map(id => [gap(id), id]).sort((a, b) => a[0] - b[0]).slice(0, match ? 1 : 3);
     if (!best.length) return null;
     const id = best[(look.hs || 0) % best.length][1];
     look.model = id;
-    look.mk = kid ? 0.95 / 0.62 : (0.97 + ((look.hs || 0) % 7) * 0.01) / (look.h || 1);
+    look.mk = kid ? 0.95 / 0.62 : match ? 1 / (look.h || 1) : (0.97 + ((look.hs || 0) % 7) * 0.01) / (look.h || 1);
     return id;
   };
+  // W.realPerson(look, type): W.person with the closest realistic townsperson (a copy of look: saves keep the built look)
+  W.realPerson = (look, type) => { const l = Object.assign({}, look); W.crowdFor(l, type, { match: true }); return W.person(l); };
+  // A silly extra on a realistic model (2026-11-27): a party hat, a traffic cone, antlers, a propeller cap or a flower,
+  // parented to the model's Head bone (its rest frame matches the figure's head: +y up, -z forward). top = the crown of
+  // the head above the bone, measured once per model. Face and belly extras (moustache, nose glasses, duck ring,
+  // baguette) become a party hat or a cone; the balloon stays in the hand (it is kept, see wearModel).
+  const TOPPER_OF = { stache: 'party', nosegl: 'cone', duckring: 'party', baguette: 'cone' };
+  function sillyTopper(kind, top) {
+    kind = TOPPER_OF[kind] || kind;
+    const m = new Merge(), { sm: SM, ring: P_RING, dome: P_DOME } = PRIM_MID;
+    if (kind === 'party') { m.add(CONE, 0x7b52c7, 0.01, top + 0.1, 0.01, 0, 0, -0.2, 0.09, 0.2, 0.09); m.add(SM, 0xffd23f, 0.03, top + 0.21, 0.01, 0, 0, 0, 0.035, 0.035, 0.035); }
+    else if (kind === 'cone') { m.add(CONE, 0xff6a1a, 0, top + 0.12, 0, 0, 0, 0, 0.12, 0.26, 0.12); m.box(0.24, 0.025, 0.24, 0xff6a1a, 0, top - 0.005, 0); m.add(P_RING, 0xf4f1ea, 0, top + 0.1, 0, 0, 0, 0, 0.08, 0.03, 0.08); }
+    else if (kind === 'antlers') { for (const sx of [-1, 1]) { seg(m, TAPER, 0x8a5a2b, sx * 0.06, top - 0.02, 0, sx * 0.14, top + 0.16, 0.02, 0.016); seg(m, TAPER, 0x8a5a2b, sx * 0.1, top + 0.07, 0.01, sx * 0.05, top + 0.15, -0.02, 0.009); seg(m, TAPER, 0x8a5a2b, sx * 0.12, top + 0.12, 0.015, sx * 0.21, top + 0.15, 0, 0.009); } }
+    else if (kind === 'propeller') { m.add(P_DOME, 0xe8453c, 0, top - 0.04, 0, 0, 0, 0, 0.2, 0.13, 0.21); m.add(SM, 0xffd23f, 0, top + 0.05, 0, 0, 0, 0, 0.02, 0.05, 0.02); m.box(0.3, 0.008, 0.04, 0x2b6cb0, 0, top + 0.09, 0); }
+    else if (kind === 'flower') { for (let k = 0; k < 5; k++) { const a = k * 1.2566; m.add(SM, 0xff6fa8, 0.075, top - 0.05 + Math.cos(a) * 0.022, 0.02 + Math.sin(a) * 0.022, 0, 0, 0, 0.012, 0.024, 0.024); } m.add(SM, 0xffd23f, 0.085, top - 0.05, 0.02, 0, 0, 0, 0.013, 0.02, 0.02); }
+    else return null;
+    const o = m.mesh();
+    o.castShadow = false;
+    return o;
+  }
   function syncModels(dt) {
     for (const g of modelPeople) {
       const u = g.userData, m = u.model;
@@ -4476,7 +4666,7 @@ varying float vGL; varying vec2 vGUV;
   let body = null, rideMesh = null;
   W.setLook = function (look) {
     if (body) { avatar.remove(body); }
-    body = W.person(look);
+    body = look && !look.model ? W.realPerson(look, 'player') : W.person(look);   // your own look = the closest realistic townsperson
     avatar.add(body);
     body.traverse(o => { if (o.isMesh) o.castShadow = !LOW; });
     applyRidePose();
@@ -5690,7 +5880,8 @@ varying float vGL; varying vec2 vGUV;
   W.setOrigin = function (lat, lon) {
     gen++;
     for (const s of allSubs) if (s.group) dropSub(s);
-    tiles.clear(); allSubs = []; inflight = 0;
+    for (const t of tiles.values()) if (t.ph) dropSub({ group: t.ph });   // stand-in ground of failed tiles
+    tiles.clear(); allSubs = []; inflight = 0; detCells.clear(); detKey = '';
     buckets.clear(); nameBuckets.clear(); hchunks.clear(); rchunks.clear(); pchunks.clear(); lchunks.clear(); segBuckets.clear(); bridgeBuckets.clear();
     terr.tiles.clear(); terr.src.clear(); nodes.clear(); terr.inflight = 0; terr.h0 = null; terr.off = false; terr.minY = 0;
     W.places.length = 0; W.placeIds.clear();
@@ -5727,6 +5918,160 @@ varying float vGL; varying vec2 vGUV;
     const r = snapReq; snapReq = null;
     try { r.res(c.toDataURL('image/jpeg', 0.72)); } catch (e) { r.res(null); }
   }
+  // ---------------------------------------------------------------- ground detail: grass tufts + pebbles (2026-11-27)
+  // The user: "The floor also looks kind of flat. we need to make sure there is some 3d texture to it, small grass small
+  // pebbles". Real geometry near you: tufts of grass blades that sway in the wind on lawns, parks, woods and yards, and
+  // pebbles on yards, woods, sand and playgrounds. Never on roads, pavements, plazas, water or inside buildings.
+  // The ground is cut into DET_CELL cells; each cell's instances are worked out once (seeded by the cell, so they don't
+  // move when you come back) as soon as every sub-tile under it is built, and cached (DET_KEEP cells). Two InstancedMeshes
+  // (one draw call each) are refilled from the cells within DET_R whenever you cross into another cell; tufts and pebbles
+  // shrink to nothing over the last DET_FADE metres so the edge doesn't pop. Off on low quality. W.groundDetail() = stats.
+  const DET_CELL = 8, DET_R = 32, DET_FADE = 8, DET_KEEP = 400, DET_GRASS_MAX = 26000, DET_PEB_MAX = 7000;
+  // per kind: [tufts, pebbles] per cell (64 m²), tuft height range, the pebble palette
+  const DET_KIND = {
+    grass: [420, 6, 0.17, 0.33], park: [420, 6, 0.17, 0.33], cemetery: [360, 10, 0.12, 0.24], pitch: [520, 0, 0.06, 0.1],
+    wood: [300, 40, 0.16, 0.34], yard: [240, 24, 0.12, 0.24], sand: [0, 80, 0, 0], playground: [12, 60, 0.1, 0.18],
+  };
+  const DET_PEB_COL = { sand: [0xcdbb93, 0xb8a37a, 0xe0d2b0, 0x9c8b6a], playground: [0xcdbb93, 0xa89574, 0x8f8a80], wood: [0x6b5a48, 0x7d7468, 0x5a5048, 0x8a7a62], def: [0x8f8a82, 0x77736c, 0xa39d92, 0x6a655e, 0x9b8f7c] };
+  const DET_GRASS_COL = { wood: [0x4a6e32, 0x5b7a3a, 0x6b7a3a], pitch: [0x4f8f3a, 0x5a9a44], yard: [0x6d8f45, 0x7f9a4e, 0x8a9a52, 0x6a8a40], def: [0x5f9442, 0x6fa24c, 0x7aa852, 0x58893c] };
+  let detGrass = null, detPeb = null, detMat = null;
+  const detCells = new Map(), detUniforms = { uTime: { value: 0 } };
+  let detKey = '', detT = 0, detPending = 0;
+  function detailMeshes() {
+    if (detGrass) return;
+    // a clump: 9 blades spread over ~0.2 m, leaning outwards, dark at the root and light at the tip, normals up (lit like the lawn under it)
+    // vertex colours are light (the instance colour gives the green): root a little darker than the tip
+    const pos = [], col = [], nrm = [], dark = new THREE.Color(0x9aa88a), tip = new THREE.Color(0xfffbe8);
+    for (let b = 0; b < 9; b++) {
+      const a = b * 2.39996, r = 0.025 + (b / 9) * 0.085, lean = 0.05 + (b % 3) * 0.03, w = 0.026, h = 0.6 + ((b * 7) % 5) * 0.1;
+      const cx = Math.cos(a) * r, cz = Math.sin(a) * r, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
+      pos.push(cx - px, 0, cz - pz, cx + px, 0, cz + pz, cx + Math.cos(a) * lean, h, cz + Math.sin(a) * lean);
+      for (const c of [dark, dark, tip]) col.push(c.r, c.g, c.b);
+      for (let k = 0; k < 3; k++) nrm.push(0, 1, 0);
+    }
+    const gg = new THREE.BufferGeometry();
+    gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    gg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    gg.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    detMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    detMat.onBeforeCompile = sh => {   // wind: the tips sway, each tuft a little out of step with its neighbours
+      sh.uniforms.uTime = detUniforms.uTime;
+      sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        float detH = clamp(position.y, 0.0, 1.0);
+        #ifdef USE_INSTANCING
+          vec4 detP = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        #else
+          vec4 detP = vec4(0.0);
+        #endif
+        float detPh = detP.x * 0.37 + detP.z * 0.23;
+        transformed.x += sin(uTime * 1.7 + detPh) * 0.12 * detH * detH;
+        transformed.z += cos(uTime * 1.3 + detPh * 1.3) * 0.09 * detH * detH;`);
+      // double-sided, but both sides lit from above: three would turn the back face's normal down (black blades)
+      sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n\tnormal = normalize( vNormal );');
+    };
+    detMat.customProgramCacheKey = () => 'cft-grass';
+    greyify(detMat, 'b');   // grey like the trees until the block's nature comes back (colour blocks)
+    detGrass = new THREE.InstancedMesh(gg, detMat, DET_GRASS_MAX);
+    const pg = new THREE.IcosahedronGeometry(1, 0).toNonIndexed();
+    pg.computeVertexNormals();   // flat faces: chipped stones
+    const pm = greyify(new THREE.MeshLambertMaterial({ color: 0xffffff }), 'b');   // nature, like the grass
+    detPeb = new THREE.InstancedMesh(pg, pm, DET_PEB_MAX);
+    for (const m of [detGrass, detPeb]) { m.count = 0; m.frustumCulled = false; m.receiveShadow = true; m.castShadow = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); }
+    detGrass.setColorAt(0, _c.set(0xffffff)); detPeb.setColorAt(0, _c.set(0xffffff));   // creates instanceColor
+    detGrass.instanceColor.setUsage(THREE.DynamicDrawUsage); detPeb.instanceColor.setUsage(THREE.DynamicDrawUsage);
+  }
+  // What the ground is at (x, z) in sub-tile s: 'water' / 'plaza' / an AREA kind / 'yard' (bare terrain) / null (built on)
+  const DET_PRI = { water: 9, plaza: 8, sand: 7, playground: 7, pitch: 6, cemetery: 5, park: 4, grass: 4, wood: 3 };
+  function detKindAt(s, x, z) {
+    let best = null, bp = -1;
+    for (const a of s.water.length ? s.water.concat(s.areas) : s.areas) {
+      if (!a.bb) { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (let i = 0; i < a.p.length; i += 2) { x0 = Math.min(x0, a.p[i]); x1 = Math.max(x1, a.p[i]); z0 = Math.min(z0, a.p[i + 1]); z1 = Math.max(z1, a.p[i + 1]); } a.bb = [x0, x1, z0, z1]; a.rings = a.hs ? [a.p].concat(a.hs) : [a.p]; }
+      if (x < a.bb[0] || x > a.bb[1] || z < a.bb[2] || z > a.bb[3]) continue;
+      const pr = DET_PRI[a.k] || 1;
+      if (pr > bp && inRings(a.rings, x, z)) { best = a.k; bp = pr; }
+    }
+    return best || 'yard';
+  }
+  const detHash = (i, j) => { let h = Math.imul(i * 73856093 ^ j * 19349663, 0x9e3779b1); return () => { h = Math.imul(h ^ (h >>> 15), 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); return ((h ^= h >>> 16) >>> 0) / 4294967296; }; };
+  function detCell(ci, cj) {   // { g: [x, y, z, yaw, s, colour, ...], p: [...] } or null while the sub-tiles under it aren't built
+    const x0 = ci * DET_CELL, z0 = cj * DET_CELL, x1 = x0 + DET_CELL, z1 = z0 + DET_CELL;
+    const subs = allSubs.filter(s => s.x1 > x0 && s.x0 < x1 && s.z1 > z0 && s.z0 < z1);
+    if (!subs.length || subs.some(s => !s.group || !s.reg)) return null;
+    const rnd = detHash(ci, cj), g = [], p = [];
+    const kindOf = (x, z) => { const s = subs.find(q => x >= q.x0 && x < q.x1 && z >= q.z0 && z < q.z1); return s ? detKindAt(s, x, z) : null; };
+    const clear = (x, z) => !heightAt(x, z) && !roadAt(x, z) && !paveAt(x, z);
+    // a few probes say what is in the cell: an empty city block costs almost nothing
+    const probe = new Set();
+    for (const [u, v] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75], [0.5, 0.5]]) { const x = x0 + u * DET_CELL, z = z0 + v * DET_CELL; if (clear(x, z)) probe.add(kindOf(x, z)); }
+    const maxG = Math.max(0, ...[...probe].map(k => (DET_KIND[k] || [0, 0])[0])), maxP = Math.max(0, ...[...probe].map(k => (DET_KIND[k] || [0, 0])[1]));
+    for (let n = 0; n < maxG + maxP; n++) {
+      const x = x0 + rnd() * DET_CELL, z = z0 + rnd() * DET_CELL, r1 = rnd(), r2 = rnd(), r3 = rnd();
+      if (!clear(x, z)) continue;
+      const k = kindOf(x, z), d = DET_KIND[k];
+      if (!d) continue;
+      const lift = AREA[k] ? AREA[k][1] + 0.03 : 0, y = groundAt(x, z) + lift;
+      if (n < maxG) {
+        if (r1 * maxG > d[0]) continue;   // this kind has fewer tufts than the cell's densest kind
+        const pal = DET_GRASS_COL[k] || DET_GRASS_COL.def;
+        g.push(x, y - 0.01, z, r2 * 6.283, d[2] + (d[3] - d[2]) * r3, pal[Math.floor(r2 * pal.length) % pal.length]);
+      } else {
+        if (r1 * maxP > d[1]) continue;
+        const pal = DET_PEB_COL[k] || DET_PEB_COL.def;
+        p.push(x, y, z, r2 * 6.283, 0.03 + r3 * r3 * 0.09, pal[Math.floor(r3 * 97) % pal.length]);
+      }
+    }
+    return { g, p };
+  }
+  const _dq = new THREE.Quaternion(), _dy = new THREE.Vector3(0, 1, 0), _dv = new THREE.Vector3(), _ds = new THREE.Vector3(), _dm = new THREE.Matrix4(), _de = new THREE.Euler();
+  function detFill(px, pz) {
+    const ci0 = Math.floor((px - DET_R) / DET_CELL), ci1 = Math.floor((px + DET_R) / DET_CELL), cj0 = Math.floor((pz - DET_R) / DET_CELL), cj1 = Math.floor((pz + DET_R) / DET_CELL);
+    let ng = 0, np = 0, made = 0;
+    detPending = 0;
+    const put = (mesh, arr, i, max, cnt, peb) => {
+      for (let k = 0; k < arr.length && cnt < max; k += 6) {
+        const x = arr[k], z = arr[k + 2], d = Math.hypot(x - px, z - pz);
+        if (d > DET_R) continue;
+        const f = Math.min(1, (DET_R - d) / DET_FADE), sc = arr[k + 4] * (f * f * (3 - 2 * f));
+        if (sc < 0.004) continue;
+        if (peb) { _de.set(arr[k + 3], arr[k + 3] * 1.7, arr[k + 3] * 0.6); _dq.setFromEuler(_de); _ds.set(sc, sc * (0.45 + (arr[k + 3] % 1) * 0.35), sc * (0.8 + (arr[k + 3] % 0.5))); }
+        else { _dq.setFromAxisAngle(_dy, arr[k + 3]); _ds.set(sc * 1.1, sc, sc * 1.1); }
+        _dm.compose(_dv.set(x, arr[k + 1], z), _dq, _ds);
+        mesh.setMatrixAt(cnt, _dm);
+        mesh.setColorAt(cnt, _c.set(arr[k + 5]));
+        cnt++;
+      }
+      return cnt;
+    };
+    for (let cj = cj0; cj <= cj1; cj++) for (let ci = ci0; ci <= ci1; ci++) {
+      const cx = (ci + 0.5) * DET_CELL, cz = (cj + 0.5) * DET_CELL;
+      if (Math.hypot(Math.max(Math.abs(cx - px) - DET_CELL / 2, 0), Math.max(Math.abs(cz - pz) - DET_CELL / 2, 0)) > DET_R) continue;
+      const key = ci + ',' + cj;
+      let c = detCells.get(key);
+      if (!c) {
+        if (made >= 40) { detPending++; continue; }   // at most 40 new cells per fill: the rest next time
+        c = detCell(ci, cj); made++;
+        if (!c) { detPending++; continue; }
+        detCells.set(key, c);
+        if (detCells.size > DET_KEEP) detCells.delete(detCells.keys().next().value);
+      }
+      ng = put(detGrass, c.g, 0, DET_GRASS_MAX, ng, false);
+      np = put(detPeb, c.p, 0, DET_PEB_MAX, np, true);
+    }
+    detGrass.count = ng; detPeb.count = np;
+    detGrass.instanceMatrix.needsUpdate = detPeb.instanceMatrix.needsUpdate = true;
+    if (detGrass.instanceColor) detGrass.instanceColor.needsUpdate = true;
+    if (detPeb.instanceColor) detPeb.instanceColor.needsUpdate = true;
+  }
+  function updateDetail(dt) {
+    if (LOW || W.detailOff) { if (detGrass) detGrass.count = detPeb.count = 0; return; }
+    detUniforms.uTime.value += dt;
+    detailMeshes();
+    const px = player.pos.x, pz = player.pos.z, key = Math.floor(px / 4) + ',' + Math.floor(pz / 4);
+    detT -= dt;
+    if (key !== detKey || (detPending && detT <= 0)) { detKey = key; detT = 0.5; detFill(px, pz); }
+  }
+  W.groundDetail = () => ({ grass: detGrass ? detGrass.count : 0, pebbles: detPeb ? detPeb.count : 0, cells: detCells.size, pending: detPending });
+  W.refreshDetail = () => { detCells.clear(); detKey = ''; };
   W.frame = function (dt, opts) {
     if (!origin) return;
     opts = opts || {};
@@ -5739,6 +6084,7 @@ varying float vGL; varying vec2 vGUV;
     updateArcs(dt);
     updateSmash(dt);
     updateLod(dt);
+    updateDetail(dt);
     updateCamera(dt);
     updateSky(dt);
     if (opts.render === false) return;

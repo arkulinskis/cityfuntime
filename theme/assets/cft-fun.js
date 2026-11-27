@@ -795,7 +795,7 @@ function attach(G, api) {
       for (const c of f.crushes) {
         const q = G.xz(c), d = Math.hypot(q.x - p.x, q.z - p.z), a = F.sweet.get(c.id);
         if (!a && d < 170) {
-          const obj = W.person(Object.assign(W.randomLook(c.id.length * 77 + c.name.charCodeAt(0)), c.look));
+          const obj = W.realPerson(Object.assign(W.randomLook(c.id.length * 77 + c.name.charCodeAt(0)), c.look));
           const tag = nameTag('💕 ' + c.name, 2.4 / (obj.scale.y || 1)); obj.add(tag);
           place(obj, q.x, q.z, Math.random() * 6.28);
           W.scene.add(obj);
@@ -897,7 +897,7 @@ function attach(G, api) {
       const a = G.ll(k.x, k.z);
       f.folkAt[d.id] = { lat: Math.round(a.lat * 1e6) / 1e6, lon: Math.round(a.lon * 1e6) / 1e6, yaw: Math.round(yaw * 100) / 100, day: s.day };
     }
-    const obj = new THREE.Group(), fig = W.person(folkLook(d));
+    const obj = new THREE.Group(), fig = W.realPerson(folkLook(d), d.elder ? 'elder' : null);
     obj.add(fig);
     const mat = W.propMesh('blanket'); mat.position.set(0, 0.02, 0.1); obj.add(mat);
     const cup = W.propMesh('cup'); cup.position.set(0.55, 0.05, -0.6); obj.add(cup);
@@ -1032,7 +1032,7 @@ function attach(G, api) {
   }
   function keeperObj(pl) {
     const seed = (pl.name || 'x').length * 131 + (pl.name || 'x').charCodeAt(0) * 7;
-    const g = W.person(Object.assign(W.randomLook(seed), { apron: 0xf4f1ea, hat: pl.kind === 'bakery' || pl.kind === 'restaurant' ? 0xffffff : null, bag: null, dress: false, shorts: false, mood: 'angry', sleeve: 'short' }));
+    const g = W.realPerson(Object.assign(W.randomLook(seed), { apron: 0xf4f1ea, hat: pl.kind === 'bakery' || pl.kind === 'restaurant' ? 0xffffff : null, bag: null, dress: false, shorts: false, mood: 'angry', sleeve: 'short' }));
     const pin = W.propMesh('pin'); pin.position.set(0, -0.03, 0); pin.rotation.x = 0.4; g.userData.handR.add(pin);
     const tag = W.label('💢', { bg: '#ff5c8a', fg: '#fff', size: 56, height: 0.8, border: '#1f1a3d', depthTest: false }); tag.position.y = 2.9; g.add(tag);
     return g;

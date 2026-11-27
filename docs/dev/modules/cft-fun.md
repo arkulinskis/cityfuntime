@@ -239,3 +239,7 @@ Pitfalls:
 - [ ] Menus use `api.setBusy` with `finally`.
 - [ ] No pranks/bans on real (non-virtual) places; Tim Hortons never named.
 - [ ] Ran `content_check.mjs`, `check.py` and the matching `game_test.py` flag; `python tools/assets.py` after editing theme/assets.
+
+## 2026-11-27: realistic street people
+Sweethearts (`updateSweet` crush spawns), street folk (`spawnFolk`, `folkLook`) and shopkeepers who chase you are built
+with `W.realPerson` (the closest realistic townsperson to their look; cft-world). Low quality keeps the built figures.

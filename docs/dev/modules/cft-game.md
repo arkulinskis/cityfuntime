@@ -490,3 +490,8 @@ Pitfalls:
 - [ ] Dynamic missions (`dyn`) are cleaned up on finish and abandon.
 - [ ] `python tools/assets.py` run; `python tools/check.py` passes; the relevant `game_test.py` flag (and the full run for mission/economy changes) passes; `content_check.mjs` for content.
 - [ ] Every function named in the diff's comments exists; line ranges in these docs still roughly right (`python -I tools/doc_check.py --lines`).
+
+## 2026-11-27: realistic story characters and kids
+`castLook(id)`: a story character without an Actor Troop model (or the giver whose model you took) gets the closest
+realistic townsperson (`W.crowdFor(look, type, { match: true })`, see cft-world). `makeCastObj` builds your kids with
+`W.realPerson(look, 'kid')`; the crew bosses (turf scenes, the chase) with `W.realPerson`.

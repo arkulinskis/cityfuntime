@@ -7,7 +7,7 @@
      client/server Python file, type-checked against Anvil's API stubs. Kit files shared by all apps (SEO, legal) are
      reported but don't fail the check.
   2. node --check on the JavaScript engines in theme/assets.
-  3. Asset hashes in anvil.yaml are current (tools/assets.py).
+  3. Asset hashes in anvil.yaml are current (tools/assets.py); Start over + the address check (node, offline).
   4. Server tests (tools/testing/test_server.py, strict Anvil mock).
   4b. Developer docs (docs/dev) only name functions, files and paths that exist (tools/doc_check.py).
   5. The design check (APP_MAKER/tools/design_check.py): printed as a note, never fails the run.
@@ -87,6 +87,8 @@ def main():
         print("     (anvil.yaml was updated with new asset hashes: commit it)")
     r = run(["node", str(ROOT / "tools" / "testing" / "reset_test.js")], timeout=60)
     step("start over wipes the life", r.returncode == 0, (r.stdout + r.stderr)[-2000:])
+    r = run(["node", str(ROOT / "tools" / "testing" / "addr_test.js")], timeout=60)
+    step("the start screen's address check (offline)", r.returncode == 0, (r.stdout + r.stderr)[-2000:])
     r = run([sys.executable, str(ROOT / "tools" / "testing" / "test_server.py")], timeout=600)
     step("server tests: " + (r.stdout.strip().splitlines() or ["?"])[-1], r.returncode == 0 and "ALL OK" in r.stdout,
          (r.stdout + r.stderr)[-3000:])

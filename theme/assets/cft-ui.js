@@ -475,7 +475,8 @@ function create(G, root) {
             <h3>2 · Where do you live?</h3>
             <p class="muted small">Type your address or any place on Earth. The city around it becomes your game world. (The address is looked up on OpenStreetMap.)</p>
             <div class="cft-search"><input name="q" placeholder="1234 Rue Saint-Denis, Montréal" autocomplete="street-address"><button class="cft-btn primary" type="submit">Move in</button></div>
-            <div class="cft-search-row"><button class="cft-btn" type="button" data-loc>📍 Use where I am</button><span class="cft-msg" data-msg></span></div>
+            <div class="cft-search-row"><button class="cft-btn" type="button" data-loc>📍 Use where I am</button><span class="cft-msg" data-msg aria-live="polite"></span></div>
+            <div class="cft-addr" data-addr hidden></div>
             <p class="muted small">Or pick a neighbourhood:</p>
             <div class="cft-places">${PLACES.map((p, k) => '<button type="button" class="cft-place" data-p="' + k + '"><span>' + p.e + '</span><b>' + esc(p.name) + '</b><em>' + esc(p.city) + '</em></button>').join('')}</div>
           </form>
@@ -507,19 +508,34 @@ function create(G, root) {
         ov.close();
         resolve({ name: name.slice(0, 20), look, home });
       };
+      // The address check (2026-11-27): what was found is shown on a small map before you move in (confirmAddress).
+      const box = ov.el.querySelector('[data-addr]');
+      let asking = 0;
       f.addEventListener('submit', async e => {
         e.preventDefault();
         const q = f.elements.q.value.trim();
         if (!q) { msg.textContent = 'Type an address, or pick a neighbourhood below.'; return; }
-        msg.textContent = 'Looking it up...';
-        try { const p = await geocode(q); if (!p) { msg.textContent = 'Couldn\'t find that. Try adding the city.'; return; } done(p); }
-        catch (err) { msg.textContent = 'The address search isn\'t reachable. You can type coordinates, like 45.52, -73.58'; }
+        msg.textContent = 'Looking it up...'; box.hidden = true;
+        const my = ++asking;
+        let r;
+        try { r = await addrLookup(q); }
+        catch (err) { if (my === asking) msg.textContent = 'The address search isn\'t reachable. You can type coordinates, like 45.52, -73.58'; return; }
+        if (my !== asking) return;
+        if (r.status === 'coords') { msg.textContent = ''; done(r.best); return; }   // typed coordinates are exact
+        if (r.status === 'none') { msg.textContent = 'Couldn\'t find that. Check the spelling and add the city, like "1234 Rue Saint-Denis, Montréal".'; return; }
+        msg.textContent = '';
+        confirmAddress(box, r, done, () => { box.hidden = true; f.elements.q.focus(); f.elements.q.select(); });
       });
       ov.el.querySelector('[data-loc]').onclick = () => {
         if (!navigator.geolocation) { msg.textContent = 'This browser can\'t share your location.'; return; }
         msg.textContent = 'Finding you...';
-        navigator.geolocation.getCurrentPosition(pos => done({ lat: pos.coords.latitude, lon: pos.coords.longitude, label: 'Where I live', short: 'My neighbourhood' }),
-          () => { msg.textContent = 'Location wasn\'t shared. Type your address instead.'; }, { timeout: 15000 });
+        navigator.geolocation.getCurrentPosition(async pos => {
+          const lat = pos.coords.latitude, lon = pos.coords.longitude, acc = pos.coords.accuracy || 0;
+          const name = await window.CFTAddr.reverse(lat, lon, addrOpts());
+          msg.textContent = '';
+          confirmAddress(box, { status: 'gps', best: { lat, lon, short: name || 'My neighbourhood', label: name || 'Where I am' }, list: [],
+            note: acc > 80 ? 'Your browser placed you within ' + Math.round(acc) + ' m.' : '' }, done, () => { box.hidden = true; });
+        }, () => { msg.textContent = 'Location wasn\'t shared. Type your address instead.'; }, { timeout: 15000 });
       };
       ov.el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const p = PLACES[+b.dataset.p]; done({ lat: p.lat, lon: p.lon, label: p.name + ', ' + p.city, short: p.name }); });
     });
@@ -673,25 +689,110 @@ function create(G, root) {
     });
     ov.el.addEventListener('change', e => { const f = e.target.closest('[data-flag]'); if (f) { cur[f.dataset.flag] = f.checked; apply(); } });
   };
-  async function geocode(q) {
-    const m = q.match(/^\s*(-?\d{1,2}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
-    if (m) return { lat: +m[1], lon: +m[2], label: q.trim(), short: q.trim() };
-    try {
-      const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=' + encodeURIComponent(q));
-      const j = await r.json();
-      if (j && j[0]) {
-        const a = j[0].address || {};
-        const short = [[a.house_number, a.road].filter(Boolean).join(' '), a.city || a.town || a.village || a.suburb].filter(Boolean).join(', ');
-        return { lat: +j[0].lat, lon: +j[0].lon, label: j[0].display_name, short: short || q };
+  // ------------------------------------------------------------------ the address check (2026-11-27)
+  // cft-addr.js finds and scores the address (window.CFTAddr); this is the network glue and the "Is this your place?" card.
+  const fetchJson = async (url, ms) => {
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = ctl && setTimeout(() => ctl.abort(), ms || 9000);
+    try { const r = await fetch(url, ctl ? { signal: ctl.signal } : {}); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
+    finally { if (tm) clearTimeout(tm); }
+  };
+  let tileTpl = null;
+  async function streetTile(x, y) {   // the same zoom-14 OpenFreeMap tiles the city is built from (cft-world tileUrl)
+    const TM = window.TileMaker;
+    if (!tileTpl) {
+      try { const c = JSON.parse(localStorage.getItem('cityfuntime.tileurl') || 'null'); if (c && Date.now() - c.t < 86400000) tileTpl = c.u; } catch (e) { /* private mode */ }
+      if (!tileTpl) { tileTpl = (await fetchJson(TM.TILEJSON)).tiles[0]; try { localStorage.setItem('cityfuntime.tileurl', JSON.stringify({ u: tileTpl, t: Date.now() })); } catch (e) { /* private mode */ } }
+    }
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = ctl && setTimeout(() => ctl.abort(), 8000);
+    try { const r = await fetch(tileTpl.replace('{z}', TM.Z).replace('{x}', x).replace('{y}', y), ctl ? { signal: ctl.signal } : {}); return r.ok ? await r.arrayBuffer() : null; }
+    finally { if (tm) clearTimeout(tm); }
+  }
+  const addrOpts = () => ({ get: url => fetchJson(url), tile: streetTile, TM: window.TileMaker, lang: (navigator.language || 'en').slice(0, 5) });
+  const addrLookup = q => window.CFTAddr.lookup(q, addrOpts());
+  // The card: a badge saying how sure the match is, the address, a small OpenStreetMap map with the pin (tap to move it
+  // onto your building, + / - to zoom), other answers to pick, then "Yes, move in here" or "Search again".
+  const ADDR_BADGE = {
+    exact: ['ok', '✅ Found your address'], guess: ['warn', '📍 Best guess for your number'], street: ['warn', '⚠️ Found the street, not the number'],
+    place: ['ok', '📍 Found this place'], gps: ['ok', '📍 Where your browser says you are'], pinned: ['ok', '📌 You placed the pin'],
+  };
+  U.confirmAddress = confirmAddress;   // tests
+  function confirmAddress(box, r, done, back) {
+    const st = { status: r.status, lat: r.best.lat, lon: r.best.lon, short: r.best.short, label: r.best.label || r.best.short, note: r.note || '',
+      z: r.status === 'place' ? 15 : r.status === 'street' ? 16 : 17, list: r.list || [] };
+    let revT = null, revN = 0;
+    const explain = () => {
+      if (st.status === 'exact') return 'The pin is on your building. Not right? Tap the map where you live.';
+      if (st.status === 'guess') return 'Your number isn\'t on the map, so the pin is ' + st.note + '. Tap the map on your building to fix it.';
+      if (st.status === 'street') return 'The ' + st.note + '. The pin is somewhere on the street: tap the map on your building, or search again with a nearby number.';
+      if (st.status === 'pinned') return 'Your world will be built around the pin.';
+      if (st.status === 'gps') return (st.note ? st.note + ' ' : '') + 'Tap the map on your building if the pin is off.';
+      return 'Your world will be built around the pin. Tap the map to move it.';
+    };
+    function draw() {
+      const [cls, title] = ADDR_BADGE[st.status] || ADDR_BADGE.place;
+      box.innerHTML = '<div class="cft-addr-head"><span class="cft-addr-badge ' + cls + '">' + title + '</span><b data-ashort>' + esc(st.short) + '</b>' +
+          (st.label && st.label !== st.short ? '<small>' + esc(st.label) + '</small>' : '') + '</div>' +
+        '<div class="cft-addr-map" data-amap role="application" aria-label="Map: tap to move the pin to your building"><div class="cft-addr-tiles" data-atiles></div><i class="cft-addr-pin" aria-hidden="true">📍</i>' +
+          '<div class="cft-addr-zoom"><button type="button" class="cft-btn sm" data-az="1" aria-label="Zoom in">+</button><button type="button" class="cft-btn sm" data-az="-1" aria-label="Zoom out">−</button></div>' +
+          '<span class="cft-addr-attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</span></div>' +
+        '<p class="muted small" data-anote>' + esc(explain()) + '</p>' +
+        (st.list.length ? '<div class="cft-addr-alt"><span class="muted small">Or did you mean:</span>' + st.list.map((c, k) => '<button type="button" class="cft-chipb" data-aalt="' + k + '">' + esc(c.short || c.label) + '</button>').join('') + '</div>' : '') +
+        '<div class="cft-row cft-addr-go"><button type="button" class="cft-btn primary" data-ago>🏠 Yes, move in here</button><button type="button" class="cft-btn" data-aback>Search again</button></div>';
+      box.hidden = false;
+      tiles();
+    }
+    function tiles() {
+      const map = box.querySelector('[data-amap]'), layer = box.querySelector('[data-atiles]');
+      const w = map.clientWidth || 360, h = map.clientHeight || 220, n = Math.pow(2, st.z);
+      const cx = (st.lon + 180) / 360 * n * 256, la = st.lat * Math.PI / 180, cy = (1 - Math.log(Math.tan(la) + 1 / Math.cos(la)) / Math.PI) / 2 * n * 256;
+      const x0 = cx - w / 2, y0 = cy - h / 2;
+      let html = '';
+      for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + h) / 256); ty++) for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + w) / 256); tx++) {
+        if (ty < 0 || ty >= n) continue;
+        const wx = ((tx % n) + n) % n;
+        html += '<img alt="" draggable="false" src="https://tile.openstreetmap.org/' + st.z + '/' + wx + '/' + ty + '.png" style="left:' + Math.round(tx * 256 - x0) + 'px;top:' + Math.round(ty * 256 - y0) + 'px">';
       }
-    } catch (e) { /* try the next service */ }
-    const r = await fetch('https://photon.komoot.io/api/?limit=1&q=' + encodeURIComponent(q));
-    const j = await r.json();
-    const ft = j.features && j.features[0];
-    if (!ft) return null;
-    const p = ft.properties || {};
-    const short = [[p.housenumber, p.street || p.name].filter(Boolean).join(' '), p.city].filter(Boolean).join(', ');
-    return { lat: ft.geometry.coordinates[1], lon: ft.geometry.coordinates[0], label: short || q, short: short || q };
+      layer.innerHTML = html;
+      map._view = { x0, y0, n };
+    }
+    function moveTo(lat, lon, why) {
+      st.lat = lat; st.lon = lon; st.status = why || 'pinned';
+      if (why === 'pinned') {
+        st.short = 'Your pin'; st.label = 'Looking up the address there...';
+        clearTimeout(revT);
+        const my = ++revN;
+        revT = setTimeout(async () => {
+          const name = await window.CFTAddr.reverse(lat, lon, addrOpts());
+          if (my !== revN) return;
+          st.short = name || 'Your pin'; st.label = name ? 'near the pin' : '';
+          const b = box.querySelector('[data-ashort]'); if (b) b.textContent = st.short;
+          const sm = box.querySelector('.cft-addr-head small'); if (sm) sm.textContent = st.label; else if (st.label && b) b.insertAdjacentHTML('afterend', '<small>' + esc(st.label) + '</small>');
+        }, 700);   // Nominatim asks for at most one request a second
+      }
+      draw();
+    }
+    box.onclick = e => {
+      const z = e.target.closest('[data-az]'), alt = e.target.closest('[data-aalt]');
+      if (z) { st.z = Math.max(12, Math.min(19, st.z + +z.dataset.az)); tiles(); return; }
+      if (alt) {
+        const c = st.list[+alt.dataset.aalt];
+        st.list = st.list.filter(x => x !== c).concat(st.status !== 'pinned' ? [{ lat: st.lat, lon: st.lon, short: st.short, label: st.label, status: st.status, note: st.note }] : []);
+        st.short = c.short || c.label; st.label = c.label || st.short; st.note = c.note || '';
+        moveTo(c.lat, c.lon, c.status || (c.exact ? 'exact' : 'place'));
+        return;
+      }
+      if (e.target.closest('[data-ago]')) { clearTimeout(revT); revN++; done({ lat: st.lat, lon: st.lon, label: st.label && st.label !== 'near the pin' && st.label.indexOf('Looking up') ? st.label : st.short, short: st.short, check: st.status }); return; }
+      if (e.target.closest('[data-aback]')) { clearTimeout(revT); revN++; back(); return; }
+      const map = e.target.closest('[data-amap]');
+      if (map && map._view && !e.target.closest('a,button')) {
+        const rc = map.getBoundingClientRect(), v = map._view, gx = v.x0 + (e.clientX - rc.left), gy = v.y0 + (e.clientY - rc.top);
+        const lon = gx / (v.n * 256) * 360 - 180, m = Math.PI - 2 * Math.PI * gy / (v.n * 256);
+        moveTo(180 / Math.PI * Math.atan(Math.sinh(m)), lon, 'pinned');
+      }
+    };
+    draw();
+    if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const go = box.querySelector('[data-ago]'); if (go) go.focus({ preventScroll: true });
   }
 
   // ------------------------------------------------------------------ HUD

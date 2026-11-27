@@ -393,19 +393,20 @@ native_deps:
     <!-- Prepsto feedback panel: every "Submit feedback" link and button opens it (it is the only feedback channel). No floating button, no cookies, nothing loads until it is opened. Codes: APP_MAKER/prepsto-links.json -->
     <script src="https://prepsto.com/_/theme/widget.js" data-prepsto="xz9nut9" data-button="false" data-label="Submit feedback" async></script>
     <link rel="stylesheet" href="_/theme/icons.css?v=8f508d76cd">
-    <link rel="stylesheet" href="_/theme/app.css?v=31eaaf54a0">
+    <link rel="stylesheet" href="_/theme/app.css?v=2319f5f084">
     <script src="_/theme/app-kit.js?v=9ddf8e5515"></script>
     <script src="_/theme/ark-music.js?v=4ee0f1e082"></script>
-    <script src="_/theme/cft-kit.js?v=9a404d0f27"></script>
+    <script src="_/theme/cft-kit.js?v=8a5e433489"></script>
     <!-- the game engine, loaded only when a page needs it (cft-kit.js reads these; tools/assets.py keeps ?v= current) -->
     <meta name="cft-asset" content="_/theme/three.min.js?v=a13f10ad8e">
     <meta name="cft-asset" content="_/theme/cft-post.js?v=59fe67cd9e">
     <meta name="cft-asset" content="_/theme/cft-gfx.js?v=e86de9d16f">
     <meta name="cft-asset" content="_/theme/three-gltf.js?v=a19eaa4fef">
-    <meta name="cft-asset" content="_/theme/cft-content.js?v=9909c81762">
+    <meta name="cft-asset" content="_/theme/cft-content.js?v=702ebb73d1">
     <meta name="cft-asset" content="_/theme/cft-tiles.js?v=e580641d28">
-    <meta name="cft-asset" content="_/theme/cft-world.js?v=0ef786087c">
-    <meta name="cft-asset" content="_/theme/cft-fun.js?v=6e1b40018c">
+    <meta name="cft-asset" content="_/theme/cft-addr.js?v=bedc0a18ce">
+    <meta name="cft-asset" content="_/theme/cft-world.js?v=ba8e891e8e">
+    <meta name="cft-asset" content="_/theme/cft-fun.js?v=59bfc7c333">
     <meta name="cft-asset" content="_/theme/cft-rpg.js?v=8912d65110">
     <meta name="cft-asset" content="_/theme/cft-hero.js?v=ce59f1c2cf">
     <meta name="cft-asset" content="_/theme/cft-chaos.js?v=d25eec6d1f">
@@ -418,8 +419,8 @@ native_deps:
     <meta name="cft-asset" content="_/theme/cft-cine.js?v=672ac11e9e">
     <meta name="cft-asset" content="_/theme/cft-debug.js?v=14d9d860dc">
     <meta name="cft-asset" content="_/theme/cft-wiki.js?v=dd1832505e">
-    <meta name="cft-asset" content="_/theme/cft-ui.js?v=9aa26b4d09">
-    <meta name="cft-asset" content="_/theme/cft-game.js?v=78d8bcb0d1">
+    <meta name="cft-asset" content="_/theme/cft-ui.js?v=adae01b898">
+    <meta name="cft-asset" content="_/theme/cft-game.js?v=d6b6fd105d">
 package_name: City_Fun_Time
 runtime_options:
   client_version: '3'

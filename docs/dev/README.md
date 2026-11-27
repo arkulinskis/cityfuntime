@@ -41,7 +41,7 @@ internal structure, state, flow, tunables, how to test, how to modify, review ch
 | [cft-game](modules/cft-game.md) — rules `G`, loop, save schema | [cft-rpg](modules/cft-rpg.md) — loot, talents, reputation | [cft-cine](modules/cft-cine.md) — cinematics + voice pipeline |
 | [cft-world](modules/cft-world.md) — 3D city `W` | [cft-hero](modules/cft-hero.md) — hype, swagger, outposts | [cft-wiki](modules/cft-wiki.md) — Admin > Balance |
 | [cft-content](modules/cft-content.md) — data dictionary | [cft-chaos](modules/cft-chaos.md) — toys, mayhem, flying | [cft-debug](modules/cft-debug.md) — `?debug=1` panel |
-| [cft-tiles](modules/cft-tiles.md) — map tile decoder | [cft-camp](modules/cft-camp.md) — campaign | |
+| [cft-tiles](modules/cft-tiles.md) — map tile decoder | [cft-camp](modules/cft-camp.md) — campaign | [cft-addr](modules/cft-addr.md) — start screen address check |
 | [cft-gfx](modules/cft-gfx.md) — materials | [cft-wild](modules/cft-wild.md) — stamina, climbing | |
 | [cft-post](modules/cft-post.md) — post-processing | [cft-aim](modules/cft-aim.md) — shooter, web tether | |
 | | [cft-color](modules/cft-color.md) — colour blocks | |
