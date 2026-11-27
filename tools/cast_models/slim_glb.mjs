@@ -18,7 +18,7 @@ await MeshoptSimplifier.ready;
 for (const f of fs.readdirSync(inDir).filter(f => f.endsWith('.glb'))) {
   const doc = await io.read(path.join(inDir, f));
   for (const mesh of doc.getRoot().listMeshes()) for (const p of mesh.listPrimitives()) p.setAttribute('TANGENT', null);
-  for (const m of doc.getRoot().listMaterials()) m.setNormalTexture(null);
+  if (!process.env.KEEP_NORMALS) for (const m of doc.getRoot().listMaterials()) m.setNormalTexture(null);   // the MPFB build keeps its cloth normal maps
   await doc.transform(
     dedup(), weld(),
     simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.0006 }),

@@ -8,12 +8,14 @@ map-backup stub that remembers which tiles it was asked to keep. Map tiles come 
 internet. tools/live/game_test.py starts this by itself. ?wiki=1 shows Admin > Balance (cft-wiki.js) instead of the game.
 """
 import http.server
+import os
 import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 ASSETS = ROOT / "theme" / "assets"
 ENGINE = ["three.min.js", "cft-post.js", "cft-gfx.js", "three-gltf.js", "cft-content.js", "cft-tiles.js", "cft-world.js", "cft-ui.js", "cft-fun.js", "cft-rpg.js", "cft-hero.js", "cft-chaos.js", "cft-camp.js", "cft-wild.js", "cft-aim.js", "cft-color.js", "cft-stunt.js", "cft-vo.js", "cft-cine.js", "cft-debug.js", "cft-game.js"]
+LOCAL_MODELS = pathlib.Path(os.environ["CFT_LOCAL_MODELS"]).resolve() if os.environ.get("CFT_LOCAL_MODELS") else None
 TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg"}
 
 PAGE = """<!doctype html>
@@ -29,7 +31,7 @@ PAGE = """<!doctype html>
 <script src="_/theme/cft-kit.js?v=%(v)s"></script>
 <script>
   // the pretend server: what client_code/cft.py + server_code would answer
-  window.HARNESS = { archived: [], calls: [] };
+  window.HARNESS = { archived: [], calls: [] };%(models)s
   window.CFT_HOST = { call: function (fn, argsJson) {
     var args = JSON.parse(argsJson || '[]'); window.HARNESS.calls.push(fn);
     if (fn === 'tile_archive') { window.HARNESS.archived = window.HARNESS.archived.concat(args[0]); return JSON.stringify({ result: { have: args[0], full: false } }); }
@@ -58,7 +60,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             v = str(int(max(f.stat().st_mtime for f in ASSETS.glob("*.js"))))
             metas = "\n".join('<meta name="cft-asset" content="_/theme/%s?v=%s">' % (n, v) for n in ENGINE)
-            return self.send(200, "text/html; charset=utf-8", (PAGE % {"v": v, "metas": metas}).encode("utf-8"))
+            models = " window.CFT_MODEL_BASE = '_/models/';" if LOCAL_MODELS else ""
+            return self.send(200, "text/html; charset=utf-8", (PAGE % {"v": v, "metas": metas, "models": models}).encode("utf-8"))
+        if path.startswith("/_/models/") and LOCAL_MODELS:   # CFT_LOCAL_MODELS=<dir>: cast models from disk instead of R2
+            f = (LOCAL_MODELS / path[len("/_/models/"):]).resolve()
+            if LOCAL_MODELS in f.parents and f.is_file():
+                return self.send(200, "model/gltf-binary", f.read_bytes())
         if path.startswith("/_/theme/"):
             f = (ASSETS / path[len("/_/theme/"):]).resolve()
             if ASSETS in f.parents and f.is_file():

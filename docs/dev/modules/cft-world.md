@@ -449,7 +449,7 @@ What to look at:
    strength, exposure, warmth, saturation), `SKY` / `SKY_TOP` for sky colours; `W.setClock` applies them. Test:
    `--balance`, `--shots`.
 9. **Add a ground texture layer.** Append to `TEX` (order = layer index) and `TL`, add the photo via
-   `tools/ground_textures.py`; the shader arrays size themselves from `NT`. **Also update `cgPatch`'s `ground` pick**,
+   `tools/ground_render.py` (Blender, 2026-11-27; it also writes the `-n` normal map) or the older `tools/ground_textures.py`; the shader arrays size themselves from `NT`. **Also update `cgPatch`'s `ground` pick**,
    which hard-codes which layer numbers count as nature (−1, 2, 3, 5) vs streets. Test: `--ground`, `--color`.
 10. **Add a new world material.** Put it in `MAT`, call `greyify(mat, 'r'|'g'|'b')` (or it ignores colour blocks), and if
     it is used by InstancedMeshes with per-instance colour give it its own material (see pitfalls). Any custom
@@ -508,3 +508,11 @@ What to look at:
 - [ ] Event listeners added via `on(...)`.
 - [ ] The narrowest game test for the change was run and its screenshots looked at; `python -I tools/check.py` passes
       (this page's names still exist).
+
+
+## Visual upgrade 2026-11-27 (Blender assets)
+
+- **Ground normal maps**: `TEX[i].nk` (strength), `GU.groundNrm` (second texture array, 512 px, 256 on low), `loadGroundNormals` (photo layers load `ground-<f>-n.jpg` from `tools/ground_render.py`, green flipped because the image's up is -v here; drawn layers get `drawnNormals`, a Sobel of the drawing's brightness). `groundify` tilts the lit normal in `normal_fragment_maps` (tangent x = world x, y = world z), fading with distance. `W.groundNormals` = loaded.
+- **Bark and classes**: `MAT.trunk` is `GFX.pbr({ bark: true })` on high quality. `PROP_K` gives Merge colours a surface class when no `kOf`/`KOF` is set (bench slats = 10 wood, dark street-furniture greys = 3 metal): those get the cft-gfx detail textures.
+- **Figment models**: `mon-*.glb` are re-textured in Blender by `tools/monster_render.py` (own UVs, baked colour x creature surface x AO, normal map); `loadMonsters` (`?v=2`) passes the glTF `normalMap` and roughness through.
+- **Cast models**: built in Blender (`tools/cast_models/mpfb/build_cast.py`, MPFB humans) since 2026-11-27; same bone names and rest convention, so `MODEL_JOINTS` / `syncModels` are unchanged.

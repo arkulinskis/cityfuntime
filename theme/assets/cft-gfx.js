@@ -7,7 +7,10 @@
      side walls, floor, ceiling, furniture) that lights up at night. Street floors get shop windows and doors.
    - roofMaterial(): flat roofs (membrane / gravel with seams), pitched roofs (shingle rows), plain sides.
    - pbr(mat): turns a vertex-coloured material into MeshStandard with a per-vertex surface class `mk` (Merge.as / kOf in
-     cft-world): 0 matte, 1 car paint, 2 glass, 3 metal, 4 skin, 5 wet / eyes, 6 cloth, 7 hair, 8 leaves, 9 plastic.
+     cft-world): 0 matte, 1 car paint, 2 glass, 3 metal, 4 skin, 5 wet / eyes, 6 cloth, 7 hair, 8 leaves, 9 plastic,
+     10 wood, 11 bark. Bark, leaves, wood, metal and matte (faint weathering) also get a Blender-rendered detail texture
+     (theme/assets/mat-*.jpg from tools/material_render.py; MAT_TEX below): projected triplanar in object space, colour
+     divided by its average (the vertex colour stays the colour), height bump-mapped in screen space.
    - env(renderer): a small sky scene rendered into a PMREM environment map (reflections on paint, glass, windows),
      refreshed when the time of day moves on.
    const X = CFTGfx.create(THREE, renderer)   X.U = shared uniforms (uNight, uDay, uSkyTop, uSkyLow, uSun)
@@ -311,8 +314,18 @@ void roofSurface(vec3 base) {
 
 // ------------------------------------------------------------------ surface classes for merged models
 const PBR_HEAD = NOISE + `
-varying float vMK; varying vec3 vLP;
+varying float vMK; varying vec3 vLP; varying vec3 vLN;
+uniform highp sampler2DArray matTex; uniform float mOn; uniform vec3 mMean[5]; uniform float mScale[5]; uniform float mK[5]; uniform float mBump[5];
+float gMH = 0.0; float gMB = 0.0;
+// triplanar sample of detail layer L at object position p, object normal n
+vec4 matSample(int L, vec3 p, vec3 n) {
+	vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z + 1e-4);
+	float s = 1.0 / mScale[L], l = float(L);
+	return texture(matTex, vec3(p.zy * s, l)) * w.x + texture(matTex, vec3(p.xz * s, l)) * w.y + texture(matTex, vec3(p.xy * s, l)) * w.z;
+}
 `;
+// Detail textures (2026-11-27): name, metres per tile, colour strength, bump strength. Order = tools/material_render.py ORDER.
+const MAT_TEX = [['bark', 0.9, 1.0, 0.06], ['leaves', 0.55, 0.85, 0.07], ['wood', 1.1, 0.85, 0.035], ['grime', 2.4, 0.35, 0.015], ['metal', 0.5, 0.5, 0.01]];
 
 const ENV_K = 0.5;   // how much the sky's environment map lights and reflects (the hemisphere light does the rest)
 function create(THREE, renderer) {
@@ -321,6 +334,37 @@ function create(THREE, renderer) {
     uNight: { value: 0 }, uDay: { value: 1 }, uDbg: { value: 0 },
     uSkyTop: { value: new THREE.Color(0x4f8fe0) }, uSkyLow: { value: new THREE.Color(0xaecde9) },
   };
+  const blank = new THREE.DataArrayTexture(new Uint8Array(4 * MAT_TEX.length).fill(255), 1, 1, MAT_TEX.length);
+  blank.needsUpdate = true;
+  const MU = X.MU = {
+    matTex: { value: blank }, mOn: { value: 0 }, mMean: { value: MAT_TEX.map(() => new THREE.Vector3(1, 1, 1)) },
+    mScale: { value: MAT_TEX.map(t => t[1]) }, mK: { value: MAT_TEX.map(t => t[2]) }, mBump: { value: MAT_TEX.map(t => t[3]) },
+  };
+  // colour + height (alpha) of every layer in one texture array; until it loads the materials look as before
+  (function loadMat() {
+    const S = 512, base = window.CFT_ASSET_BASE || '_/theme/';
+    const one = f => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = base + f + '?v=1'; });
+    Promise.all(MAT_TEX.map(t => Promise.all([one('mat-' + t[0] + '.jpg'), one('mat-' + t[0] + '-h.jpg')]))).then(pairs => {
+      if (pairs.some(p => !p[0] || !p[1])) return;
+      const cv = document.createElement('canvas'); cv.width = cv.height = S;
+      const g = cv.getContext('2d', { willReadFrequently: true }), data = new Uint8Array(S * S * 4 * MAT_TEX.length);
+      pairs.forEach(([c, h], i) => {
+        g.drawImage(h, 0, 0, S, S); const hp = g.getImageData(0, 0, S, S).data;
+        g.drawImage(c, 0, 0, S, S); const cp = g.getImageData(0, 0, S, S).data;
+        let r = 0, gg = 0, b = 0, n = 0;
+        for (let k = 0; k < cp.length; k += 4) { cp[k + 3] = hp[k]; if (!(k % 28)) { r += cp[k]; gg += cp[k + 1]; b += cp[k + 2]; n++; } }
+        MU.mMean.value[i].set(r / n / 255, gg / n / 255, b / n / 255);
+        data.set(cp, i * S * S * 4);
+      });
+      const tex = new THREE.DataArrayTexture(data, S, S, MAT_TEX.length);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
+      tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+      tex.needsUpdate = true;
+      MU.matTex.value = tex; MU.mOn.value = 1;
+      X.matReady = true;
+    });
+  })();
   const tangentNormal = `
 	{
 		vec3 nT = normalize((viewMatrix * vec4(normalize(vec3(vWN.z, 0.0, -vWN.x)), 0.0)).xyz);
@@ -372,13 +416,25 @@ function create(THREE, renderer) {
   X.pbr = function (o) {
     o = o || {};
     const mat = new THREE.MeshStandardMaterial({ vertexColors: o.vertexColors !== false, color: o.color == null ? 0xffffff : o.color, roughness: o.rough || 0.78, metalness: 0, envMapIntensity: ENV_K, transparent: !!o.transparent, opacity: o.opacity == null ? 1 : o.opacity });
-    const key = 'cft-pbr' + (o.leaf ? '-leaf' : '');
+    const key = 'cft-pbr' + (o.leaf ? '-leaf' : o.bark ? '-bark' : '');
     mat.onBeforeCompile = sh => {
-      sh.vertexShader = 'attribute float mk;\nvarying float vMK; varying vec3 vLP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvMK = mk; vLP = position;');
+      Object.assign(sh.uniforms, MU);
+      sh.vertexShader = 'attribute float mk;\nvarying float vMK; varying vec3 vLP; varying vec3 vLN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvMK = mk; vLP = position; vLN = objectNormal;');
       sh.fragmentShader = PBR_HEAD + sh.fragmentShader
         .replace('#include <color_fragment>', `#include <color_fragment>
 	int K = int(vMK + 0.5);
-	${o.leaf ? 'K = 8;' : ''}
+	${o.leaf ? 'K = 8;' : o.bark ? 'K = 11;' : ''}
+	{   // Blender-rendered detail texture for bark / leaves / wood / matte / metal
+		int L = K == 11 ? 0 : K == 8 ? 1 : K == 10 ? 2 : K == 0 ? 3 : K == 3 ? 4 : -1;
+		vec3 fwP = fwidth(vLP);
+		if (mOn > 0.5 && L >= 0) {
+			vec4 t = matSample(L, vLP, normalize(vLN));
+			diffuseColor.rgb *= mix(vec3(1.0), t.rgb / mMean[L], mK[L]);
+			// bump only while a texel still covers a pixel or more (minified it would just sparkle)
+			float tpp = max(fwP.x, max(fwP.y, fwP.z)) / mScale[L] * 512.0;
+			gMH = t.a; gMB = mBump[L] * (1.0 - smoothstep(0.7, 2.5, tpp));
+		}
+	}
 	float fwL = max(fwidth(vLP.x), max(fwidth(vLP.y), fwidth(vLP.z)));
 	float dK = 1.0 - smoothstep(0.004, 0.02, fwL);
 	if (K == 6) diffuseColor.rgb *= 1.0 - dK * 0.09 * step(0.5, fract((vLP.x + vLP.y * 0.7 + vLP.z) * 90.0));   // cloth weave
@@ -386,7 +442,15 @@ function create(THREE, renderer) {
 	if (K == 8) diffuseColor.rgb *= 0.78 + 0.4 * gn2(vLP.xz * 7.0 + vLP.y * 5.0);                               // leaves: lighter / darker clumps
 	if (K == 4) diffuseColor.rgb *= 0.97 + 0.05 * gn2(vLP.xy * 80.0);`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-	roughnessFactor = K == 1 ? 0.26 : K == 2 ? 0.05 : K == 3 ? 0.28 : K == 4 ? 0.52 : K == 5 ? 0.12 : K == 6 ? 0.95 : K == 7 ? 0.42 : K == 8 ? 0.82 : K == 9 ? 0.38 : roughnessFactor;`)
+	roughnessFactor = K == 1 ? 0.26 : K == 2 ? 0.05 : K == 3 ? 0.28 : K == 4 ? 0.52 : K == 5 ? 0.12 : K == 6 ? 0.95 : K == 7 ? 0.42 : K == 8 ? 0.82 : K == 9 ? 0.38 : K == 10 ? 0.8 : K == 11 ? 0.92 : roughnessFactor;`)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+	if (gMB > 0.0) {   // bump from the detail height (three's perturbNormalArb, screen-space derivatives)
+		vec2 dH = vec2(dFdx(gMH), dFdy(gMH)) * gMB;
+		vec3 sx = dFdx(-vViewPosition), sy = dFdy(-vViewPosition);
+		vec3 r1 = cross(sy, normal), r2 = cross(normal, sx);
+		float det = dot(sx, r1) * faceDirection;
+		normal = normalize(abs(det) * normal - sign(det) * (dH.x * r1 + dH.y * r2));
+	}`)
         .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
 	metalnessFactor = K == 3 ? 0.9 : K == 1 ? 0.12 : 0.0;`)
         .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>

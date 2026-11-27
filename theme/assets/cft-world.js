@@ -210,7 +210,7 @@ function create(opts) {
     terrain: new THREE.MeshLambertMaterial({ vertexColors: true }),   // photo-textured (groundify, below)
     // parks, water, roads draped on the hills: pulled towards the camera so they never flicker into the ground
     drape: new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }),
-    trunk: new THREE.MeshLambertMaterial({ color: 0x6b4f37 }),
+    trunk: GFX ? GFX.pbr({ bark: true }) : new THREE.MeshLambertMaterial({ color: 0x6b4f37 }),   // bark texture (cft-gfx MAT_TEX)
     crown: GFX ? GFX.pbr({ vertexColors: false, leaf: true }) : new THREE.MeshLambertMaterial({ color: 0xffffff }),
     vc: GFX ? GFX.pbr() : new THREE.MeshLambertMaterial({ vertexColors: true }),
     glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
@@ -235,15 +235,19 @@ function create(opts) {
   // `real` of the photo's own hues. m = metres one photo covers (their real size), k = how strong the detail is.
   // Without WebGL2, or until the photos load, the ground looks as it did before (plain colours).
   const TEX = [
-    { f: 'asphalt', m: 7.0, k: 1.0, real: 0, draw: cartoonRoad },  // 0 car roads, service lanes, cycleways, road paint (drawn, not a photo)
-    { f: 'sidewalk', m: 6.0, k: 1.0, real: 0.65, draw: cartoonPavement },  // 1 pavements: drawn herringbone brick laid along the street (bricks 0.5 x 0.25 m)
+    { f: 'asphalt', m: 7.0, k: 1.0, real: 0, draw: cartoonRoad, nk: 0.45 },  // 0 car roads, service lanes, cycleways, road paint (drawn, not a photo)
+    { f: 'sidewalk', m: 6.0, k: 1.0, real: 0.65, draw: cartoonPavement, nk: 0.7 },  // 1 pavements: drawn herringbone brick laid along the street (bricks 0.5 x 0.25 m)
     { f: 'grass', m: 2.4, k: 0.95, real: 0.4 },     // 2 grass, parks, pitches, cemeteries
     { f: 'forest', m: 3.0, k: 0.9, real: 0.45 },    // 3 woods
     { f: 'bricks', m: 2.4, k: 0.9, real: 0.5 },     // 4 plazas, pedestrian streets, steps
     { f: 'sand', m: 1.8, k: 0.9, real: 0.35 },      // 5 sand, playgrounds
     { f: 'ground', m: 2.6, k: 0.85, real: 0.3 },    // 6 the terrain between everything (yards, lots)
-    { f: 'path', m: 2.0, k: 0.9, real: 0.2 },       // 7 footways, park paths (plain concrete, no slab joints)
+    { f: 'path', m: 2.0, k: 0.9, real: 0.2, nk: 0.7 },       // 7 footways, park paths (plain concrete, no slab joints)
   ];
+  // Normal maps (2026-11-27): the photo layers' ground-<f>-n.jpg are rendered in Blender from the really displaced
+  // Poly Haven surface (tools/ground_render.py); the drawn layers get theirs from the drawing (drawnNormals). They sit
+  // in a second texture array and tilt the lit normal, so grass blades, brick joints and pebbles catch the game's sun.
+  // nk = strength (default 1).
   const TL = { asphalt: 0, sidewalk: 1, grass: 2, forest: 3, bricks: 4, sand: 5, ground: 6, path: 7, none: -1 };
   const NT = TEX.length, TERRAIN_COL = new THREE.Color(0x8f9282);  // a touch greener than the far floor: yards
   const blankArr = new THREE.DataArrayTexture(new Uint8Array(4 * NT).fill(255), 1, 1, NT);
@@ -252,14 +256,16 @@ function create(opts) {
     groundTex: { value: blankArr }, gOn: { value: 0 },
     gMean: { value: TEX.map(() => new THREE.Vector3(1, 1, 1)) },
     gScale: { value: TEX.map(t => 1 / t.m) }, gK: { value: TEX.map(t => t.k) }, gReal: { value: TEX.map(t => t.real) },
+    groundNrm: { value: blankArr }, gNOn: { value: 0 }, gNK: { value: TEX.map(t => t.nk == null ? 1 : t.nk) },
   };
   function groundify(mat) {
     mat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, GU);
       sh.vertexShader = 'attribute float glayer;\nattribute vec2 guv;\nvarying float vGL;\nvarying vec2 vGUV;\n' +
         sh.vertexShader.replace('#include <color_vertex>', '#include <color_vertex>\n\tvGL = glayer; vGUV = guv;');
-      sh.fragmentShader = `uniform highp sampler2DArray groundTex;
+      sh.fragmentShader = `uniform highp sampler2DArray groundTex; uniform highp sampler2DArray groundNrm;
 uniform float gOn; uniform vec3 gMean[${NT}]; uniform float gScale[${NT}]; uniform float gK[${NT}]; uniform float gReal[${NT}];
+uniform float gNOn; uniform float gNK[${NT}];
 varying float vGL; varying vec2 vGUV;
 ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
 	if (gOn > 0.5 && vGL > -0.5) {
@@ -274,6 +280,13 @@ varying float vGL; varying vec2 vGUV;
 		vec3 detail = mix(vec3(1.0), t / m, gK[L]) * patchy;
 		vec3 photo = t * (dot(base, vec3(0.3333)) / max(dot(m, vec3(0.3333)), 0.02)) * patchy;
 		diffuseColor.rgb = mix(base * detail, photo, gReal[L]);
+	}`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+	if (gNOn > 0.5 && vGL > -0.5) {
+		int NL = int(vGL + 0.5);
+		vec3 tn = texture(groundNrm, vec3(vGUV * gScale[NL], float(NL))).xyz * 2.0 - 1.0;
+		// tangent x = ground u (world x), y = ground v (world z); fade the detail out far away (it only shimmers there)
+		float nf = gNK[NL] * (1.0 - smoothstep(0.02, 0.08, length(fwidth(vGUV * gScale[NL]))));
+		normal = normalize(normal + mat3(viewMatrix) * vec3(tn.x, 0.0, tn.y) * nf);
 	}`);
     };
     mat.customProgramCacheKey = () => 'cft-ground';
@@ -283,7 +296,7 @@ varying float vGL; varying vec2 vGUV;
   function loadGround() {
     if (!renderer.capabilities.isWebGL2) return;
     const S = LOW ? 512 : 1024;
-    const load = t => t.draw ? Promise.resolve(t.draw(S)) : new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = '_/theme/ground-' + t.f + '.jpg?v=1'; });
+    const load = t => t.draw ? Promise.resolve(t.draw(S)) : new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = '_/theme/ground-' + t.f + '.jpg?v=2'; });
     Promise.all(TEX.map(load)).then(ims => {
       if (destroyed || ims.some(im => !im)) return;
       const cv = document.createElement('canvas'); cv.width = cv.height = S;
@@ -304,7 +317,47 @@ varying float vGL; varying vec2 vGUV;
       tex.needsUpdate = true;
       GU.groundTex.value = tex; GU.gOn.value = 1;
       W.groundTextures = true;
+      loadGroundNormals(ims);
     });
+  }
+  function loadGroundNormals(drawn) {
+    const S = LOW ? 256 : 512;
+    const load = (t, i) => t.draw ? Promise.resolve(drawnNormals(drawn[i], S)) : new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = '_/theme/ground-' + t.f + '-n.jpg?v=1'; });
+    Promise.all(TEX.map(load)).then(ims => {
+      if (destroyed || ims.some(im => !im)) return;
+      const cv = document.createElement('canvas'); cv.width = cv.height = S;
+      const g = cv.getContext('2d', { willReadFrequently: true }), data = new Uint8Array(S * S * 4 * NT);
+      ims.forEach((im, i) => {
+        g.clearRect(0, 0, S, S); g.drawImage(im, 0, 0, S, S);
+        const px = g.getImageData(0, 0, S, S).data;
+        if (!TEX[i].draw) for (let k = 1; k < px.length; k += 4) px[k] = 255 - px[k];   // Blender's green = image up = -v here
+        data.set(px, i * S * S * 4);
+      });
+      const tex = new THREE.DataArrayTexture(data, S, S, NT);
+      tex.format = THREE.RGBAFormat; tex.type = THREE.UnsignedByteType;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
+      tex.needsUpdate = true;
+      GU.groundNrm.value = tex; GU.gNOn.value = 1;
+      W.groundNormals = true;
+    });
+  }
+  // A normal map from a drawn layer: its brightness is the height (dark joints and cracks sit lower), Sobel slopes.
+  function drawnNormals(src, S) {
+    const c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(src, 0, 0, S, S);
+    const px = g.getImageData(0, 0, S, S), d = px.data, h = new Float32Array(S * S);
+    for (let i = 0; i < S * S; i++) h[i] = (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) / 255;
+    const H = (x, y) => h[((y + S) % S) * S + ((x + S) % S)];
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const dx = (H(x + 1, y - 1) + 2 * H(x + 1, y) + H(x + 1, y + 1)) - (H(x - 1, y - 1) + 2 * H(x - 1, y) + H(x - 1, y + 1));
+      const dy = (H(x - 1, y - 1) + 2 * H(x, y - 1) + H(x + 1, y - 1)) - (H(x - 1, y + 1) + 2 * H(x, y + 1) + H(x + 1, y + 1));
+      let nx = -dx * 2.2, ny = dy * 2.2, nz = 1;   // canvas rows run down = +v const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+      const o = (y * S + x) * 4; d[o] = (nx * 0.5 + 0.5) * 255; d[o + 1] = (ny * 0.5 + 0.5) * 255; d[o + 2] = (nz * 0.5 + 0.5) * 255; d[o + 3] = 255;
+    }
+    g.putImageData(px, 0, 0);
+    return c;
   }
   // The road surface as a cartoon (2026-11-20, the photo felt too serious): flat slate with soft blotches, rounded
   // pebbles and a few chunky outlined cracks and tar patches. Drawn once on a canvas, seamless (every shape is drawn
@@ -404,13 +457,15 @@ varying float vGL; varying vec2 vGUV;
   const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
   const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
   // Surface classes (2026-11-19, read by cft-gfx.js pbr materials): 0 matte, 1 car paint, 2 glass, 3 metal, 4 skin, 5 wet /
-  // eyes, 6 cloth, 7 hair, 8 leaves, 9 plastic. m.as(k) sets the class for what follows (null = look it up); m.kOf =
-  // {hexColour: class} (or the builder-wide KOF while W.person runs) picks it by colour.
+  // eyes, 6 cloth, 7 hair, 8 leaves, 9 plastic, 10 wood, 11 bark. m.as(k) sets the class for what follows (null = look it
+  // up); m.kOf = {hexColour: class} (or the builder-wide KOF while W.person runs) picks it by colour. Without either,
+  // PROP_K does (2026-11-27): bench slats are wood, the dark street-furniture greys metal, so they get those detail textures.
   let KOF = null;
+  const PROP_K = { 0x9a6a3c: 10, 0xa8774a: 10, 0xc9a26a: 10, 0x5b4030: 10, 0x33373f: 3, 0x3a3f4a: 3, 0x2a2e37: 3, 0x1f2229: 3 };
   class Merge {
     constructor() { this.p = []; this.n = []; this.c = []; this.mk = []; this.k = null; this.kOf = null; }
     as(k) { this.k = k; return this; }
-    kFor(hex) { if (this.k != null) return this.k; const t = this.kOf || KOF; return (t && t[hex]) || 0; }
+    kFor(hex) { if (this.k != null) return this.k; const t = this.kOf || KOF; return t ? t[hex] || 0 : PROP_K[hex] || 0; }
     add(geo, color, x, y, z, rx, ry, rz, sx, sy, sz) {
       const g = geo.index ? geo.toNonIndexed() : geo;
       _m4.compose(_v.set(x || 0, y || 0, z || 0), _q.setFromEuler(_e.set(rx || 0, ry || 0, rz || 0)), _s.set(sx || 1, sy || 1, sz || 1));
@@ -4063,15 +4118,16 @@ varying float vGL; varying vec2 vGUV;
     if (!THREE.GLTFLoader || !THREE.SkeletonUtils || opts.nomodels || /[?&]nomodels=1/.test(location.search)) return;
     const loader = new THREE.GLTFLoader();
     const names = [...new Set(Object.values(MON_MODELS).flat())];
-    names.forEach(name => loader.load('_/theme/mon-' + name + '.glb?v=1', gl => {
+    names.forEach(name => loader.load('_/theme/mon-' + name + '.glb?v=2', gl => {
       if (destroyed) return;
       const sc = gl.scene;
       sc.traverse(o => {
         if (!o.isMesh) return;
         o.castShadow = !LOW; o.frustumCulled = false;   // skinned: the bind-pose bounds lag behind the animation
-        const old = o.material, map = old.map;
+        // since 2026-11-27 each model carries a Blender-baked colour map + normal map + roughness (tools/monster_render.py)
+        const old = o.material, map = old.map, normalMap = old.normalMap || null;
         if (map) { map.encoding = THREE.LinearEncoding; map.anisotropy = 4; map.needsUpdate = true; }   // this game draws in display colours
-        o.material = GFX ? new THREE.MeshStandardMaterial({ map, roughness: 0.5, metalness: 0, envMapIntensity: 0.6, side: old.side })
+        o.material = GFX ? new THREE.MeshStandardMaterial({ map, normalMap, roughness: normalMap ? old.roughness : 0.5, metalness: 0, envMapIntensity: 0.6, side: old.side })
           : new THREE.MeshLambertMaterial({ map, side: old.side });
         old.dispose();
       });

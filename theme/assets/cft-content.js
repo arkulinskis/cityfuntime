@@ -309,17 +309,17 @@ D.CAST = {
 // plays a mission giver (giver) unless you are that character. Files: <media base>models/cft/<file>.
 // Faces: cast-faces.jpg, one 160 px portrait per entry in this order.
 D.CAST_MODELS = {
-  ava: { n: "Ava", d: "Woman, 30s, sharp and confident, dark bob, red blazer", file: "ava-32b21443.glb", h: 1.68, giver: "priya" },
-  diego: { n: "Diego", d: "Muscular man, 30s, mohawk, black tank top and cargo pants, fighter", file: "diego-dd43aabf.glb", h: 1.8, giver: "dmitri" },
-  grace: { n: "Grace", d: "Older woman, 70, grey bun, purple cardigan, long skirt, wise", file: "grace-af612905.glb", h: 1.58, giver: "rosa" },
-  kenji: { n: "Kenji", d: "Young man, 20, spiky hair, yellow t-shirt and shorts, energetic", file: "kenji-3807b452.glb", h: 1.72, giver: "kai" },
-  lena: { n: "Lena", d: "Woman, 20s, blonde ponytail, green sweater and skirt, cheerful", file: "lena-fd469350.glb", h: 1.65, giver: "sam" },
-  marcus: { n: "Marcus", d: "Man, 30s, tall, short black hair, full beard, navy hoodie", file: "marcus-818e9598.glb", h: 1.88, giver: "max" },
-  nora: { n: "Nora", d: "Woman, 30s, big afro, orange dress, warm and funny", file: "nora-b80220c4.glb", h: 1.7, giver: "zoe" },
-  otis: { n: "Otis", d: "Older man, 60s, bald with grey mustache, brown suit and fedora, gruff", file: "otis-bf27022a.glb", h: 1.76, giver: "bouchard" },
-  raj: { n: "Raj", d: "Man, 40s, glasses and mustache, white shirt and tie, precise", file: "raj-33829cd3.glb", h: 1.74, giver: "okafor" },
-  zoe: { n: "Zoe", d: "Teen girl, 15, curly hair, pink hoodie and jeans, sarcastic", file: "zoe-8471f8f1.glb", h: 1.6, giver: "luna" },
-  vitalijs: { n: "Vitalijs", d: "Man, 30s, wavy swept-back dark hair, light stubble, all-black shirt and jeans, watch", file: "vitalijs-7efc2d67.glb", h: 1.82, giver: "jay" },
+  ava: { n: "Ava", d: "Woman, 30s, sharp and confident, dark bob, red blazer", file: "ava-32d6a86e.glb", h: 1.68, giver: "priya" },
+  diego: { n: "Diego", d: "Muscular man, 30s, mohawk, black tank top and cargo pants, fighter", file: "diego-b9bc8251.glb", h: 1.8, giver: "dmitri" },
+  grace: { n: "Grace", d: "Older woman, 70, grey bun, purple cardigan, long skirt, wise", file: "grace-566f6dd5.glb", h: 1.58, giver: "rosa" },
+  kenji: { n: "Kenji", d: "Young man, 20, spiky hair, yellow t-shirt and shorts, energetic", file: "kenji-4f070fe1.glb", h: 1.72, giver: "kai" },
+  lena: { n: "Lena", d: "Woman, 20s, blonde ponytail, green sweater and skirt, cheerful", file: "lena-5cae2a04.glb", h: 1.65, giver: "sam" },
+  marcus: { n: "Marcus", d: "Man, 30s, tall, short black hair, full beard, navy hoodie", file: "marcus-1260a81f.glb", h: 1.88, giver: "max" },
+  nora: { n: "Nora", d: "Woman, 30s, big afro, orange dress, warm and funny", file: "nora-235bd7b9.glb", h: 1.7, giver: "zoe" },
+  otis: { n: "Otis", d: "Older man, 60s, bald with grey mustache, brown suit and fedora, gruff", file: "otis-6dfb9391.glb", h: 1.76, giver: "bouchard" },
+  raj: { n: "Raj", d: "Man, 40s, glasses and mustache, white shirt and tie, precise", file: "raj-2c29b33f.glb", h: 1.74, giver: "okafor" },
+  zoe: { n: "Zoe", d: "Teen girl, 15, curly hair, pink hoodie and jeans, sarcastic", file: "zoe-74f67d9a.glb", h: 1.6, giver: "luna" },
+  vitalijs: { n: "Vitalijs", d: "Man, 30s, wavy swept-back dark hair, light stubble, all-black shirt and jeans, watch", file: "vitalijs-449e420a.glb", h: 1.82, giver: "jay" },
 };
 // cast-models:end
 D.FRIENDS = ['bouchard', 'max', 'kai', 'jay', 'noor', 'benny', 'zoe', 'ollie', 'luna', 'dmitri', 'kim', 'okafor', 'priya', 'tomas', 'rosa'];

@@ -1,9 +1,17 @@
-"""City Fun Time's cast models: Actor Troop's characters as real 3D people in the game (2026-11-24).
+"""City Fun Time's cast models: Actor Troop's characters as real 3D people in the game (2026-11-24; realistic 2026-11-27).
 
-    python tools/cast_models/build.py            export + slim + portraits + manifest (all characters)
-    python tools/cast_models/build.py ava zoe    only these (the manifest keeps the others)
-    python tools/cast_models/build.py --manifest rewrite the manifest from what's already in media/public/models/cft
+    python tools/cast_models/build.py                 Blender build (realistic MPFB humans) + slim + portraits + manifest
+    python tools/cast_models/build.py ava zoe         only these (the manifest keeps the others)
+    python tools/cast_models/build.py --from DIR      reuse a finished Blender build in DIR (<id>.glb + <id>-portrait.png)
+    python tools/cast_models/build.py --godot [ids]   the old path: Actor Troop's Godot export (see below)
+    python tools/cast_models/build.py --manifest      rewrite the manifest from what's already in media/public/models/cft
 
+Realistic build (default since 2026-11-27): mpfb/build_cast.py runs in headless Blender (MPFB MakeHuman bodies, CC0 skins,
+clothes, hair; Cycles-baked colour + ambient occlusion; the game rig; Cycles portraits) -> fix_rest.mjs (identity rest
+rotations, the convention cft-world needs) -> slim_glb.mjs with KEEP_NORMALS (cloth normal maps stay) -> the same
+upload/manifest steps as below. Looks per character (outfit, colours, hair, facial hair, glasses) = CAST in build_cast.py.
+
+Godot path:
 Steps: Godot exports each Actor Troop character (../actor-troop/tools/export_cft.sh: CC0 MakeHuman body + its
 procedural clothes and hair, one skinned mesh on the Rig skeleton, rest pose, no animations) -> slim_glb.mjs
 (tangents and normal maps off, simplified, quantized: 3-5 MB -> 0.7-1.9 MB) -> APP_MAKER/media/public/models/cft/
@@ -111,18 +119,55 @@ def manifest():
     return [(cid, have[cid]) for cid in [c for c in ORDER if c in have]]
 
 
+BLENDER = r"C:\Program Files\Blender Foundation\Blender 5.3lender.exe"
+
+
+def blender_portraits(files, raw):
+    """Cycles portraits from the Blender build (raw/<id>-portrait.png) -> cast-faces.jpg; the old Godot ones are kept
+    for models this run did not build (cut from the current strip)."""
+    from PIL import Image
+    old = Image.open(FACES).convert("RGB") if FACES.exists() else None
+    strip = Image.new("RGB", (CAST_FACE * len(files), CAST_FACE), (200, 200, 200))
+    for i, (cid, _) in enumerate(files):
+        p = raw / (cid + "-portrait.png")
+        if p.exists():
+            strip.paste(Image.open(p).convert("RGB").resize((CAST_FACE, CAST_FACE), Image.LANCZOS), (i * CAST_FACE, 0))
+        elif old is not None and old.width >= (i + 1) * CAST_FACE:
+            strip.paste(old.crop((i * CAST_FACE, 0, (i + 1) * CAST_FACE, CAST_FACE)), (i * CAST_FACE, 0))
+    strip.save(FACES, quality=88, optimize=True)
+    print("portraits ->", FACES.relative_to(APP), "(%d faces, %d KB)" % (len(files), FACES.stat().st_size // 1024))
+
+
 def main():
     args = sys.argv[1:]
     if args == ["--manifest"]:
         manifest()
         return
-    ids = args or ORDER
+    godot = "--godot" in args
+    src = None
+    if "--from" in args:
+        i = args.index("--from")
+        src = Path(args[i + 1])
+        args = args[:i] + args[i + 2:]
+    ids = [a for a in args if not a.startswith("--")] or ORDER
     MEDIA.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix="cft-cast-"))
     raw, slim = tmp / "raw", tmp / "slim"
-    run([bash(), str(AT / "tools" / "export_cft.sh"), raw.as_posix(), *ids])
     env = dict(os.environ, NODE_PATH=str(HERE / "node_modules"))
-    run(["node", str(HERE / "slim_glb.mjs"), str(raw), str(slim)], env=env, cwd=str(HERE))
+    if godot:
+        run([bash(), str(AT / "tools" / "export_cft.sh"), raw.as_posix(), *ids])
+        run(["node", str(HERE / "slim_glb.mjs"), str(raw), str(slim)], env=env, cwd=str(HERE))
+    else:
+        if src is None:
+            run([BLENDER, "-b", "-P", str(HERE / "mpfb" / "build_cast.py"), "--", str(raw), *ids])
+            src = raw
+        fixed = tmp / "fixed"
+        fixed.mkdir(parents=True, exist_ok=True)
+        for cid in ids:
+            if (src / (cid + ".glb")).exists():
+                run(["node", str(HERE / "fix_rest.mjs"), str(src / (cid + ".glb")), str(fixed / (cid + ".glb"))], env=env, cwd=str(HERE))
+        run(["node", str(HERE / "slim_glb.mjs"), str(fixed), str(slim), "0.6"], env=dict(env, KEEP_NORMALS="1"), cwd=str(HERE))
+        raw = src
     for cid in ids:
         src = slim / (cid + ".glb")
         if not src.exists():
@@ -133,7 +178,10 @@ def main():
             old.unlink()
         shutil.copy(src, MEDIA / ("%s-%s.glb" % (cid, h)))
     files = manifest()
-    portraits(files, tmp)
+    if godot:
+        portraits(files, tmp)
+    else:
+        blender_portraits(files, raw)
     shutil.rmtree(tmp, ignore_errors=True)
     print("next: python -I ../APP_MAKER/media/r2_deploy.py --only=models/cft/ ; python tools/assets.py")
 

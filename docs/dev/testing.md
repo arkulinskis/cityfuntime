@@ -265,7 +265,11 @@ script that returns a value and run `python -I tools/live/game_test.py --eval pr
 | `tools/voice_missions.py` | `python tools/voice_missions.py` (`--list`, `--only max,rosa`, `--force`) | After mission dialogue changes: renders new/changed lines with Kokoro on the local GPU (lines from `node tools/vo_lines.mjs`), writes `theme/assets/cft-vo.js` (never edit by hand) and MP3s into APP_MAKER/media/public/vo/cft. Then upload with `python -I C:/Users/arkvi/Documents/CLAUDE/APP_MAKER/media/r2_deploy.py`, run `python tools/assets.py`, commit, push. |
 | `tools/vo_lines.mjs` | `node tools/vo_lines.mjs` | Prints every spoken line as JSON (`key`, `speaker`, `say`); used by voice_missions.py. |
 | `tools/monster_models.py` | `python -I tools/monster_models.py <pack folder>` | Repacks the Quaternius figment models into `theme/assets/mon-*.glb`. Its docstring says assets.py is not needed afterwards (models are fetched by name). |
-| `tools/ground_textures.py` | `python tools/ground_textures.py` (Pillow) | Downloads the Poly Haven ground photos into `theme/assets/ground-*.jpg`. |
+| `tools/ground_textures.py` | `python tools/ground_textures.py` (Pillow) | Old (2026-11-17): Poly Haven colour x AO photos into `theme/assets/ground-*.jpg`. Replaced by `ground_render.py`. |
+| `tools/ground_render.py` | `blender -b -P tools/ground_render.py [-- name ...]` | Blender (2026-11-27): each Poly Haven set really displaced and lit by an even sky, rendered top-down into `ground-<name>.jpg` + normal map `ground-<name>-n.jpg`. `GROUND_OUT=dir` to try it elsewhere. |
+| `tools/material_render.py` | `blender -b -P tools/material_render.py [-- name ...]` | Blender: the detail textures `mat-<name>.jpg` + `-h.jpg` (bark, leaves built from leaf cards, wood, grime, brushed metal) for cft-gfx `MAT_TEX`. |
+| `tools/monster_render.py` | `blender -b -P tools/monster_render.py [-- name ...]` | Blender: re-textures `mon-*.glb` (new UVs, baked colour + AO + normal map, clips kept). `MON_OUT=dir` to try it elsewhere. |
+| `tools/cast_models/build.py` | `python tools/cast_models/build.py [ids] [--from DIR]` | Cast models: Blender MPFB build (`tools/cast_models/mpfb/build_cast.py`) -> `fix_rest.mjs` -> `slim_glb.mjs` -> media/public/models/cft + manifest + `cast-faces.jpg`. `CFT_LOCAL_MODELS=<dir>` makes the test harness load cast models from disk instead of R2. |
 
 Code graph (optional, 0 tokens to build): from the project root, `graphify query "<question>"`; the graph is in
 `graphify-out/` (git-excluded). Refresh it after code changes (command in [deploy.md](deploy.md)).
