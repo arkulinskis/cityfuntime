@@ -17,6 +17,7 @@ Package name (used in templates): `City_Fun_Time` (`package_name` in `anvil.yaml
 | `client_code/auth.py` | Sign in / sign up / reset / Continue with Google / sign out. |
 | `client_code/legal.py` | Connects the shared Privacy & Terms kit (`theme/assets/legal-kit.js`, `window.LegalKit`) to the server. Kit file: do not edit here. |
 | `client_code/session_guard.py` | Quiet reload when Anvil's server session expired; uncaught-error reporting. |
+| `client_code/lifetime.py` | Lifetime access on the page side (`lifetime.gate`, `lifetime.offer`, `lifetime.handle_return` in startup). Shared file from template-forms: do not edit here. Dialogs `LifetimeOffer`, `LifetimeSales`. |
 | `client_code/cft.py` | **The only bridge** from Python to the JS engine (`window.CFT`) and from the engine to the server. |
 | `client_code/Layouts/Shell/` | The frame around every page except Play: header, account menu, footer, phone tab bar. |
 | `client_code/Pages/*` | Landing, Play, Life, Quests, Album, Ranks, Auth, Profile, Admin. |

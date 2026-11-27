@@ -152,6 +152,17 @@ never comes back by itself; `state()` → `"never" | "loaded" | "removed"`; `cou
 (`C:/Users/arkvi/Documents/CLAUDE/APP_MAKER/seo/seo.py`): don't edit it here. `tools/check.py` reports type warnings in
 `seo_routes.py` and `legal_server.py` without failing (`KIT_FILES`).
 
+### Lifetime access (`Lifetime.py`, `lifetime_config.py`)
+
+`Lifetime.py` is the same file in every app (from `APP_MAKER/template-forms`; do not edit it here). It sells one $34
+payment through Stripe Checkout and is **off** until the App Secret `stripe_secret_key` is set: then `Lifetime.unlocked`
+is True for everyone and nothing changes. Public: `lifetime_status`, `lifetime_confirm`, the webhook
+`/_/api/lifetime/stripe`; signed in: `lifetime_checkout`; admin: `admin_lifetime`, `admin_lifetime_settings`,
+`admin_lifetime_action`, `admin_lifetime_grant` (Admin -> Overview -> "Lifetime sales ($34)"). Nothing in the game is
+gated yet (2026-11-27: there are no separate city packs or cosmetics). A future pack: client
+`if not lifetime.gate("Pack name"): return`, server `if not Lifetime.unlocked(user): return C.fail(Lifetime.LOCKED_MESSAGE)`,
+and a line in `lifetime_config.py` `PAID`. Setup: `C:/Users/arkvi/Documents/CLAUDE/APP_MAKER/money/lifetime/STRIPE_SETUP.md`.
+
 ## 3. Data tables (`anvil.yaml` → `db_schema`)
 
 All tables are `client: none, server: full`: the browser can never read tables directly; everything goes through callables.
@@ -164,8 +175,9 @@ All tables are `client: none, server: full`: the browser can never read tables d
 | `app_settings` | `key` (string), `value` (simpleObject) | `C.set_setting` | `C.get_setting` |
 | `feedback` | `user` (link → users), `name`, `email`, `kind` (string), `message` (string), `context` (simpleObject), `status`, `note` (string), `created` (datetime) | `submit_feedback`, `set_feedback_status`, `delete_feedback` | `list_feedback`, `Feedback.new_count`, AppStatus `_feedback` |
 | `error_log` | `when` (datetime), `source`, `kind`, `message`, `traceback`, `page`, `session` (string), `user` (link → users) | `log_client_error`, `log_server_error`, `_prune` | AppStatus `_errors` |
+| `lifetime_purchases` | `user` (link → users), `email`, `status`, `amount`, `currency`, `session`, `payment_intent`, `note` (string/number), `created`, `updated` (datetime) | `Lifetime.py` (checkout return, webhook, admin actions) | `Lifetime.py` |
 
-Keys used in `app_settings`: `balance`, `balance_history` (Balance.py), `tiles_bytes`, `tiles_cap_mb` (Tiles.py), `demo`
+Keys used in `app_settings`: `lifetime` (Lifetime.py), `balance`, `balance_history` (Balance.py), `tiles_bytes`, `tiles_cap_mb` (Tiles.py), `demo`
 (DemoData.py).
 
 **Changing the schema:** edit `db_schema` in `anvil.yaml`. The server-test mock reads `anvil.yaml` itself (environment
@@ -176,6 +188,7 @@ other code does not). See [deploy.md](deploy.md).
 
 ## 4. App Secrets and services
 
+- App Secrets `stripe_secret_key` and `stripe_webhook_secret` (Lifetime.py): optional; without the key the lifetime gate is off.
 - App Secret used by code: **`admin_emails`** (AdminAccess.py; the admin's email is never in the repo). AppStatus reports
   whether it is set (`admin_emails_secret`). The Docker UI tests pass `--secret admin_emails=admin@example.com`; the server
   tests fake it in `anvil.secrets.SECRETS`.

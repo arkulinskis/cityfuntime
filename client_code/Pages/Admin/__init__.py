@@ -179,3 +179,8 @@ class Admin(AdminTemplate):
             if state.call("demo_remove"):
                 state.toast("Done", "ok")
                 self._demo()
+
+    @handle("lifetime_button", "click")
+    def lifetime_button_click(self, **event_args):
+        from ...Dialogs.LifetimeSales import LifetimeSales
+        alert(LifetimeSales(), buttons=[], role="app-dialog", large=True)

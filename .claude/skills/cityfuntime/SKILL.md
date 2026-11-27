@@ -986,6 +986,7 @@ importantly the face. Put graffiti on 10% of buildings."
 
 ## Recipes
 
+- **Lifetime gate ($34, branch `lifetime-34`, off until `stripe_secret_key`):** nothing is gated yet. A future pack: client `if not lifetime.gate("Pack name"): return` (`from ... import lifetime`; from the engine, add a `cft.py` bridge entry), server `if not Lifetime.unlocked(user): return C.fail(Lifetime.LOCKED_MESSAGE)`, a line in `server_code/lifetime_config.py` PAID, a buy link that shows only when `lifetime.gate_on()`, and `docs/dev/server.md` (Lifetime access).
 - **New page:** copy a similar `client_code/Pages/<Name>/`, register it in `client_code/router.py`; new field on Life / Quests /
   Album = add it to that function in cft-kit.js `VIEWS`, then show it in the Form.
 - **New server function:** `@anvil.server.callable` in the matching module (+ `C.require_user()` / ownership), a test in

@@ -1,5 +1,42 @@
 allow_embedding: false
 db_schema:
+  lifetime_purchases:
+    client: none
+    columns:
+    - admin_ui: {order: 0, width: 200}
+      name: user
+      target: users
+      type: link_single
+    - admin_ui: {order: 1, width: 220}
+      name: email
+      type: string
+    - admin_ui: {order: 2, width: 110}
+      name: status
+      type: string
+    - admin_ui: {order: 3, width: 90}
+      name: amount
+      type: number
+    - admin_ui: {order: 4, width: 70}
+      name: currency
+      type: string
+    - admin_ui: {order: 5, width: 200}
+      name: session
+      type: string
+    - admin_ui: {order: 6, width: 200}
+      name: payment_intent
+      type: string
+    - admin_ui: {order: 7, width: 180}
+      name: created
+      type: datetime
+    - admin_ui: {order: 8, width: 180}
+      name: updated
+      type: datetime
+    - admin_ui: {order: 9, width: 220}
+      name: note
+      type: string
+    indexes: []
+    server: full
+    title: Lifetime purchases
   app_settings:
     client: none
     columns:

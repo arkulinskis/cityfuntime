@@ -408,6 +408,18 @@ doesn't answer, so every neighbourhood someone has played keeps working; places 
 (no hills: the world stays flat; no streets: empty). Admin > Map backup copies 20 starter cities ahead of time. Size limit:
 3,000 MB by default (Admin > Map backup).
 
+## Lifetime access ($34)
+
+Off until the App Secret `stripe_secret_key` is set: until then nothing changes (no prices, no locks). Setup:
+`APP_MAKER/money/lifetime/STRIPE_SETUP.md`. Code: `server_code/Lifetime.py` + `lifetime_config.py`, `client_code/lifetime.py`,
+`Dialogs/LifetimeOffer` + `LifetimeSales` (Admin -> Overview -> "Lifetime sales ($34)"). Developer notes: `docs/dev/server.md`.
+
+- **Free:** the whole game on your own real street.
+- **Paid (once):** every future pack (extra cities, cosmetics). Nothing is gated yet: the game has no separate city
+  packs or cosmetics today (any address works, and clothes are bought with game money), so there is no buy button for
+  players until a pack exists.
+
+
 ## Setting it up in Anvil (once)
 
 1. In the Anvil editor: **Create app → Clone from GitHub**, and paste `https://github.com/arkulinskis/cityfuntime`.
