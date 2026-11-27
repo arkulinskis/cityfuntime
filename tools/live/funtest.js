@@ -111,7 +111,8 @@ window.__funOut = []; window.__funDone = false;
 
     // ---------- the people themselves: rounded bodies with joints
     {
-      const u = W.life.peds[0].fig.userData, tris = o => { let n = 0; o.traverse(m => { if (m.isMesh) n += m.geometry.attributes.position.count / 3; }); return Math.round(n); };
+      const u = W.life.peds[0].fig.userData, skip = new Set(), tris = o => { let n = 0; o.traverse(m => { if (m.isMesh && !skip.has(m)) n += m.geometry.attributes.position.count / 3; }); return Math.round(n); };
+      if (u.model) u.model.obj.traverse(m => skip.add(m));   // the built figure only (a realistic townsperson's model is counted apart, 2026-11-27)
       ok(!!(u.head && u.kneeL && u.kneeR && u.elbowL && u.elbowR && u.handR), 'people have heads that turn, knees, elbows and hands');
       const t1 = tris(W.life.peds[0].fig);
       ok(t1 > 1000 && t1 < 9500, 'a passer-by is built from ' + t1 + ' triangles (the old box figures had about 130; smoother since the 2026-11-19 graphics overhaul; the 2026-11-24 face pass: about 7,300 from 5,800)');
