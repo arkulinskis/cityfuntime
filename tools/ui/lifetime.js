@@ -1,6 +1,7 @@
 /* Lifetime gate (local App Server, no Stripe key = gate off): signs in as the ADMIN_EMAILS address, opens
    Admin -> "Lifetime sales", checks it says the gate is off, closes it. Same file in every app (tools/lifetime_rollout.py).
-   Resolves to {ok, log}. */
+   Resolves to {ok, log}. If the local database already has admin@example.com with another password (from the
+   app's own smoke/admin tests), sign-in times out: `docker volume rm <key>-data` (local test data only) and rerun. */
 (async function () {
   const log = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -24,14 +25,15 @@
     type(inputs()[0], 'admin@example.com'); type(inputs()[1], pw);
     $$('.anvil-role-btn-block button').find((b) => /Sign in/.test(b.textContent)).click();
     await sleep(3000);
-    if (location.hash !== '#home') {  // no account yet in this local database: create it
+    if (location.hash.indexOf('#auth') === 0 || location.hash === '') {  // no account yet in this local database: create it
       $$('.ui-seg button').find((b) => /Create account/.test(b.textContent)).click();
       await sleep(500);
       const i = inputs(); type(i[0], 'Local Admin'); type(i[1], 'admin@example.com'); type(i[2], pw);
       const tick = $('.au-card input[type=checkbox]'); if (tick && !tick.checked) tick.click();
       $$('.anvil-role-btn-block button').find((b) => /Create account/.test(b.textContent)).click();
     }
-    await until(() => location.hash === '#home' && window.UI_READY, 'signed in as admin', 40000);
+    // apps land on different pages after sign-in (#home, #notebook, #books ...): any page but #auth counts
+    await until(() => location.hash && location.hash.indexOf('#auth') !== 0 && window.UI_READY, 'signed in as admin', 40000);
     window.UI_READY = false; location.hash = '#admin/overview';
     const btn = await until(() => $$('button').find((b) => /Lifetime sales/.test(b.textContent) && b.offsetParent), 'the Lifetime sales button on #admin', 40000);
     ok(true, 'admin has the Lifetime sales button');
