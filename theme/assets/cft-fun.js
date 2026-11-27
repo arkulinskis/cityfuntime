@@ -101,7 +101,7 @@ function attach(G, api) {
   }
 
   // ------------------------------------------------------------------ weapons
-  function weapon() { const lw = G.rpg && G.rpg.weapon(); if (lw) return lw; const it = D.ITEMS[save().equip.weapon]; return it && it.weapon ? Object.assign({ e: it.e, n: it.n }, it.weapon) : Object.assign({ e: '🖐️', n: 'Bare hands' }, D.SLAP); }
+  function weapon() { const lw = G.rpg && G.rpg.weapon(); if (lw) return lw; const it = D.ITEMS[save().equip.weapon]; return it && it.weapon ? Object.assign({ e: it.e, n: it.n }, it.weapon) : Object.assign({ e: '👊', n: 'Fists' }, D.SLAP); }
   function syncWeapon() {
     const ov = F.handOverride || null, lw = G.rpg && G.rpg.weapon(), id = (lw ? 'loot:' + G.rpg.weaponId() : save().equip.weapon || null) + (onFoot() ? '' : ':ride') + (ov ? ':ov:' + ov : '');
     if (id === weaponOn) return;

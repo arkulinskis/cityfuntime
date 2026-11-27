@@ -182,3 +182,6 @@ fan tips `5-15 × (1 + 0.05L)`.
 - [ ] Nothing punishes absence (no streaks/decay): see SKILL.md "The long game" principles.
 - [ ] Rares and new spawns respect `G.allow('rares')`, `calm()` and the first-mission check.
 - [ ] New data entries pass `node tools/live/content_check.mjs`; rpgtest.js check added; `python -I tools/live/game_test.py --rpg` passes; `python tools/assets.py` + `python tools/check.py` pass.
+
+## 2026-11-27
+`tick` returns early while `G.dreaming()` (the opening): no achievements, discoveries, reputation or rares in the fever dream.

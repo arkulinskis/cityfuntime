@@ -146,7 +146,12 @@ function create(G, root) {
   const bannerQ = [];
   let bannerBusy = false;
   U.clearBanners = () => { bannerQ.length = 0; };  // tests: start from an empty queue
-  U.banner = function (title, sub, kind, color) { bannerQ.push({ title, sub, kind, color }); if (!bannerBusy) nextBanner(); };
+  // the fever dream (G.dreaming, 2026-11-27): no achievement, level, borough, discovery or "done" banners while it runs
+  const DREAM_QUIET = { ach: 1, level: 1, boro: 1, done: 1 };
+  U.banner = function (title, sub, kind, color) {
+    if (G.dreaming && G.dreaming() && (DREAM_QUIET[kind] || /Discovered/.test(title || ''))) return;
+    bannerQ.push({ title, sub, kind, color }); if (!bannerBusy) nextBanner();
+  };
   function nextBanner() {
     const b = bannerQ.shift();
     if (!b) { bannerBusy = false; return; }

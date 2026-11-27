@@ -495,3 +495,5 @@ Pitfalls:
 `castLook(id)`: a story character without an Actor Troop model (or the giver whose model you took) gets the closest
 realistic townsperson (`W.crowdFor(look, type, { match: true })`, see cft-world). `makeCastObj` builds your kids with
 `W.realPerson(look, 'kid')`; the crew bosses (turf scenes, the chase) with `W.realPerson`.
+
+`G.dreaming()` (2026-11-27): true during the opening's fever dream; `doSave` writes nothing then (see cft-camp).

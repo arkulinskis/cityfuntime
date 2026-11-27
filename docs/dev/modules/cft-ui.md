@@ -261,3 +261,6 @@ Pitfalls:
 - [ ] No `data-go`; buttons have `type="button"`; icon buttons have `aria-label`.
 - [ ] Names cited exist (`D.*` tables, `G.*` functions); no balance numbers hard-coded here (they belong in `D.TUNE`).
 - [ ] `python tools/assets.py` run (hash change in anvil.yaml), `python tools/check.py` passes, the relevant `game_test.py` suite passes.
+
+## 2026-11-27: banners in the fever dream
+`U.banner` drops `DREAM_QUIET` kinds (ach, level, boro, done) and "Discovered" banners while `G.dreaming()`.

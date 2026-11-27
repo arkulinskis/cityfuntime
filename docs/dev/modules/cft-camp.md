@@ -229,3 +229,9 @@ Captured at attach time (a live Balance change won't affect them until reload): 
 - [ ] Every scene object created (fires, rings, hearts, labels, stashes) is removed in its remover **and** `K.destroy`.
 - [ ] Knobs added to `D.TUNE.camp`, documented in FIX_INDEX.md.
 - [ ] camptest.js has a check; `python -I tools/live/game_test.py --camp` passes; `python tools/assets.py` + `python tools/check.py` pass.
+
+## The fever dream, second pass (2026-11-27)
+- **Nothing is saved while it runs**: cft-game `G.dreaming()` (= `K.inIntro()`) makes `doSave` return early. `K.startIntro` saves once just before (`G.saveNow('dream')`), so closing the game mid-dream comes back to the life before it and the dream plays again.
+- **The whole save is put back**: `dreamSnap` copies every key except `DREAM_KEEP` (camp, settings, clock, play time) into `dreamSave` (memory only, `K.dreamBefore()` for tests); `wakeUp` restores it, deletes keys the dream added, then refreshes the colour blocks. `DREAM_KEYS` + `camp.snap` remain only for old saves.
+- **No achievements yet**: cft-rpg `tick` does nothing while dreaming (achievements, discoveries, reputation, rares); cft-ui `U.banner` drops `ach` / `level` / `boro` / `done` banners and "Discovered" ones (`DREAM_QUIET`).
+- **Shooters right away**: `dreamGuns` puts five shooters from cheapest to fanciest on the slot-5 belt and selects slot 5; ammo is endless in the dream (`K.useAmmo`). Tests in camptest.js (`--camp`).

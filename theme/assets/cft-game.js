@@ -2156,8 +2156,13 @@ function mount(root, opts) {
   // ------------------------------------------------------------------ saving
   function dirty(now) { rt.dirtyT = now ? 0.1 : Math.max(rt.dirtyT, 0) || 4; if (now) rt.dirtyT = 0.1; }
   G.dirty = dirty;
+  // The fever dream (the opening's three minutes, 2026-11-27, the user: "let's not save anything they do at that point"):
+  // nothing is written while it runs. Closing the game mid-dream comes back to the life as it was before it (the dream
+  // starts again). G.dreaming() is also read by the achievement / banner gates (cft-rpg tick, cft-ui U.banner).
+  G.dreaming = () => !!(G.camp && G.camp.inIntro && G.camp.inIntro());
   function doSave(reason) {
     if (!save || !W || state === 'start') return;
+    if (G.dreaming()) return;
     const p = P(), a = ll(p.x, p.z);
     save.pos = { lat: Math.round(a.lat * 1e6) / 1e6, lon: Math.round(a.lon * 1e6) / 1e6, yaw: Math.round(W.player.face * 100) / 100 };
     save.updated = Date.now();

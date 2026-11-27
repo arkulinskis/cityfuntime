@@ -513,7 +513,8 @@ C.attach = function (G) {
     const e = C.SHOUT.match(title, kind, D);
     if (!e) return null;
     let p;
-    do { p = Math.floor(Math.random() * C.SHOUT.praise.length); } while (p === lastPraise && C.SHOUT.praise.length > 1);
+    const n = C.SHOUT.praise.length;   // never the same praise twice in a row, without a retry loop (a stubbed Math.random froze the page, 2026-11-27)
+    p = n > 1 && lastPraise != null && lastPraise >= 0 ? (lastPraise + 1 + Math.floor(Math.random() * (n - 1))) % n : Math.floor(Math.random() * n);
     lastPraise = p;
     e.praise = C.SHOUT.praise[p]; e.at = Date.now();
     Cn.shoutLog.push({ id: e.id, raw: e.raw, praise: e.praise });

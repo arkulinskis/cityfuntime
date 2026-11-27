@@ -6,7 +6,8 @@
 window.__funOut = []; window.__funDone = false;
 (async () => {
   const out = window.__funOut, T0 = Date.now();
-  const ok = (c, m) => out.push((c ? 'PASS ' : 'FAIL ') + m + '  [' + Math.round((Date.now() - T0) / 1000) + 's]');
+  const trail = m => { try { const r = new XMLHttpRequest(); r.open('GET', '/_/progress?m=' + encodeURIComponent(m), false); r.send(); } catch (e) { /* no harness */ } };   // CFT_PROGRESS (harness.py)
+  const ok = (c, m) => { const line = (c ? 'PASS ' : 'FAIL ') + m + '  [' + Math.round((Date.now() - T0) / 1000) + 's]'; out.push(line); trail(line); };
   const info = m => out.push('INFO ' + m);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const G = window.__cft, W = G.W, U = G.ui, s = G.save, D = G.D, F = G.fun;

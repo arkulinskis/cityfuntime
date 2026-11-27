@@ -500,6 +500,7 @@ function attach(G, api) {
     if (!alive) return;
     if (beam) { beam.t += dt; beam.m.material.opacity = 0.55 * Math.max(0, 1 - beam.t / 2.2); beam.m.position.copy(W.player.pos); if (beam.t > 2.2) { W.scene.remove(beam.m); beam.m.geometry.dispose(); beam.m.material.dispose(); beam = null; } }
     if (paused) return;
+    if (G.dreaming && G.dreaming()) return;   // the fever dream: no achievements, discoveries, reputation or rares yet (2026-11-27)
     secT -= dt; slowT -= dt; rareT -= dt; tipT -= dt;
     if (secT <= 0) { secT = 1; explore(); repTick(); }
     if (slowT <= 0) { slowT = 2; achTick(); }

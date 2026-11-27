@@ -538,7 +538,7 @@ else:
 sf = out / "steps.json"
 sf.write_text(json.dumps(steps), encoding="utf-8")
 env = dict(__import__("os").environ, WINDOW=__import__("os").environ.get("WINDOW", "1280,800"))
-r = subprocess.run(["node", str(HERE / "gldrive.mjs"), "http://127.0.0.1:%d/?fresh=1&music=0&nointro=1" % port + __import__("os").environ.get("CFT_QS", ""), str(sf), str(out)],
+r = subprocess.run(["node", str(HERE / "gldrive.mjs"), "http://127.0.0.1:%d/?fresh=1&music=0&nointro=1&noperf=1" % port + __import__("os").environ.get("CFT_QS", ""), str(sf), str(out)],
                    capture_output=True, text=True, env=env, encoding="utf-8", errors="replace", timeout=3000)
 fails = passes = 0
 for line in r.stdout.splitlines():

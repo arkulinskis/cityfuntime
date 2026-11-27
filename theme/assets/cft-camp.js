@@ -153,7 +153,9 @@ function attach(G, api) {
     if (c.intro === 'ending' || (c.intro === 'run' && !(c.left > 1))) { // closed the game right as it ended: it's over
       c.intro = 'done'; c.left = 0; wakeUp(c); c.seen = storyDone(); G.dirty(); U.help(true); return;
     }
-    if (!c.snap) c.snap = dreamSnap();   // what the save looked like before the dream (put back when you wake up)
+    G.saveNow('dream');   // the life as it is before the dream: the only save until you wake up (G.dreaming blocks the rest)
+    dreamSave = dreamSnap();   // everything, kept in memory (put back when you wake up)
+    delete c.snap;
     c.intro = 'run';
     if (!(c.left > 0)) c.left = CP.INTRO_SECS;
     const home = G.homeSpot();
@@ -164,8 +166,9 @@ function attach(G, api) {
     if (!alive) return;
     shell.classList.add('cft-panic');
     introEl.hidden = false;
+    dreamGuns();
     U.banner('🌀 WHAT IS HAPPENING', 'Everything is chasing you. Good news: you can\'t die. Survive three minutes of total chaos!', 'fail');
-    word('YOU CAN\'T DIE!', 'red', 'Fight (F), splash (1), zap (2), jump on everything', true);
+    word('YOU CAN\'T DIE!', 'red', 'Shooters on 5 (scroll to switch, endless ammo), fight (F), splash (1), zap (2)', true);
     G.sfx.fail();
     introEv = 6; introFire = 2; introPanic = 3; introMega = Math.min(introMega, Math.max(10, c.left - CP.INTRO_SECS * 0.75));   // the first MEGA a quarter of the way in introChamp = 30;
     startStorm(c.left + 5, true);
@@ -213,11 +216,36 @@ function attach(G, api) {
   // The opening was a fever dream (the user, 2026-11-18): you wake at the address you typed, level 1 with $0, and nothing
   // from those three minutes is kept: no gear, loot, stickers, achievements, counters, aura or Dex entries. DREAM_KEYS are the
   // parts of the save that are put back exactly as they were before it started (save.camp.snap, taken in startIntro).
+  // Since 2026-11-27 the WHOLE save is put back (dreamSave: a copy taken in startIntro, in memory only), except the
+  // opening's own state (camp), your settings and the clock: colour blocks, the Dex, secrets, stats, the log, the shooter
+  // belt... none of it survives the dream. DREAM_KEYS is only the fallback for old saves that still carry camp.snap.
   const DREAM_KEYS = ['bag', 'owned', 'equip', 'rpg', 'stickers', 'counters', 'hero', 'chaos', 'fun', 'm', 'track', 'jobs', 'dyn'];
-  function dreamSnap() { const s = save(), o = {}; for (const k of DREAM_KEYS) o[k] = s[k] === undefined ? null : JSON.parse(JSON.stringify(s[k])); return o; }
+  const DREAM_KEEP = { camp: 1, settings: 1, clock: 1, gameMin: 1, playMs: 1, updated: 1 };
+  let dreamSave = null;
+  function dreamSnap() { const s = save(), o = {}; for (const k in s) if (!DREAM_KEEP[k]) o[k] = s[k] === undefined ? null : JSON.parse(JSON.stringify(s[k])); return o; }
+  // a bunch of distance weapons right away (the user, 2026-11-27): five shooters from cheap to fancy on the belt, slot 5
+  // chosen. Ammo is endless during the dream (K.useAmmo); the belt goes when you wake up (dreamSave).
+  function dreamGuns() {
+    if (!G.aim) return;
+    const ids = Object.keys(D.ITEMS).filter(id => D.ITEMS[id].type === 'gear' && G.aim.isShooter(D.ITEMS[id].weapon)).sort((a, b) => D.ITEMS[a].p - D.ITEMS[b].p);
+    if (!ids.length) return;
+    const n = Math.min(5, ids.length), pickIds = [];
+    for (let i = 0; i < n; i++) pickIds.push(ids[Math.round(i * (ids.length - 1) / Math.max(1, n - 1))]);
+    const s = save();
+    for (const id of pickIds) s.owned[id] = true;
+    G.aim.pickGun(pickIds[pickIds.length - 1], true);
+    G.aim.select('gun');
+    U.feed('🎯', 'Dream shooters: ' + pickIds.map(id => D.ITEMS[id].e).join(' ') + ' on slot 5 · scroll to switch');
+  }
+  K.dreamGuns = dreamGuns;
+  K.dreamBefore = () => dreamSave;   // tests: the save as it was when the dream began
   function wakeUp(c) {
     const s = save();
-    if (c.snap) for (const k of DREAM_KEYS) { if (c.snap[k] === null) delete s[k]; else s[k] = c.snap[k]; }
+    if (dreamSave) {
+      for (const k of Object.keys(s)) if (!DREAM_KEEP[k] && !(k in dreamSave)) delete s[k];
+      for (const k in dreamSave) { if (dreamSave[k] === null) delete s[k]; else s[k] = dreamSave[k]; }
+      dreamSave = null;
+    } else if (c.snap) for (const k of DREAM_KEYS) { if (c.snap[k] === null) delete s[k]; else s[k] = c.snap[k]; }
     delete c.snap;
     s.xp = 0; s.money = 0; s.savings = 0;
     if (s.rpg) s.rpg.rested = 0;
@@ -229,6 +257,7 @@ function attach(G, api) {
     W.setLook(G.playerLook());
     G.setRide(s.equip.ride || null);
     for (const k of G.rt.pickups.slice()) if (!k.mission && !k.dead) k.dead = 0.0001;   // the dream's coins vanish too
+    if (G.color && G.color.apply) G.color.apply('snap');   // colour blocks back to what they were before the dream
   }
   async function endIntro() {
     const c = st();

@@ -37,7 +37,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Borrowed cars | "can't borrow", "park spot wrong" | cft-hero `H.borrow` `H.park`, cft-world `W.borrowable` `W.borrowCar` `W.parkCar`, cft-game `findInteraction` | | --hero |
 | Smashing things | "lamp needs too many hits", "debris weird", "hydrant" | cft-world `W.hitProp` `debris` `updateSmash` `W.propNear`, cft-fun `smashProp` | `D.TUNE.smash` | --hero |
 | Fighting: monster attacks | "can't see it coming", "hits too hard" | cft-fun `windUp` `teleTick` `strike` `touch` `updateMonsters` | `D.TUNE.combat`, `D.MONSTERS` | --combat --hero |
-| Fighting: your hits | "aim jumps", "combo", "slap weak" | cft-fun `F.attack` `hitMonster` | `D.TUNE.combat`, weapons in `D.ITEMS` | --fun --hero |
+| Fighting: your hits | "aim jumps", "combo", "slap weak", "punch looks odd" | cft-fun `F.attack` `hitMonster`, the punch / swing pose in cft-world updatePlayer (`punching`, `punchSide`, `W.swing`) | `D.TUNE.combat`, weapons in `D.ITEMS` | --fun --hero |
 | Blocking / parry | "parry too hard", "block button" | cft-fun `F.setBlock` `strike`, cft-ui keys (`onKey` G, `[data-block]`; right mouse aims since 2026-11-19), cft-world block pose in `updatePlayer` | `D.TUNE.combat.parry/block` | --hero |
 | Monster spawning | "too many at night", "none by day" | cft-fun `updateMonsters` (top), `spawnMonster`, `monsterLevel` | `D.TUNE.monsters` | --combat |
 | Monster looks | "the goose looks odd" | cft-world `W.monster` `W.animateMonster` | | --monsters |
@@ -82,7 +82,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Boroughs (names, colours, banners, HUD chip) | "wrong borough", "two boroughs look alike", "banner too small", "chip covers the clock" | cft-world `LOOKS` `districtAt` `assignLooks` `pumpBoroughs` `PROP.banner` `dashes` (`DASH`), cft-tiles `places`, cft-rpg `boroughTick`, cft-ui hud tick (`[data-boro]`), CSS `.cft-boro` `.cft-banner.boro` | `BORO_MIX`, `BORO_R`, `LOOK_GAP` | --boro --boroshots |
 | Trees, bushes, lamps, halos, street furniture | "too many spruces", "bushes everywhere" | cft-world `TREE` / `TREE_LO` `treeKind` `leafShell`, `BUSH` (placed in `plantTrees`), tree colours in `buildSub`, `PROP`, `layProps`, halos in `W.setClock` | | --models --heroshots |
 | Sky, day/night, lighting, shadows | "night too dark" | cft-world `W.setClock` (`SKY`, `SKY_TOP`, `LIGHT`), lights at the top of `create` | | --shots |
-| Performance | "laggy" | cft-world `LOD_R` (full models only near you), `layProps` (density), bushes in `plantTrees`, `SHADOW`, `D.TUNE.world`; `W.renderInfo()` | | real device |
+| Performance | "laggy", "low fps" | cft-world quality governor `PERF_LEVELS` `applyPerf` `perfTick` (`W.perf()`, `W.setPerf(n)`), `syncModels` culling, `lodSub` shadow reach, `LOD_R` (full models only near you), `layProps` (density), bushes in `plantTrees`, `SHADOW`, `D.TUNE.world`; `W.renderInfo()` | `PERF_LEVELS` rows | real device |
 | Music, sounds | | cft-game `music` / `MUSIC`, `G.sfx` | | |
 | Saving | "progress lost" | cft-game `doSave`, cft-kit `persist` `loadSave`, server `server_code/Game.py` `put_save` | | ui_test |
 | Pages outside the game (Life, Quests, Album, Ranks, Landing) | | `client_code/Pages/<Name>/` (template + Python), data from cft-kit `VIEWS` | | ui_test |
@@ -98,7 +98,7 @@ figment: hp, atk, speed, coins), `D.OUTPOSTS` (+bonus and cap per kind), `D.RPG`
 | Sky (blimps, balloons, whale) | "blimp text" | cft-chaos `skyTick` `blimpModel` | `D.CHAOS.BLIMPS` | --chaosshots |
 | Hit-stop | "game freezes on hits" | cft-game `frame` (`rt.hitstop`), cft-chaos `hitstop` | `D.TUNE.chaos.hitstop` | --chaos |
 | Start over (new life) | "restart doesn't reset money/level" | cft-kit `CFT.reset` + `mountGame` onReset (`CFT.wiping`), cft-ui settings `case 'reset'`, server `reset_save` | none | node tools/testing/reset_test.js |
-| The opening (3 immortal minutes) | "too long", "too few figments", "lands too far from home" | cft-camp `K.startIntro` `introTick` `endIntro` `wakeUp` (fever dream: what is reset, `DREAM_KEYS`) `K.shrug`, cft-game `startWorld` (introPending) | `D.CAMPAIGN.INTRO_SECS`, `D.TUNE.camp.introFoes` | --camp |
+| The opening (3 immortal minutes) | "too long", "too few figments", "lands too far from home", "got an achievement in the dream", "dream shooters" | cft-camp `K.startIntro` `introTick` `endIntro` `wakeUp` (fever dream: the whole save back from `dreamSave`, `DREAM_KEEP`) `dreamGuns` `K.shrug`, cft-game `startWorld` (introPending) `G.dreaming` (no saves), cft-rpg `tick` + cft-ui `U.banner` (`DREAM_QUIET`) | `D.CAMPAIGN.INTRO_SECS`, `D.TUNE.camp.introFoes` | --camp |
 | Crazy list (one more per mission), mission cap | "storms too early", "show 4 missions" | cft-camp `K.allow` `tierTick` `K.capOpen`, cft-game `G.allow` `G.openMissions` | order of `D.CAMPAIGN.WILD`, `D.CAMPAIGN.CAP` | --camp |
 | Ammo, crates | "runs out too fast", "crates too far" | cft-camp `K.useAmmo` `manageCrates` `K.collect`, cft-fun `F.attack` (useAmmo) | `D.TUNE.camp.ammo*`, `crate*`, weapon `ammo` in `D.ITEMS` | --camp |
 | Water / lightning / extinguisher | "zap too weak", "water knocks too far" | cft-camp `K.power` `waterBlast` `zap` `bolt` `sprayTick` `aimDir`, cft-ui keys 1/2/3 + `[data-pw]` | `D.TUNE.camp.water*`, `volt*`, `wetMul`, `foamMax` | --camp |

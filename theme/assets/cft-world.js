@@ -21,6 +21,9 @@
 
 const CELL = 1.5, CH = 32, BUCKET = 25;
 const SHOW_R = 600, HIDE_R = 900, LOAD_R = 850, URGENT_R = 140;
+// The quality governor (2026-11-27, the user: "the app does seem heavier now and i am getting framerate issues"): see
+// PERF_LEVELS near W.frame. Level 0 = full quality; each step down trades a little look for speed.
+const PERF = { level: 0, shadowR: 170, shadowEvery: 1, detailR: 32, modelR: 150, modelShadowR: 45, pedK: 1 };
 const GRAV = 26;
 const EXAG = 1.5;  // hills are drawn 1.5x taller than real, so gentle slopes still show
 const TERRAIN_URL = 'https://tiles.mapterhorn.com/{z}/{x}/{y}.webp', TZ = 15, TZ_MIN = 8;
@@ -42,7 +45,7 @@ function create(opts) {
 
   // ---------------------------------------------------------------- renderer + scene
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !LOW, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW ? 1 : 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW ? 1 : 1.5));   // the governor (PERF_LEVELS) lowers it when slow
   renderer.shadowMap.enabled = !LOW;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // high quality: post-processing (cft-post.js: ambient occlusion, bloom, filmic grade). P.level drops itself when slow.
@@ -2695,7 +2698,8 @@ varying float vGL; varying vec2 vGUV;
       im.castShadow = !!shadow && !LOW; im.receiveShadow = false;
       return keep(kind, culled(im));
     };
-    for (const kind of ['lamp', 'bench', 'hydrant', 'bin', 'box']) if (pr[kind]) inst(kind, PROP[kind], MAT.prop, pr[kind], 3, true);
+    // small street furniture only near you (LOD_R; performance pass 2026-11-27): lamps stay, you see them from far at night
+    for (const kind of ['lamp', 'bench', 'hydrant', 'bin', 'box']) if (pr[kind]) { const im = inst(kind, PROP[kind], MAT.prop, pr[kind], 3, true); if (im && kind !== 'lamp' && !LOW) im.userData.lod = 'hi'; }
     if (pr.lamp) {
       inst('lamp', PROP.bulb, MAT.bulb, pr.lamp, 3, false);
       const pool = inst('lamp', PROP.pool, MAT.pool, pr.lamp, 3, false); if (pool) pool.renderOrder = 2;
@@ -2729,7 +2733,7 @@ varying float vGL; varying vec2 vGUV;
         if (tinted) im.setColorAt(i, dcol.setHex(list[i * 5 + 3]));
       }
       im.castShadow = !LOW && !flag && !kind.startsWith('chalk'); im.receiveShadow = false;
-      if (DECOR_HI.has(kind) && !LOW) im.userData.lod = 'hi';
+      if (!LOW && (DECOR_HI.has(kind) || !flag)) im.userData.lod = 'hi';   // every decor piece is a near-only detail (2026-11-27), bunting stays
       culled(im);
       if (DECOR_HP[kind]) keep(kind, im);
       return im;
@@ -2752,6 +2756,13 @@ varying float vGL; varying vec2 vGUV;
   function lodSub(s) {
     if (LOW || !s.group) return;
     const d = rectDist(s, player.pos.x, player.pos.z), near = s.near ? d < LOD_R + 20 : d < LOD_R;
+    // performance pass 2026-11-27: only sub-tiles that touch the shadow area (PERF.shadowR) cast shadows
+    const cast = s.cast ? d < PERF.shadowR + 20 : d < PERF.shadowR;
+    if (cast !== s.cast || s.castGroup !== s.group) {
+      if (s.castGroup !== s.group) { s.casters = []; s.group.traverse(o => { if (o.isMesh && o.castShadow) s.casters.push(o); }); s.castGroup = s.group; }
+      s.cast = cast;
+      for (const o of s.casters) o.castShadow = cast;
+    }
     if (near === s.near) return;
     s.near = near;
     for (const o of s.group.children) if (o.userData.lod) o.visible = (o.userData.lod === 'hi') === near;
@@ -4066,11 +4077,23 @@ varying float vGL; varying vec2 vGUV;
     o.castShadow = false;
     return o;
   }
+  const _frus = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(new THREE.Vector3(), 1.6), _gp = new THREE.Vector3();
   function syncModels(dt) {
+    camera.updateMatrixWorld();
+    _frus.setFromProjectionMatrix(_pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const cx = camera.position.x, cz = camera.position.z;
     for (const g of modelPeople) {
       const u = g.userData, m = u.model;
       if (!g.parent) { if (++m.miss > 240) modelPeople.delete(g); continue; }
       m.miss = 0;
+      g.getWorldPosition(_gp);
+      const d = Math.hypot(_gp.x - cx, _gp.z - cz);
+      _sph.center.set(_gp.x, _gp.y + 0.9, _gp.z);
+      const show = g === body || (d < PERF.modelR && _frus.intersectsSphere(_sph));
+      if (m.obj.visible !== show) m.obj.visible = show;
+      if (!show) continue;   // hidden: no bones to copy (the built figure keeps animating; it is hidden too)
+      const sh = !LOW && d < PERF.modelShadowR;
+      if (m.sh !== sh) { m.sh = sh; m.obj.traverse(o => { if (o.isMesh) o.castShadow = sh; }); }
       const B = m.bones;
       for (const [j, b] of MODEL_JOINTS) if (B[b] && u[j]) B[b].quaternion.copy(u[j].quaternion);
       const bp = u.body.position;
@@ -4672,7 +4695,7 @@ varying float vGL; varying vec2 vGUV;
     applyRidePose();
     holdWeapon();
   };
-  let weaponKind = null, weaponMesh = null, swingT = 0;
+  let weaponKind = null, weaponMesh = null, swingT = 0, punchSide = 1, punching = false;
   function holdWeapon() {
     if (weaponMesh && weaponMesh.parent) weaponMesh.parent.remove(weaponMesh);
     weaponMesh = null;
@@ -4697,7 +4720,10 @@ varying float vGL; varying vec2 vGUV;
     m.position.set(player.pos.x, y, player.pos.z); m.rotation.y = player.face + Math.PI / 2; m.renderOrder = 3;
     scene.add(m); arcs.push({ m, t: 0, life, ground });
   }
-  W.swing = function (reach, arc) { swingT = 0.3; if (reach) arcFx(reach, arc || 160, player.pos.y + 1.05, 0xfff6d0, 0.26); };
+  // bare hands punch (2026-11-27, the user: "make the punching more like punching, rather than raising a hand"): jab and
+  // cross, alternating fists; anything held is still swung overhead
+  W.swing = function (reach, arc) { swingT = 0.3; punching = !weaponKind; if (punching) punchSide = -punchSide; if (reach) arcFx(reach, arc || 160, player.pos.y + 1.05, 0xfff6d0, 0.26); };
+  W.punchSide = () => punchSide;
   W.showReach = function (reach) { if (reach) arcFx(reach, 360, player.pos.y + 0.3, 0xffc21f, 1.6, true); };
   W.arcCount = () => arcs.length;
   // The bonk reach on the ground, all the time (2026-11-21, the user: "a visual indication how far the melee attack reaches").
@@ -5081,7 +5107,20 @@ varying float vGL; varying vec2 vGUV;
       else if (k === 'skateboard' || k === 'kickscooter') { W.animate(body, 0, dt, 'ride'); body.rotation.y = k === 'skateboard' ? Math.PI / 2 * 0.9 : 0; }
       else { body.rotation.y = 0; W.animate(body, Math.abs(player.speed), dt, W.pose || null); }
       if (k !== 'skateboard') body.rotation.y = 0;
-      if (swingT > 0) { // an overhead smash: up fast, down hard
+      if (swingT > 0 && punching) { // a punch: fist chambered at the chin, snapped straight out with a shoulder turn, back to guard
+        swingT -= dt;
+        const t = 1 - Math.max(0, swingT) / 0.3, u = body.userData, R = punchSide > 0;
+        const [arm, elbow, garm, gelbow, sz] = R ? [u.armR, u.elbowR, u.armL, u.elbowL, -1] : [u.armL, u.elbowL, u.armR, u.elbowR, 1];
+        // 0-0.2 chamber, 0.2-0.45 strike (fast, eased out), 0.45-0.65 hold, 0.65-1 back to the chin
+        const out = t < 0.2 ? 0 : t < 0.45 ? 1 - Math.pow(1 - (t - 0.2) / 0.25, 3) : t < 0.65 ? 1 : 1 - (t - 0.65) / 0.35;
+        arm.rotation.x = 1.0 + 0.58 * out;                // from the chin to straight forward, shoulder height
+        arm.rotation.z = sz * (0.32 - 0.24 * out);       // the fist comes in to the centre line
+        elbow.rotation.x = 2.15 * (1 - out) + 0.06;      // the elbow straightens as it lands
+        garm.rotation.x = 1.25; garm.rotation.z = -sz * 0.42; gelbow.rotation.x = 2.1;   // the other fist guards the face
+        u.body.rotation.y = -sz * 0.32 * out;            // the shoulder drives the punch
+        u.body.rotation.x = -0.1 * out;                  // and a little lean in
+        if (swingT <= 0) { u.body.rotation.y = 0; u.body.rotation.x = 0; }
+      } else if (swingT > 0) { // an overhead smash: up fast, down hard
         swingT -= dt;
         const t = 1 - Math.max(0, swingT) / 0.3;
         body.userData.armR.rotation.x = t < 0.3 ? 0.5 + t / 0.3 * 2.5 : 3.0 - (t - 0.3) / 0.7 * 2.3;   // up over the head, then down in front
@@ -5926,7 +5965,8 @@ varying float vGL; varying vec2 vGUV;
   // move when you come back) as soon as every sub-tile under it is built, and cached (DET_KEEP cells). Two InstancedMeshes
   // (one draw call each) are refilled from the cells within DET_R whenever you cross into another cell; tufts and pebbles
   // shrink to nothing over the last DET_FADE metres so the edge doesn't pop. Off on low quality. W.groundDetail() = stats.
-  const DET_CELL = 8, DET_R = 32, DET_FADE = 8, DET_KEEP = 400, DET_GRASS_MAX = 26000, DET_PEB_MAX = 7000;
+  let DET_R = 32;
+  const DET_CELL = 8, DET_FADE = 8, DET_KEEP = 400, DET_GRASS_MAX = 26000, DET_PEB_MAX = 7000;
   // per kind: [tufts, pebbles] per cell (64 m²), tuft height range, the pebble palette
   const DET_KIND = {
     grass: [420, 6, 0.17, 0.33], park: [420, 6, 0.17, 0.33], cemetery: [360, 10, 0.12, 0.24], pitch: [520, 0, 0.06, 0.1],
@@ -6063,7 +6103,8 @@ varying float vGL; varying vec2 vGUV;
     if (detPeb.instanceColor) detPeb.instanceColor.needsUpdate = true;
   }
   function updateDetail(dt) {
-    if (LOW || W.detailOff) { if (detGrass) detGrass.count = detPeb.count = 0; return; }
+    if (DET_R !== PERF.detailR) { DET_R = PERF.detailR; detKey = ''; }
+    if (LOW || W.detailOff || DET_R <= 0) { if (detGrass) detGrass.count = detPeb.count = 0; return; }
     detUniforms.uTime.value += dt;
     detailMeshes();
     const px = player.pos.x, pz = player.pos.z, key = Math.floor(px / 4) + ',' + Math.floor(pz / 4);
@@ -6093,11 +6134,53 @@ varying float vGL; varying vec2 vGUV;
   // every frame goes through here: post-processing on high quality, else straight to the screen
   let lastDraw = 0;
   let lastSync = 0;
+  // ---------------------------------------------------------------- the quality governor (2026-11-27)
+  // Frame times are averaged; ~2 s of frames under 45 fps steps one level down, ~8 s over 57 fps one level up (never sooner
+  // than 6 s after a change, so it doesn't flicker). Per level: render resolution (pixel ratio cap), how often the shadow
+  // map is redrawn, how far shadows reach, ambient occlusion (post level), grass radius, how far realistic people are
+  // drawn and cast shadows, and how many people walk around. Settings > Quality "low" still means LOW (no shadows at all).
+  // W.perf() = the state; W.setPerf(n) pins a level (tests, the play-test panel); W.setPerf(null) lets it adapt again.
+  const PERF_LEVELS = [
+    { px: 1.5, shadowEvery: 1, shadowR: 170, post: 2, detailR: 32, modelR: 150, modelShadowR: 45, pedK: 1 },
+    { px: 1.25, shadowEvery: 2, shadowR: 150, post: 2, detailR: 28, modelR: 130, modelShadowR: 35, pedK: 1 },
+    { px: 1.0, shadowEvery: 2, shadowR: 130, post: 1, detailR: 22, modelR: 110, modelShadowR: 25, pedK: 0.85 },
+    { px: 0.85, shadowEvery: 3, shadowR: 120, post: 1, detailR: 14, modelR: 90, modelShadowR: 18, pedK: 0.7 },
+    { px: 0.7, shadowEvery: 4, shadowR: 110, post: 0, detailR: 0, modelR: 75, modelShadowR: 0, pedK: 0.55 },
+  ];
+  const gov = { ema: 1 / 60, slow: 0, fast: 0, since: 0, pinned: null, frames: 0, last: 0, dpr: window.devicePixelRatio || 1, off: /[?&]noperf=1/.test(location.search) };
+  function applyPerf(n) {
+    n = Math.max(0, Math.min(PERF_LEVELS.length - 1, n));
+    const L = PERF_LEVELS[n];
+    PERF.level = n;
+    Object.assign(PERF, { shadowR: L.shadowR, shadowEvery: L.shadowEvery, detailR: L.detailR, modelR: L.modelR, modelShadowR: L.modelShadowR, pedK: L.pedK });
+    const pr = Math.min(gov.dpr, LOW ? 1 : L.px);
+    if (Math.abs(renderer.getPixelRatio() - pr) > 0.01) { renderer.setPixelRatio(pr); resize(); }
+    if (POST) POST.level = L.post;   // the governor replaces cft-post's one-way watchdog (POST.adapt is no longer called)
+    life.max = Math.round((LOW ? TW.pedsLow : TW.peds) * L.pedK);
+    for (const s of allSubs) s.cast = undefined;   // lodSub re-decides shadows with the new reach
+    lodT = 0;
+    gov.since = 0;
+  }
+  function perfTick(dt) {
+    if (!(dt > 0) || dt > 0.5) return;   // pauses, tab switches
+    if (gov.off || (window.CFT_TEST && !window.CFT_TEST.perf)) return;   // the test harness (?noperf=1) renders in software: frame times mean nothing there
+    gov.ema += (dt - gov.ema) * 0.08;
+    gov.since += dt;
+    if (gov.pinned != null || gov.since < 6) return;
+    if (gov.ema > 1 / 45) { gov.slow += dt; gov.fast = 0; } else if (gov.ema < 1 / 57) { gov.fast += dt; gov.slow = 0; } else { gov.slow = Math.max(0, gov.slow - dt); gov.fast = Math.max(0, gov.fast - dt); }
+    if (gov.slow > 2 && PERF.level < PERF_LEVELS.length - 1) { gov.slow = 0; applyPerf(PERF.level + 1); }
+    else if (gov.fast > 8 && PERF.level > 0) { gov.fast = 0; applyPerf(PERF.level - 1); }
+  }
+  W.perf = () => Object.assign({ fps: Math.round(1 / gov.ema), pixelRatio: renderer.getPixelRatio(), post: POST ? POST.level : -1, pinned: gov.pinned, peds: life.max }, PERF);
+  W.setPerf = n => { gov.pinned = n; if (n != null) applyPerf(n); };
+  if (!LOW) { renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; }
+  applyPerf(0);
   function draw(live) {
+    if (!LOW) { gov.frames++; if (gov.frames % PERF.shadowEvery === 0 || !live) renderer.shadowMap.needsUpdate = true; }
+    if (live) { const now = performance.now(); if (gov.last) perfTick((now - gov.last) / 1000); gov.last = now; }
     if (modelPeople.size) { const now = performance.now(); syncModels(Math.min(0.1, lastSync ? (now - lastSync) / 1000 : 0)); lastSync = now; }
     if (!POST) { renderer.render(scene, camera); return; }
     POST.render(scene, camera);
-    if (live) { const now = performance.now(); if (lastDraw) POST.adapt((now - lastDraw) / 1000); lastDraw = now; }
   }
 
   // ---------------------------------------------------------------- little effects: bursts of emoji, comic words

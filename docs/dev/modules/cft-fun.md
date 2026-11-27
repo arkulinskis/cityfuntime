@@ -243,3 +243,5 @@ Pitfalls:
 ## 2026-11-27: realistic street people
 Sweethearts (`updateSweet` crush spawns), street folk (`spawnFolk`, `folkLook`) and shopkeepers who chase you are built
 with `W.realPerson` (the closest realistic townsperson to their look; cft-world). Low quality keeps the built figures.
+
+Bare hands are called "👊 Fists" since 2026-11-27 (`weapon()`), and the player punches with them (cft-world `W.swing`).

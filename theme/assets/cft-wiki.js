@@ -77,7 +77,7 @@ function mount(root, opts) {
   const meleeIds = () => Object.keys(D.ITEMS).filter(id => D.ITEMS[id].weapon && (!D.ITEMS[id].weapon.ranged || D.ITEMS[id].weapon.ranged === 'cone')).sort((a, b) => D.ITEMS[a].p - D.ITEMS[b].p);
   const shooterIds = () => Object.keys(D.ITEMS).filter(id => { const w = D.ITEMS[id].weapon; return w && (w.ranged === 'proj' || w.ranged === 'shot'); }).sort((a, b) => D.ITEMS[a].p - D.ITEMS[b].p);
   const weaponOf = id => (id && D.ITEMS[id] && D.ITEMS[id].weapon) || D.SLAP;
-  const weaponName = id => id && D.ITEMS[id] ? D.ITEMS[id].e + ' ' + D.ITEMS[id].n : '🖐️ Bare hands';
+  const weaponName = id => id && D.ITEMS[id] ? D.ITEMS[id].e + ' ' + D.ITEMS[id].n : '👊 Fists';
   function hitDmg(L, w) { return (w.dmg + (w.add || 0)) * C.dmgMul(L) * (1 + ctx.gear / 100); }   // + the weapon's strength adder   // one ordinary hit of yours (before combos, counters, crits)
   function gearRatio(w) { return Math.max(1, Math.min(40, (w.dmg + (w.add || 0)) * (1 + ctx.gear / 100) / (D.SLAP.dmg + (D.SLAP.add || 0)))); }
   function foe(kind, L, lvl, w) { // a figment of `kind` at level lvl when you are level L holding w
@@ -95,7 +95,7 @@ function mount(root, opts) {
       '<label>Fitness <input type="text" inputmode="numeric" data-ctx="fit" value="' + ctx.fit + '"></label>' +
       '<label>Armour <input type="text" inputmode="numeric" data-ctx="armor" value="' + ctx.armor + '"></label>' +
       '<label>Damage bonus % <input type="text" inputmode="numeric" data-ctx="gear" value="' + ctx.gear + '"></label>' +
-      '<label>Weapon <select data-ctx="weapon"><option value="">🖐️ Bare hands</option>' + meleeIds().map(id => '<option value="' + id + '"' + (ctx.weapon === id ? ' selected' : '') + '>' + esc(D.ITEMS[id].e + ' ' + D.ITEMS[id].n) + '</option>').join('') + '</select></label></div>';
+      '<label>Weapon <select data-ctx="weapon"><option value="">👊 Fists</option>' + meleeIds().map(id => '<option value="' + id + '"' + (ctx.weapon === id ? ' selected' : '') + '>' + esc(D.ITEMS[id].e + ' ' + D.ITEMS[id].n) + '</option>').join('') + '</select></label></div>';
   }
 
   // ------------------------------------------------------------------ the sections
@@ -201,7 +201,7 @@ function mount(root, opts) {
   VIEW.weapons = function () {
     const L = ctx.L;
     const B = id => id ? 'ITEMS.' + id + '.weapon.' : 'SLAP.';
-    const who = (id, it) => '<td class="wk-who"><span class="wk-e">' + (it ? it.e : '🖐️') + '</span><b>' + esc(it ? it.n : 'Bare hands') + '</b><small>' + (it ? '$' + it.p + (it.req && it.req.lvl ? ' · level ' + it.req.lvl : '') : 'always') + '</small></td>';
+    const who = (id, it) => '<td class="wk-who"><span class="wk-e">' + (it ? it.e : '👊') + '</span><b>' + esc(it ? it.n : 'Fists') + '</b><small>' + (it ? '$' + it.p + (it.req && it.req.lvl ? ' · level ' + it.req.lvl : '') : 'always') + '</small></td>';
     const mrow = id => {
       const it = id ? D.ITEMS[id] : null, w = weaponOf(id), b = B(id), cd = w.cd || 0.42, hit = hitDmg(L, w) * 10, crit = 1 + (w.crit || 0);
       return '<tr>' + who(id, it) + ['dmg', 'add', 'reach', 'arc', 'cd', 'hits', 'knock', 'stun', 'crit', 'def', 'block'].map(k => '<td>' + num(b + k, { unit: k === 'reach' ? 'm' : k === 'arc' ? '°' : k === 'cd' || k === 'stun' ? 's' : '' }) + '</td>').join('') +

@@ -57,6 +57,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0]
+        if path == "/_/progress":   # CFT_PROGRESS=<file>: a test's checks as they happen (a hung or crashed page still leaves a trail)
+            if os.environ.get("CFT_PROGRESS"):
+                import urllib.parse
+                with open(os.environ["CFT_PROGRESS"], "a", encoding="utf-8") as fh:
+                    fh.write(urllib.parse.unquote(self.path.split("m=", 1)[-1]) + "\n")
+            return self.send(204, "text/plain", b"")
         if path in ("/", "/index.html"):
             v = str(int(max(f.stat().st_mtime for f in ASSETS.glob("*.js"))))
             metas = "\n".join('<meta name="cft-asset" content="_/theme/%s?v=%s">' % (n, v) for n in ENGINE)

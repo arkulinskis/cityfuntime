@@ -90,10 +90,14 @@ window.__campOut = []; window.__campDone = false;
     ok(K.fires.length > 0 && !!K.storm, 'fires and a lightning storm during the opening (' + K.fires.length + ' fires)');
     const hp0 = F.hp(); F.hurt(999); ok(F.hp() === hp0 && !F.dying, 'you can\'t die during the opening');
     ok(K.useAmmo({ ammo: 3 }) && /∞/.test(document.querySelector('[data-pwn="water"]').textContent), 'infinite ammo and powers during the opening');
+    // 2026-11-27: shooters right away, nothing saved, no achievements
+    ok(G.aim && G.aim.guns().length >= 3 && G.aim.slot() === 'gun', 'a belt of shooters from the start of the dream (' + (G.aim ? G.aim.guns().length : 0) + ', slot ' + (G.aim && G.aim.slot()) + ')');
+    { const before = s.updated; G.saveNow('test'); ok(s.updated === before && G.dreaming(), 'nothing is saved during the dream'); }
+    { let shown = 0; const ob = G.ui.banner; G.ui.banner('🏆 Test achievement', 'x', 'ach'); G.ui.banner('⭐ Level 2', 'x', 'level'); ok(!document.querySelector('.cft-banner') || !/Test achievement|Level 2/.test(document.body.textContent), 'no achievement or level banners during the dream'); }
     // things you 'get' in the dream: money, XP (levels), a weapon, loot, a sticker, a counter
     if (s.rpg && s.rpg.loot && s.rpg.loot.length > 10) { const keep = new Set(Object.values(s.rpg.eq || {})); s.rpg.loot = s.rpg.loot.filter((x, i) => keep.has(x.id) || i < 10); }   // room in the bag (the full run fills it)
     // compare with the game's own snapshot from when the dream began (things can already happen in the dream before this line)
-    const sn = (s.camp && s.camp.snap) || {}, before = sn.counters ? { loot: (sn.rpg && sn.rpg.loot || []).length, tshirt: !!(sn.owned || {}).w_tshirt, stickers: JSON.stringify(sn.stickers), bonks: (sn.counters || {}).bonks || 0 }
+    const sn = (K.dreamBefore && K.dreamBefore()) || (s.camp && s.camp.snap) || {}, before = sn.counters ? { loot: (sn.rpg && sn.rpg.loot || []).length, tshirt: !!(sn.owned || {}).w_tshirt, stickers: JSON.stringify(sn.stickers), bonks: (sn.counters || {}).bonks || 0 }
       : { loot: (s.rpg && s.rpg.loot || []).length, tshirt: !!s.owned.w_tshirt, stickers: JSON.stringify(s.stickers), bonks: c('bonks') };
     s.money += 777; s.xp = G.xpAt(6); s.owned.w_tshirt = true; s.equip.weapon = 'w_tshirt'; if (G.rpg) { G.rpg.drop('boss'); G.rpg.drop('chest'); } G.addSticker(); s.counters.bonks = (s.counters.bonks || 0) + 50;
     ok(G.level() >= 6 && (s.rpg.loot || []).length > before.loot, 'in the dream you level up and find things (level ' + G.level() + ', ' + (s.rpg.loot || []).length + ' loot)');
